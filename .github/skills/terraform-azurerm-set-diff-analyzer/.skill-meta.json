@@ -1,0 +1,8 @@
+{
+  "name": "terraform-azurerm-set-diff-analyzer",
+  "source": "github/awesome-copilot",
+  "description": "Analyze Terraform plan JSON output for AzureRM Provider to distinguish between false-positive diffs (order-only changes in Set-type attributes) and actual resource changes.",
+  "whenToUse": "Use when reviewing terraform plan output for Azure resources showing spurious diffs due to Set-type attribute ordering changes.",
+  "categories": [],
+  "installedAt": "2026-05-06T09:33:21.595Z"
+}

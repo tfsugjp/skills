@@ -1,0 +1,8 @@
+{
+  "name": "containerize-aspnetcore",
+  "source": "github/awesome-copilot",
+  "description": "Containerize an ASP.NET Core project by creating Dockerfile and .dockerfile files customized for the project.",
+  "whenToUse": "Use when you need to containerize an ASP.NET Core application.",
+  "categories": [],
+  "installedAt": "2026-05-06T09:33:21.595Z"
+}
