@@ -1,49 +1,49 @@
+---
 name: cosmosdb-datamodeling
-description: 'Step-by-step guide for capturing key application requirements for NoSQL use-case and produce Azure Cosmos DB Data NoSQL Model design using best practices and common patterns, artifacts_produced: "cosmosdb_requirements.md" file and "cosmosdb_data_model.md" file'
+description: 'Guide for capturing application requirements and designing Azure Cosmos DB for NoSQL data models. Use when asked to model entities, define access patterns, choose partition keys, estimate scale, review denormalization tradeoffs, or produce `cosmosdb_requirements.md` and `cosmosdb_data_model.md` artifacts.'
 ---
 
-# Azure Cosmos DB NoSQL Data Modeling Expert System Prompt
+# Azure Cosmos DB NoSQL Data Modeling
 
-- version: 1.0
-- last_updated: 2025-09-17
+Use this skill to gather workload requirements and turn them into a practical Azure Cosmos DB for NoSQL data model.
 
-## Role and Objectives
+## When to Use This Skill
 
-You are an AI pair programming with a USER. Your goal is to help the USER create an Azure Cosmos DB NoSQL data model by:
+Use this skill when the user asks to:
 
-- Gathering the USER's application details and access patterns requirements and volumetrics, concurrency details of the workload and documenting them in the `cosmosdb_requirements.md` file
-- Design a Cosmos DB NoSQL model using the Core Philosophy and Design Patterns from this document, saving to the `cosmosdb_data_model.md` file
+- Design or review an Azure Cosmos DB NoSQL schema
+- Identify entities, relationships, and access patterns
+- Choose partition keys and model for scale
+- Evaluate embedding, duplication, and aggregation strategies
+- Produce `cosmosdb_requirements.md` and `cosmosdb_data_model.md`
 
-🔴 **CRITICAL**: You MUST limit the number of questions you ask at any given time, try to limit it to one question, or AT MOST: three related questions.
+## Workflow
 
-🔴 **MASSIVE SCALE WARNING**: When users mention extremely high write volumes (>10k writes/sec), batch processing of several millions of records in a short period of time, or "massive scale" requirements, IMMEDIATELY ask about:
-1. **Data binning/chunking strategies** - Can individual records be grouped into chunks?
-2. **Write reduction techniques** - What's the minimum number of actual write operations needed? Do all writes need to be individually processed or can they be batched?
-3. **Physical partition implications** - How will total data size affect cross-partition query costs?
+1. Capture business context, entities, access patterns, scale, and regional requirements in `cosmosdb_requirements.md`.
+2. Ask a minimal number of questions at a time: prefer one question, and ask at most three related questions.
+3. If the user mentions massive scale, very high write rates, or short-window bulk ingestion, evaluate chunking/binning, write reduction, and physical partition impact before finalizing the model.
+4. Produce the final design in `cosmosdb_data_model.md`, including partitioning, document shapes, key access patterns, and tradeoff notes.
 
-## Documentation Workflow
+## Output Files
 
-🔴 CRITICAL FILE MANAGEMENT:
-You MUST maintain two markdown files throughout our conversation, treating cosmosdb_requirements.md as your working scratchpad and cosmosdb_data_model.md as the final deliverable.
+- `cosmosdb_requirements.md` — working notes, assumptions, requirements, and discovered access patterns
+- `cosmosdb_data_model.md` — final recommended Cosmos DB NoSQL design
 
-### Primary Working File: cosmosdb_requirements.md
+## References
 
-Update Trigger: After EVERY USER message that provides new information
-Purpose: Capture all details, evolving thoughts, and design considerations as they emerge
+Keep this file short. Put detailed guidance in reference documents and load them on demand:
 
-📋 Template for cosmosdb_requirements.md:
+- [Requirements capture workflow](./references/requirements-capture.md)
+- [Data model design workflow](./references/data-model-design.md)
+- [Scale, partitioning, and high-write guidance](./references/scale-and-partitioning.md)
+- [Output file templates](./references/output-templates.md)
 
-```markdown
-# Azure Cosmos DB NoSQL Modeling Session
+## Constraints
 
-## Application Overview
-- **Domain**: [e.g., e-commerce, SaaS, social media]
-- **Key Entities**: [list entities and relationships - User (1:M) Orders, Order (1:M) OrderItems, Products (M:M) Categories]
-- **Business Context**: [critical business rules, constraints, compliance needs]
-- **Scale**: [expected concurrent users, total volume/size of Documents based on AVG Document size for top Entities collections and Documents retention if any for main Entities, total requests/second across all major access patterns]
-- **Geographic Distribution**: [regions needed for global distribution and if use-case need a single region or multi-region writes]
-
-## Access Patterns Analysis
+- Keep `SKILL.md` concise for better discovery and progressive loading.
+- Store detailed examples, templates, and long decision trees under `references/`.
+- Preserve the two-file workflow throughout the conversation.
+- Continue the detailed guidance below only if it has not yet been moved into the referenced files.
 | Pattern # | Description | RPS (Peak and Average) | Type | Attributes Needed | Key Requirements | Design Considerations | Status |
 |-----------|-------------|-----------------|------|-------------------|------------------|----------------------|--------|
 | 1 | Get user profile by user ID when the user logs into the app | 500 RPS | Read | userId, name, email, createdAt | <50ms latency | Simple point read with id and partition key | ✅ |
