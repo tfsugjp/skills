@@ -10,17 +10,17 @@ Update Bicep file `${file}` to use latest Azure Verified Module (AVM) versions. 
 ## Process
 
 1. **Scan**: Extract AVM modules and current versions from `${file}`
-1. **Identify**: List all unique AVM modules used by matching `avm/res/{service}/{resource}` using `#search` tool
-1. **Check**: Use `#fetch` tool to get latest version of each AVM module from MCR: `https://mcr.microsoft.com/v2/bicep/avm/res/{service}/{resource}/tags/list`
+1. **Identify**: List all unique AVM modules used by matching `avm/res/{service}/{resource}` using the `search` tool
+1. **Check**: Use the `fetch` tool to get latest version of each AVM module from MCR: `https://mcr.microsoft.com/v2/bicep/avm/res/{service}/{resource}/tags/list`
 1. **Compare**: Parse semantic versions to identify AVM modules needing update
-1. **Review**: For breaking changes, use `#fetch` tool to get docs from: `https://github.com/Azure/bicep-registry-modules/tree/main/avm/res/{service}/{resource}`
-1. **Update**: Apply version updates and parameter changes using `#editFiles` tool
-1. **Validate**: Run `bicep lint` and `bicep build` using `#runCommands` tool to ensure compliance.
+1. **Review**: For breaking changes, use the `fetch` tool to get docs from: `https://github.com/Azure/bicep-registry-modules/tree/main/avm/res/{service}/{resource}`
+1. **Update**: Apply version updates and parameter changes using `editFiles`
+1. **Validate**: Run `bicep lint` and `bicep build` using `runCommands` to ensure compliance.
 1. **Output**: Summarize changes in a table format with summary of updates below.
 
 ## Tool Usage
 
-Always use tools `#search`, `#searchResults`,`#fetch`, `#editFiles`, `#runCommands`, `#todos` if available. Avoid writing code to perform tasks.
+Always use tools `search`, `searchResults`, `fetch`, `editFiles`, `runCommands`, and `todos` if available. Avoid writing code to perform tasks.
 
 ## Breaking Change Policy
 
