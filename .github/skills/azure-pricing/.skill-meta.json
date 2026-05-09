@@ -1,0 +1,8 @@
+{
+  "name": "azure-pricing",
+  "source": "github/awesome-copilot",
+  "description": "Fetches real-time Azure retail pricing using the Azure Retail Prices API and estimates Copilot Studio agent credit consumption.",
+  "whenToUse": "Use when the user asks about the cost of any Azure service, wants to compare SKU prices, needs pricing data for a cost estimate, or asks about Azure billing.",
+  "categories": [],
+  "installedAt": "2026-05-06T09:33:21.595Z"
+}

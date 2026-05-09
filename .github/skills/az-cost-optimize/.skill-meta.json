@@ -1,0 +1,8 @@
+{
+  "name": "az-cost-optimize",
+  "source": "github/awesome-copilot",
+  "description": "Analyze Azure resources used in the app (IaC files and/or resources in a target rg) and optimize costs - creating GitHub issues for identified optimizations.",
+  "whenToUse": "Use when you need to analyze Azure resources and optimize costs.",
+  "categories": [],
+  "installedAt": "2026-05-06T09:33:21.595Z"
+}

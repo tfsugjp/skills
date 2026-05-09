@@ -1,0 +1,8 @@
+{
+  "name": "update-avm-modules-in-bicep",
+  "source": "github/awesome-copilot",
+  "description": "Update Azure Verified Modules (AVM) to latest versions in Bicep files.",
+  "whenToUse": "Use when you need to update AVM module versions in Bicep files.",
+  "categories": [],
+  "installedAt": "2026-05-06T09:33:21.595Z"
+}

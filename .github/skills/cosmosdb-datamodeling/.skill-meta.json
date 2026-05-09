@@ -1,0 +1,8 @@
+{
+  "name": "cosmosdb-datamodeling",
+  "source": "github/awesome-copilot",
+  "description": "Step-by-step guide for capturing key application requirements for NoSQL use-case and produce Azure Cosmos DB Data NoSQL Model design using best practices and common patterns.",
+  "whenToUse": "Use when designing Azure Cosmos DB data models for NoSQL applications.",
+  "categories": [],
+  "installedAt": "2026-05-06T09:33:21.595Z"
+}

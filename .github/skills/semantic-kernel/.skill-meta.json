@@ -1,0 +1,8 @@
+{
+  "name": "semantic-kernel",
+  "source": "github/awesome-copilot",
+  "description": "Create, update, refactor, explain, or review Semantic Kernel solutions using shared guidance plus language-specific references for .NET and Python.",
+  "whenToUse": "Use when working with applications, plugins, function-calling flows, or AI integrations built on Semantic Kernel.",
+  "categories": [],
+  "installedAt": "2026-05-06T09:33:21.595Z"
+}
