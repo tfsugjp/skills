@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 
@@ -107,10 +108,10 @@ async Task<CommandResult> ValidateAsync(HttpClient httpClient, string packageId,
 
 async Task<CommandResult> AuditProjectAsync(string projectOrSolutionPath)
 {
-    var first = await RunDotnetAsync($"package list --project \"{projectOrSolutionPath}\" --vulnerable --include-transitive");
+    var first = await RunDotnetAsync("package", "list", "--project", projectOrSolutionPath, "--vulnerable", "--include-transitive");
     var audit = first.ExitCode == 0 || !LooksLikeUnsupportedCommand(first.Output)
         ? first
-        : await RunDotnetAsync($"list \"{projectOrSolutionPath}\" package --vulnerable --include-transitive");
+        : await RunDotnetAsync("list", projectOrSolutionPath, "package", "--vulnerable", "--include-transitive");
 
     var hasVulnerabilities = LooksLikeVulnerabilityOutput(audit.Output);
     var commandFailed = audit.ExitCode != 0;
@@ -130,6 +131,11 @@ async Task<CommandResult> AuditProjectAsync(string projectOrSolutionPath)
 ValidationResult CreateValidation(PackageInfo package)
 {
     var issues = new List<ValidationIssue>();
+
+    if (!package.Listed)
+    {
+        issues.Add(new ValidationIssue(IssueSeverity.Error, "Package version is unlisted."));
+    }
 
     foreach (var vulnerability in package.Vulnerabilities)
     {
@@ -355,21 +361,26 @@ DateTimeOffset GetDate(JsonElement element, string propertyName)
         : DateTimeOffset.MinValue;
 }
 
-async Task<ProcessResult> RunDotnetAsync(string arguments)
+async Task<ProcessResult> RunDotnetAsync(params string[] arguments)
 {
-    var startInfo = new ProcessStartInfo("dotnet", arguments)
+    var startInfo = new ProcessStartInfo("dotnet")
     {
         RedirectStandardOutput = true,
         RedirectStandardError = true,
         UseShellExecute = false
     };
 
+    foreach (var argument in arguments)
+    {
+        startInfo.ArgumentList.Add(argument);
+    }
+
     using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start dotnet process.");
     var output = await process.StandardOutput.ReadToEndAsync();
     var error = await process.StandardError.ReadToEndAsync();
     await process.WaitForExitAsync();
 
-    return new ProcessResult($"dotnet {arguments}", process.ExitCode, string.Join(Environment.NewLine, [output, error]).Trim());
+    return new ProcessResult(BuildCommandDisplay(arguments), process.ExitCode, string.Join(Environment.NewLine, [output, error]).Trim());
 }
 
 bool LooksLikeUnsupportedCommand(string output)
@@ -466,6 +477,27 @@ string ToJson(CommandResult result)
 
     builder.AppendLine("}");
     return builder.ToString();
+}
+
+string BuildCommandDisplay(IEnumerable<string> arguments)
+{
+    return string.Join(" ", new[] { "dotnet" }.Concat(arguments.Select(QuoteArgument)));
+}
+
+string QuoteArgument(string argument)
+{
+    if (argument.Length == 0)
+    {
+        return "\"\"";
+    }
+
+    var needsQuoting = argument.Any(char.IsWhiteSpace) || argument.Contains('"') || argument.Contains('\'');
+    if (!needsQuoting)
+    {
+        return argument;
+    }
+
+    return "\"" + argument.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 }
 
 StringBuilder AppendIndent(StringBuilder builder, int level) => builder.Append(' ', level * 2);
@@ -591,17 +623,22 @@ public enum IssueSeverity
     Error
 }
 
-public sealed record SemVerKey(int[] Parts, string? Prerelease)
+public sealed record SemVerKey(int[] Parts, SemVerIdentifier[] Prerelease)
 {
     public static SemVerKey Parse(string version)
     {
-        var split = version.Split('-', 2);
+        var normalized = version.Split('+', 2)[0];
+        var split = normalized.Split('-', 2);
         var parts = split[0]
             .Split('.', StringSplitOptions.RemoveEmptyEntries)
-            .Select(part => int.TryParse(part, out var number) ? number : 0)
+            .Select(part => int.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out var number) ? number : 0)
             .ToArray();
 
-        return new SemVerKey(parts, split.Length > 1 ? split[1] : null);
+        var prerelease = split.Length > 1
+            ? split[1].Split('.', StringSplitOptions.RemoveEmptyEntries).Select(SemVerIdentifier.Parse).ToArray()
+            : [];
+
+        return new SemVerKey(parts, prerelease);
     }
 }
 
@@ -638,16 +675,66 @@ public sealed class SemVerKeyComparer : IComparer<SemVerKey>
             }
         }
 
-        if (x.Prerelease is null && y.Prerelease is not null)
+        if (x.Prerelease.Length == 0 && y.Prerelease.Length > 0)
         {
             return 1;
         }
 
-        if (x.Prerelease is not null && y.Prerelease is null)
+        if (x.Prerelease.Length > 0 && y.Prerelease.Length == 0)
         {
             return -1;
         }
 
-        return string.Compare(x.Prerelease, y.Prerelease, StringComparison.OrdinalIgnoreCase);
+        var prereleaseLength = Math.Max(x.Prerelease.Length, y.Prerelease.Length);
+        for (var i = 0; i < prereleaseLength; i++)
+        {
+            if (i >= x.Prerelease.Length)
+            {
+                return -1;
+            }
+
+            if (i >= y.Prerelease.Length)
+            {
+                return 1;
+            }
+
+            var comparison = ComparePrereleaseIdentifier(x.Prerelease[i], y.Prerelease[i]);
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+        }
+
+        return 0;
+    }
+
+    int ComparePrereleaseIdentifier(SemVerIdentifier left, SemVerIdentifier right)
+    {
+        if (left.IsNumeric && right.IsNumeric)
+        {
+            return left.NumericValue.CompareTo(right.NumericValue);
+        }
+
+        if (left.IsNumeric)
+        {
+            return -1;
+        }
+
+        if (right.IsNumeric)
+        {
+            return 1;
+        }
+
+        return string.Compare(left.Value, right.Value, StringComparison.Ordinal);
+    }
+}
+
+public sealed record SemVerIdentifier(string Value, bool IsNumeric, int NumericValue)
+{
+    public static SemVerIdentifier Parse(string value)
+    {
+        return int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+            ? new SemVerIdentifier(value, true, number)
+            : new SemVerIdentifier(value, false, 0);
     }
 }
