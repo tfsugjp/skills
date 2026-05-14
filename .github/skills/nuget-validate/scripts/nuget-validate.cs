@@ -1,3 +1,4 @@
+#!dotnet script
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -175,7 +176,8 @@ async Task<PackageInfo?> GetPackageAsync(HttpClient httpClient, string packageId
             continue;
         }
 
-        return MapPackage(catalogEntry);
+        var listed = !leaf.TryGetProperty("listed", out var listedElement) || listedElement.GetBoolean();
+        return MapPackage(catalogEntry, listed);
     }
 
     return null;
@@ -275,12 +277,11 @@ async Task<JsonDocument> GetJsonDocumentAsync(HttpClient httpClient, string url)
     return await JsonDocument.ParseAsync(stream);
 }
 
-PackageInfo MapPackage(JsonElement catalogEntry)
+PackageInfo MapPackage(JsonElement catalogEntry, bool listed)
 {
     var packageId = GetString(catalogEntry, "id") ?? "unknown";
     var version = GetString(catalogEntry, "version") ?? "unknown";
     var published = GetDate(catalogEntry, "published");
-    var listed = !catalogEntry.TryGetProperty("listed", out var listedElement) || listedElement.GetBoolean();
     var deprecationMessage = GetDeprecationMessage(catalogEntry);
     var vulnerabilities = GetVulnerabilities(catalogEntry);
 
@@ -567,7 +568,7 @@ void PrintUsage()
       dotnet run scripts/nuget-validate.cs -- audit-project <project-or-solution> [--json]
 
     Rules:
-      - Deprecated or vulnerable packages fail validation.
+      - Deprecated, unlisted, or vulnerable packages fail validation.
       - Packages published more than 365 days ago are stale and require user confirmation.
       - audit-project checks the resolved project graph with dotnet package list/list package.
     """);
