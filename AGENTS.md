@@ -50,6 +50,7 @@
 | [microsoft-code-reference](.github/skills/microsoft-code-reference/SKILL.md) | Look up Microsoft API references, find working code samples, and verify SDK code is correct. |
 | [microsoft-docs](.github/skills/microsoft-docs/SKILL.md) | Query official Microsoft documentation to find concepts, tutorials, and code examples across Azur... \| Research skill for the Microsoft technology ecosystem. Covers learn.microsoft.com and documentati... |
 | [nuget-manager](.github/skills/nuget-manager/SKILL.md) | Manage NuGet packages in .NET projects/solutions. |
+| [nuget-validate](.github/skills/nuget-validate/SKILL.md) | Validate NuGet package versions for vulnerabilities, deprecation, freshness, and listing status before package changes. |
 | [semantic-kernel](.github/skills/semantic-kernel/SKILL.md) | Create, update, refactor, explain, or review Semantic Kernel solutions using shared guidance plus language-specific references for .NET and Python. |
 | [sql-code-review](.github/skills/sql-code-review/SKILL.md) | Universal SQL code review assistant that performs comprehensive security, maintainability, and co... \| Perform a thorough SQL code review of ${selection} (or entire project if no selection) focusing o... |
 | [sql-optimization](.github/skills/sql-optimization/SKILL.md) | Universal SQL performance optimization assistant for comprehensive query tuning, indexing strateg... \| Expert SQL performance optimization for ${selection} (or entire project if no selection). Focus o... |
