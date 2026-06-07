@@ -13,7 +13,7 @@ Trigger whenever someone wants to fold several open Dependabot PRs into one: "de
 
 Dependabot opens one PR per dependency bump. A repo that's gone a few weeks without attention can easily accumulate 5-10+ of these. Reviewing and merging them one at a time is tedious, and — worse — several of them often touch the *same line or file* (e.g. three separate PRs each bumping a sibling package of the same vendor in one `.csproj`), so merging them in sequence turns into a conflict-resolution slog. Folding them into a single PR backed by one tracking issue turns N review cycles into one, while still preserving a paper trail of what was bumped and why.
 
-## The workflow — five phases, always in this order
+## The workflow — six phases, always in this order
 
 ### Phase 0 — Detect, then propose a plan and WAIT for confirmation
 

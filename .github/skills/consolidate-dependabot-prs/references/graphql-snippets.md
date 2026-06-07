@@ -51,7 +51,7 @@ since the checks were already green).
 ## 3. Confirm what's actually blocking the merge (before assuming it's threads)
 
 ```bash
-gh api repos/OWNER/REPO/branches/main/protection 2>&1   # classic branch protection (404 if none)
+gh api repos/OWNER/REPO/branches/DEFAULT_BRANCH/protection 2>&1   # classic branch protection (404 if none)
 gh api repos/OWNER/REPO/rulesets --jq '.[] | {id, name, target}'
 gh api repos/OWNER/REPO/rulesets/RULESET_ID --jq '.rules[] | {type, parameters}'
 ```
