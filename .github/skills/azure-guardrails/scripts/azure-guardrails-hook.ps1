@@ -198,13 +198,16 @@ function Get-McpClassification {
     $paramsBlob = ($ToolInput | ConvertTo-Json -Depth 10 -Compress) ?? ''
     $haystack = "$op $paramsBlob"
 
-    $writePattern = '\b(delete|remove|purge|create-or-update|update|set|restart|stop|start|scale|upload|import|failover)\b'
+    $writePattern = '\b(delete|remove|purge|create-or-update|update|set|restart|stop|start|scale|upload|import|install|failover)\b'
 
     if ($area -eq 'role' -and $haystack -imatch $writePattern) {
         return @{ Tier = 4; What = 'Azure MCP role (RBAC) write'; MatchString = "mcp:$area $op" }
     }
     if ($area -eq 'deploy') {
         return @{ Tier = 3; What = 'Azure MCP deploy'; MatchString = "mcp:$area $op" }
+    }
+    if ($area -eq 'extension_cli_install') {
+        return @{ Tier = 3; What = 'Azure MCP CLI extension install'; MatchString = "mcp:$area $op" }
     }
     if ($haystack -imatch $writePattern) {
         return @{ Tier = 3; What = "Azure MCP $area write operation"; MatchString = "mcp:$area $op" }

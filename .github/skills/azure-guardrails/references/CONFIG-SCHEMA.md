@@ -17,7 +17,6 @@ allow:
   - operation: "<command prefix>"     # required — case-insensitive prefix match
     scope:                            # optional — restricts where the exemption applies
       resource-groups: ["<glob>"]     # glob patterns; omit = any resource group
-      subscriptions: ["<id-or-glob>"] # omit = any subscription
     reason: "<why this is safe>"      # optional but recommended — shown in audit output
 
 # Optional. Operations that are ALWAYS blocked, even if the user approves
@@ -27,11 +26,6 @@ deny:
     scope:
       resource-groups: ["<glob>"]
     reason: "<why this is forbidden>"
-
-# Optional. If present, ALL mutating operations are restricted to these
-# subscriptions; operations targeting any other subscription are denied.
-subscriptions:
-  - "<subscription id or name glob>"
 ```
 
 ## Matching Rules
@@ -73,10 +67,6 @@ deny:
     reason: "Production deletion is a human-only, change-managed operation"
   - operation: "azd down"
     reason: "Environment teardown must be done manually"
-
-subscriptions:
-  - "contoso-dev"
-  - "contoso-sandbox"
 ```
 
 ### Minimal (lock everything down explicitly)

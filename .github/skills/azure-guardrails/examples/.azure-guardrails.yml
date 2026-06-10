@@ -32,8 +32,3 @@ deny:
 
   - operation: "azd down"
     reason: "Environment teardown must be done manually"
-
-# Optional: restrict all mutating operations to these subscriptions.
-subscriptions:
-  - "contoso-dev"
-  - "contoso-sandbox"
