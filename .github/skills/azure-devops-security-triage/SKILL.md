@@ -49,7 +49,7 @@ One work item per actionable alert (or one per dependency-upgrade batch):
 ### 4. Fix via branch and PR
 
 1. Create a fix branch (`repo_create_branch`), implement the remediation.
-2. Create a PR whose description references the work item (`AB#{id}`) and the alert URL.
+2. Create a PR whose description references the work item with the literal auto-link syntax `AB#<id>` (e.g. `AB#1234`) and the alert URL.
 3. The Advanced Security PR annotation will flag remaining findings on changed lines — resolve them before completing.
 4. Complete the PR per the team's policy (reviewers, build validation).
 

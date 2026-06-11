@@ -37,7 +37,7 @@ Read the matching skill before acting:
 
 ## Cross-service workflows you handle
 
-- **Feature delivery loop**: work item → branch → PR (description containing `AB#{id}` for auto-linking) → build validation → complete PR → work item auto-transition or explicit close with resolution comment.
+- **Feature delivery loop**: work item → branch → PR (description containing the literal auto-link syntax `AB#<id>`, e.g. `AB#1234`) → build validation → complete PR → work item auto-transition or explicit close with resolution comment.
 - **Security burn-down**: GHAS alert inventory → prioritized triage → tracking work items → fix PRs → re-scan verification → documented dismissals (see azure-devops-security-triage).
 - **Pipeline failure investigation**: failing build → timeline → failing job's log → root cause → fix PR or stage retry, with the work item updated.
 - **Sprint reporting**: iteration work items + PR/build status → summary published to the wiki.

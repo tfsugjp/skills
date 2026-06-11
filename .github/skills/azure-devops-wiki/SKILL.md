@@ -24,15 +24,15 @@ Read, search, and publish wiki content. Read [azure-devops-foundation](../azure-
 
 ## REST API fallback
 
-Base: `https://dev.azure.com/{organization}/{project}/_apis/wiki/wikis/{wikiIdentifier}` — verify with `microsoft_docs_search("Azure DevOps wiki pages REST API")` before calling.
+Base: `https://dev.azure.com/{organization}/{project}/_apis/wiki`. The "List wikis" operation sits directly under this base (`/wikis`); page operations are scoped to a specific wiki (`/wikis/{wikiIdentifier}/pages`). Verify with `microsoft_docs_search("Azure DevOps wiki pages REST API")` before calling.
 
 | Operation | Method and endpoint | api-version |
 |---|---|---|
-| List wikis | `GET /_apis/wiki/wikis` | `7.1` |
-| Get page (+content) | `GET .../pages?path={path}&includeContent=true` | `7.1` |
-| Create page | `PUT .../pages?path={path}` (no `If-Match`) | `7.1` |
-| Update page | `PUT .../pages?path={path}` with `If-Match: {ETag}` | `7.1` |
-| Delete page | `DELETE .../pages?path={path}` | `7.1` |
+| List wikis | `GET /wikis` | `7.1` |
+| Get page (+content) | `GET /wikis/{wiki}/pages?path={path}&includeContent=true` | `7.1` |
+| Create page | `PUT /wikis/{wiki}/pages?path={path}` (no `If-Match`) | `7.1` |
+| Update page | `PUT /wikis/{wiki}/pages?path={path}` with `If-Match: {ETag}` | `7.1` |
+| Delete page | `DELETE /wikis/{wiki}/pages?path={path}` | `7.1` |
 
 Updates are **ETag-guarded**: first GET the page and capture the `ETag` response header, then PUT with `If-Match`. A 412 response means someone edited the page in between — re-read and merge, don't blind-overwrite.
 

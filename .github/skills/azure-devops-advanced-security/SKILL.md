@@ -1,7 +1,7 @@
 ---
 name: azure-devops-advanced-security
 description: 'Work with GitHub Advanced Security for Azure DevOps (GHAzDO): list and triage code/secret/dependency scanning alerts, dismiss (close) alerts, and associate alerts with work items. Use when the user asks about Advanced Security alerts, CodeQL findings, secret scanning, or dependency vulnerabilities in Azure Repos. REST-API-based — the Azure DevOps MCP Server has no Advanced Security tools.'
-compatibility: 'Azure DevOps Services with GitHub Advanced Security (or standalone Code/Secret Security) enabled on the repository. API is 7.2-preview.'
+compatibility: 'Azure DevOps Services with GitHub Advanced Security (or standalone Code/Secret Security) enabled on the repository. API is 7.2-preview.1.'
 ---
 
 # GitHub Advanced Security for Azure DevOps (GHAzDO)
