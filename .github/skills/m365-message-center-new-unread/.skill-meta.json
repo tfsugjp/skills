@@ -1,0 +1,11 @@
+{
+  "name": "m365-message-center-new-unread",
+  "source": "project",
+  "description": "Retrieve newly created, unread Microsoft 365 Message Center announcements while excluding updates to older posts.",
+  "categories": [
+    "microsoft-365",
+    "microsoft-graph",
+    "powershell"
+  ],
+  "installedAt": "2026-06-15T00:00:00.000Z"
+}
