@@ -21,10 +21,11 @@ The bundled validator is a single C# file-based app. It runs with `dotnet run <p
 
 1. Do not add a package version that is deprecated.
 2. Do not add a package version with known vulnerabilities.
-3. Prefer the latest version that is not deprecated and has no known vulnerabilities.
-4. If the candidate package version was last published more than 365 days ago, ask the user for confirmation before proceeding.
-5. After adding or updating a package, audit the actual project dependency graph with `dotnet package list` or `dotnet list package`.
-6. Use `dotnet add package` and `dotnet remove package` for package add/remove operations. Direct file edits are only acceptable for changing existing version values.
+3. Do not add an unlisted package version.
+4. Prefer the latest version that is not deprecated, listed, and has no known vulnerabilities.
+5. If the candidate package version was last published more than 365 days ago, ask the user for confirmation before proceeding.
+6. After adding or updating a package, audit the actual project dependency graph with `dotnet package list` or `dotnet list package`.
+7. Use `dotnet add package` and `dotnet remove package` for package add/remove operations. Direct file edits are only acceptable for changing existing version values.
 
 ## Validator Commands
 
@@ -87,7 +88,7 @@ dotnet run .github\skills\nuget-validate\scripts\nuget-validate.cs -- validate N
 | Command | Purpose |
 | --- | --- |
 | `latest-safe <package-id>` | Finds the newest stable listed version that is not deprecated and has no known vulnerabilities. Add `--include-prerelease` only when the user explicitly allows prerelease packages. |
-| `validate <package-id> <version>` | Reports vulnerability, deprecation, and publish-age status for one package version. |
+| `validate <package-id> <version>` | Reports listing, vulnerability, deprecation, and publish-age status for one package version. |
 | `audit-project <project-or-solution>` | Runs `dotnet package list --project <path> --vulnerable --include-transitive`, falling back to `dotnet list <path> package --vulnerable --include-transitive` if needed. |
 
 ## Freshness Policy
