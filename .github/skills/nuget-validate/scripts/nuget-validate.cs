@@ -19,7 +19,10 @@ if (commandArgs.Count == 0 || commandArgs[0] is "-h" or "--help")
 
 try
 {
-    using var httpClient = new HttpClient();
+    using var httpClient = new HttpClient(new HttpClientHandler
+    {
+        AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+    });
     httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("nuget-validate/1.0");
 
     var command = commandArgs[0].ToLowerInvariant();
@@ -244,6 +247,23 @@ async Task<string> GetRegistrationBaseUrlAsync(HttpClient httpClient)
         throw new InvalidOperationException("NuGet service index did not contain resources.");
     }
 
+    // RegistrationsBaseUrl has several variants. Only RegistrationsBaseUrl/3.6.0 (and /Versioned)
+    // point to registration5-gz-semver2 which includes the deprecation field in catalog entries.
+    // The base RegistrationsBaseUrl points to registration5-semver1 which omits the deprecation field.
+    // Priority (highest first): /Versioned > /3.6.0 > /3.4.0 > /3.0.0-* > base
+    static int RegistrationTypePriority(string? type) => type switch
+    {
+        not null when type.EndsWith("/Versioned", StringComparison.OrdinalIgnoreCase) => 4,
+        not null when type.EndsWith("/3.6.0", StringComparison.OrdinalIgnoreCase) => 3,
+        not null when type.EndsWith("/3.4.0", StringComparison.OrdinalIgnoreCase) => 2,
+        not null when type.StartsWith("RegistrationsBaseUrl/", StringComparison.OrdinalIgnoreCase) => 1,
+        not null when type.Equals("RegistrationsBaseUrl", StringComparison.OrdinalIgnoreCase) => 0,
+        _ => -1
+    };
+
+    string? bestId = null;
+    var bestPriority = -1;
+
     foreach (var resource in resources.EnumerateArray())
     {
         if (!resource.TryGetProperty("@type", out var typeElement))
@@ -252,17 +272,23 @@ async Task<string> GetRegistrationBaseUrlAsync(HttpClient httpClient)
         }
 
         var types = typeElement.ValueKind == JsonValueKind.Array
-            ? typeElement.EnumerateArray().Select(t => t.GetString())
-            : [typeElement.GetString()];
+            ? typeElement.EnumerateArray().Select(t => t.GetString()).ToList()
+            : (IList<string?>)[typeElement.GetString()];
 
-        if (types.Any(t => t?.Contains("RegistrationsBaseUrl", StringComparison.OrdinalIgnoreCase) == true) &&
-            GetString(resource, "@id") is { Length: > 0 } id)
+        var priority = types.Max(RegistrationTypePriority);
+        if (priority < 0)
         {
-            return id;
+            continue;
+        }
+
+        if (GetString(resource, "@id") is { Length: > 0 } id && priority > bestPriority)
+        {
+            bestId = id;
+            bestPriority = priority;
         }
     }
 
-    throw new InvalidOperationException("RegistrationsBaseUrl was not found in NuGet service index.");
+    return bestId ?? throw new InvalidOperationException("RegistrationsBaseUrl was not found in NuGet service index.");
 }
 
 async Task<JsonDocument> GetJsonDocumentAsync(HttpClient httpClient, string url)
