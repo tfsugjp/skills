@@ -59,6 +59,7 @@
 | [import-infrastructure-as-code](.github/skills/import-infrastructure-as-code/SKILL.md) | Import existing Azure resources into Terraform using Azure CLI discovery and Azure Verified Modules (AVM). Use when asked to reverse-engineer live Azure infrastructure or generate IaC from existing Azure resources. |
 | [microsoft-code-reference](.github/skills/microsoft-code-reference/SKILL.md) | Look up Microsoft API references, find working code samples, and verify SDK code is correct. |
 | [microsoft-docs](.github/skills/microsoft-docs/SKILL.md) | Query official Microsoft documentation to find concepts, tutorials, and code examples across Azur... \| Research skill for the Microsoft technology ecosystem. Covers learn.microsoft.com and documentati... |
+| [m365-message-center-new-unread](.github/skills/m365-message-center-new-unread/SKILL.md) | Retrieve newly created, unread Microsoft 365 Message Center announcements for a specified period while excluding updates to older posts. |
 | [nuget-manager](.github/skills/nuget-manager/SKILL.md) | Manage NuGet packages in .NET projects/solutions. |
 | [nuget-validate](.github/skills/nuget-validate/SKILL.md) | Validate NuGet package versions for vulnerabilities, deprecation, freshness, and listing status before package changes. |
 | [semantic-kernel](.github/skills/semantic-kernel/SKILL.md) | Create, update, refactor, explain, or review Semantic Kernel solutions using shared guidance plus language-specific references for .NET and Python. |
