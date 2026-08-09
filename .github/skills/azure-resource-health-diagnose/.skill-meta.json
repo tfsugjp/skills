@@ -1,8 +1,0 @@
-{
-  "name": "azure-resource-health-diagnose",
-  "source": "github/awesome-copilot",
-  "description": "Analyze Azure resource health, diagnose issues from logs and telemetry, and create a remediation plan for identified problems.",
-  "whenToUse": "Use when you need to diagnose Azure resource health issues and create a remediation plan.",
-  "categories": [],
-  "installedAt": "2026-05-06T09:33:21.595Z"
-}

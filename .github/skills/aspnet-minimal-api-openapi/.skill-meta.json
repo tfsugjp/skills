@@ -1,8 +1,0 @@
-{
-  "name": "aspnet-minimal-api-openapi",
-  "source": "github/awesome-copilot",
-  "description": "Create ASP.NET Minimal API endpoints with proper OpenAPI documentation",
-  "whenToUse": "Your goal is to help me create well-structured ASP.NET Minimal API endpoints with correct types and comprehensive OpenAPI/Swagger documentation.",
-  "categories": [],
-  "installedAt": "2026-05-06T09:33:21.595Z"
-}

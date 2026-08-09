@@ -1,8 +1,0 @@
-{
-  "name": "csharp-mcp-server-generator",
-  "source": "github/awesome-copilot",
-  "description": "Generate a complete MCP server project in C# with tools, prompts, and proper configuration",
-  "whenToUse": "Generate a complete, production-ready MCP server in C# with comprehensive documentation and error handling.",
-  "categories": [],
-  "installedAt": "2026-05-06T09:33:21.595Z"
-}

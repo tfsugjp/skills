@@ -1,8 +1,0 @@
-{
-  "name": "fluentui-blazor",
-  "source": "github/awesome-copilot",
-  "description": "Guide for using the Microsoft Fluent UI Blazor component library (Microsoft.FluentUI.AspNetCore.Components) in Blazor applications.",
-  "whenToUse": "Use when building a Blazor app with Fluent UI components.",
-  "categories": [],
-  "installedAt": "2026-05-06T09:33:21.595Z"
-}

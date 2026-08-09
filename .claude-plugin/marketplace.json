@@ -1,0 +1,30 @@
+{
+  "name": "tfsugjp-agent-skills",
+  "owner": {
+    "name": "Team Foundation Users Japan"
+  },
+  "metadata": {
+    "description": "Skills and plugins for Azure DevOps, .NET, and NuGet workflows.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "azure-devops-toolkit",
+      "description": "Azure DevOps skills for Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security.",
+      "version": "0.1.0",
+      "source": "./plugins/azure-devops-toolkit",
+      "license": "MIT",
+      "keywords": ["azure", "azure-devops", "devops", "security"],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "nuget-validate",
+      "description": "Validate NuGet package versions for vulnerabilities, deprecation, listing status, and freshness.",
+      "version": "0.1.0",
+      "source": "./plugins/nuget-validate",
+      "license": "MIT",
+      "keywords": ["dotnet", "nuget", "security"],
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "tfsugjp-agent-skills",
+  "interface": {
+    "displayName": "TFSUG.JP Agent Skills"
+  },
+  "plugins": [
+    {
+      "name": "azure-devops-toolkit",
+      "source": {
+        "source": "local",
+        "path": "./plugins/azure-devops-toolkit"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "nuget-validate",
+      "source": {
+        "source": "local",
+        "path": "./plugins/nuget-validate"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
