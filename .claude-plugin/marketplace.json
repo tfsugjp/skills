@@ -14,7 +14,12 @@
       "version": "0.1.0",
       "source": "./plugins/azure-devops-toolkit",
       "license": "MIT",
-      "keywords": ["azure", "azure-devops", "devops", "security"],
+      "keywords": [
+        "azure",
+        "azure-devops",
+        "devops",
+        "security"
+      ],
       "category": "Developer Tools"
     },
     {
@@ -23,7 +28,25 @@
       "version": "0.1.0",
       "source": "./plugins/nuget-validate",
       "license": "MIT",
-      "keywords": ["dotnet", "nuget", "security"],
+      "keywords": [
+        "dotnet",
+        "nuget",
+        "security"
+      ],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "dependabot-safe-merge",
+      "description": "Safely refresh, review, and merge eligible Dependabot pull requests.",
+      "version": "0.1.0",
+      "source": "./plugins/dependabot-safe-merge",
+      "license": "MIT",
+      "keywords": [
+        "dependabot",
+        "dependencies",
+        "github",
+        "security"
+      ],
       "category": "Developer Tools"
     }
   ]
