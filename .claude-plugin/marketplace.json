@@ -48,6 +48,21 @@
         "security"
       ],
       "category": "Developer Tools"
+    },
+    {
+      "name": "github-plan-wiki",
+      "description": "Break an approved plan into a parent GitHub issue plus sub-issues, and publish feature/refactor/perf plans to the repository's GitHub wiki in English and Japanese.",
+      "version": "0.1.0",
+      "source": "./plugins/github-plan-wiki",
+      "license": "MIT",
+      "keywords": [
+        "github",
+        "issues",
+        "sub-issues",
+        "wiki",
+        "planning"
+      ],
+      "category": "Developer Tools"
     }
   ]
 }
