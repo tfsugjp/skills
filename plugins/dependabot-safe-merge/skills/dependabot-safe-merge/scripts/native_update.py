@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from dataclasses import asdict, dataclass, field
@@ -66,7 +67,13 @@ def build_plan(ecosystem: str, manager: str, package: str, version: str) -> Upda
         else:
             raise ValueError("unsupported JavaScript package manager")
     elif ecosystem == "nuget":
-        command = [UpdateCommand(["dotnet", "restore"], {"NUGET_XMLDOC_MODE": "skip"})]
+        command = [
+            UpdateCommand(
+                ["dotnet", "add", "package", package, "--version", version, "--no-restore"],
+                {"NUGET_XMLDOC_MODE": "skip"},
+            ),
+            UpdateCommand(["dotnet", "restore"], {"NUGET_XMLDOC_MODE": "skip"}),
+        ]
         manager = manager or "dotnet"
     elif ecosystem in {"python", "pip", "pypi", "poetry", "uv"}:
         manager = manager or ecosystem
@@ -118,7 +125,7 @@ def execute_plan(plan: UpdatePlan, runner: Callable[..., Any]) -> list[Any]:
     """Execute argv arrays through an injected runner; intended for controlled callers and tests."""
     results = []
     for command in plan.commands:
-        results.append(runner(command.argv, env=dict(command.environment), check=True, shell=False))
+        results.append(runner(command.argv, env={**os.environ, **command.environment}, check=True, shell=False))
     return results
 
 
