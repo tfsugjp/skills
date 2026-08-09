@@ -84,6 +84,20 @@ def validate_skill_links(plugin_root: Path, skill_file: Path) -> None:
         require(target.exists(), f"broken relative link in {skill_file}: {reference}")
 
 
+def validate_workflow_action_pins(root: Path) -> None:
+    action_pattern = re.compile(r"^\s*uses:\s*([^#\s]+)")
+    sha_pattern = re.compile(r"^.+@[0-9a-fA-F]{40}$")
+    workflow_root = root / ".github/workflows"
+    if not workflow_root.is_dir():
+        return
+    for workflow in sorted(workflow_root.glob("*.y*ml")):
+        for line_number, line in enumerate(workflow.read_text(encoding="utf-8").splitlines(), start=1):
+            match = action_pattern.match(line)
+            if match:
+                action = match.group(1)
+                require(sha_pattern.fullmatch(action), f"GitHub Action is not pinned to a full SHA: {workflow}:{line_number}: {action}")
+
+
 def skill_directories(plugin_root: Path, manifest: dict, plugin_name: str) -> list[Path]:
     value = manifest.get("skills", "skills/")
     values = value if isinstance(value, list) else [value]
@@ -123,6 +137,7 @@ def main() -> int:
     root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
     claude = load_json(root / ".claude-plugin/marketplace.json")
     codex = load_json(root / ".agents/plugins/marketplace.json")
+    validate_workflow_action_pins(root)
     claude_entries = {entry.get("name"): entry for entry in claude.get("plugins", [])}
     codex_entries = {entry.get("name"): entry for entry in codex.get("plugins", [])}
     require(set(claude_entries) == set(codex_entries), "Claude/Copilot and Codex plugin lists differ")
