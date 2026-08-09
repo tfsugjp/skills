@@ -10,7 +10,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Azure DevOps Toolkit",
-    "shortDescription": "Azure DevOps workflow skills",
+    "shortDescription": "Azure DevOps workflow skills and agents",
     "longDescription": "A plugin with skills and custom agents for Azure Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security workflows.",
     "developerName": "Team Foundation Users Japan",
     "category": "Developer Tools",
