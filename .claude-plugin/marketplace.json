@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "azure-devops-toolkit",
-      "description": "Azure DevOps skills for Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security.",
+      "description": "Azure DevOps skills and agents for Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security.",
       "version": "0.1.0",
       "source": "./plugins/azure-devops-toolkit",
       "license": "MIT",

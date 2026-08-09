@@ -1,7 +1,7 @@
 {
   "name": "azure-devops-toolkit",
   "version": "0.1.0",
-  "description": "Azure DevOps skills for Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security.",
+  "description": "Azure DevOps skills and agents for Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security.",
   "author": {
     "name": "Team Foundation Users Japan"
   },
@@ -11,7 +11,7 @@
   "interface": {
     "displayName": "Azure DevOps Toolkit",
     "shortDescription": "Azure DevOps workflow skills",
-    "longDescription": "A skills-only plugin for Azure Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security workflows.",
+    "longDescription": "A plugin with skills and custom agents for Azure Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security workflows.",
     "developerName": "Team Foundation Users Japan",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write"],
