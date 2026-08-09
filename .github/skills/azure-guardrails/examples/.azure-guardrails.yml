@@ -1,0 +1,34 @@
+# Example .azure-guardrails.yml
+#
+# Copy this file to your project root and adjust to your environment.
+# See ../references/CONFIG-SCHEMA.md for the full schema.
+#
+# Precedence: deny > allow > default(ask).
+# Identity operations (az ad, az role, Mg* writes, Graph writes) ALWAYS
+# require approval and CANNOT be exempted by `allow`.
+
+version: 1
+
+# Operations pre-approved to run WITHOUT per-operation approval.
+allow:
+  - operation: "az webapp config appsettings set"
+    scope:
+      resource-groups: ["rg-dev-*", "rg-sandbox-*"]
+    reason: "Dev config churn is routine and recoverable"
+
+  - operation: "az webapp restart"
+    scope:
+      resource-groups: ["rg-dev-*"]
+
+  - operation: "Remove-AzResourceGroupDeployment"
+    reason: "Deletes deployment history records, not live resources"
+
+# Operations ALWAYS blocked, even if approved interactively.
+deny:
+  - operation: "az group delete"
+    scope:
+      resource-groups: ["rg-prod-*"]
+    reason: "Production deletion is a human-only, change-managed operation"
+
+  - operation: "azd down"
+    reason: "Environment teardown must be done manually"
