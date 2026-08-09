@@ -1,0 +1,19 @@
+name: Temporary Dependabot Safe Merge Tests
+
+on:
+  push:
+    branches:
+      - feature/20-dependabot-safe-merge
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Run policy unit tests
+        run: python -m unittest discover -s plugins/dependabot-safe-merge/skills/dependabot-safe-merge/tests -p "test_*.py"
