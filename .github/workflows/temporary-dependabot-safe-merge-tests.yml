@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/20-dependabot-safe-merge
+  pull_request:
 
 jobs:
   unit-tests:
