@@ -144,8 +144,17 @@ class NativeUpdateTests(unittest.TestCase):
         native_update.execute_plan(plan, runner)
         self.assertEqual(1, len(calls))
         self.assertFalse(calls[0][1]["shell"])
+        self.assertTrue(any(key.lower() == "path" for key in calls[0][1]["env"]))
         self.assertEqual("true", calls[0][1]["env"]["npm_config_ignore_scripts"])
         self.assertNotIn("token", json.dumps(plan.to_json()).lower())
+
+    def test_nuget_plan_targets_package_before_restore(self):
+        plan = native_update.build_plan("nuget", "dotnet", "Example.Package", "2.3.4")
+        self.assertEqual(
+            ["dotnet", "add", "package", "Example.Package", "--version", "2.3.4", "--no-restore"],
+            plan.commands[0].argv,
+        )
+        self.assertEqual(["dotnet", "restore"], plan.commands[1].argv)
 
 
 class MajorPlanTests(unittest.TestCase):
