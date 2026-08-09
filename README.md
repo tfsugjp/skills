@@ -1,12 +1,12 @@
 # TFSUG.JP Agent Skills
 
-Personal, skills-only plugins for Azure DevOps and .NET package maintenance. The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
+Personal plugins for Azure DevOps and .NET package maintenance (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
 
 ## Plugins
 
-| Plugin | Included skills |
+| Plugin | Included skills and agents |
 |---|---|
-| `azure-devops-toolkit` | Azure DevOps Foundation, Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, Advanced Security, CLI, and security triage |
+| `azure-devops-toolkit` | Skills: Azure DevOps Foundation, Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, Advanced Security, CLI, security triage. Agents: Azure DevOps Agent, Azure DevOps Work Item Agent |
 | `nuget-validate` | NuGet vulnerability, deprecation, listing, freshness, and project-audit validation |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
