@@ -34,7 +34,7 @@ def blocked(reason: str) -> MajorPlanDecision:
 
 
 def strings(value: Any, field_name: str) -> list[str]:
-    if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
+    if not isinstance(value, list) or not value or not all(isinstance(item, str) and item.strip() for item in value):
         raise ValueError(f"{field_name} must be a non-empty string array")
     return [item.strip() for item in value]
 
