@@ -31,7 +31,8 @@ Use the required GitHub Connector for repository, pull request, review, check, c
 ## Deterministic policy tools
 
 - Pass registry payloads to `python scripts/registry_metadata.py --ecosystem <name> --package <name>` on standard input. Feed its JSON output into `python scripts/release_policy.py`.
-- Pass refresh state to `python scripts/refresh_policy.py`; use `python scripts/native_update.py` only to construct non-shell argv for the selected manager.\n- Pass the release decision and the current pull-request snapshot to `python scripts/pr_gate.py`.
+- Pass refresh state to `python scripts/refresh_policy.py`; use `python scripts/native_update.py` only to construct non-shell argv for the selected manager.
+- Pass the release decision and the current pull-request snapshot to `python scripts/pr_gate.py`.
 - Generate or compare a major-upgrade issue with `python scripts/major_plan.py`; search the exact marker before creating an issue.
 - Treat script output as a lower-level decision aid. Repository policy and missing GitHub evidence can only make the result more restrictive.
 
