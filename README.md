@@ -8,6 +8,7 @@ Personal plugins for Azure DevOps and .NET package maintenance (skills + agents)
 |---|---|
 | `azure-devops-toolkit` | Skills: Azure DevOps Foundation, Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, Advanced Security, CLI, security triage. Agents: Azure DevOps Agent, Azure DevOps Work Item Agent |
 | `nuget-validate` | NuGet vulnerability, deprecation, listing, freshness, and project-audit validation |
+| `dependabot-safe-merge` | Safe Dependabot refresh, release-age policy, merge gates, and major-upgrade planning |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 
@@ -19,6 +20,7 @@ Add the repository as a marketplace, then install the plugin you need:
 claude plugin marketplace add tfsugjp/skills
 claude plugin install azure-devops-toolkit@tfsugjp-agent-skills
 claude plugin install nuget-validate@tfsugjp-agent-skills
+claude plugin install dependabot-safe-merge@tfsugjp-agent-skills
 ```
 
 ## Install from the GitHub Copilot marketplace
@@ -29,6 +31,7 @@ The Copilot CLI reads the shared Claude marketplace catalog in this repository:
 copilot plugin marketplace add tfsugjp/skills
 copilot plugin install azure-devops-toolkit@tfsugjp-agent-skills
 copilot plugin install nuget-validate@tfsugjp-agent-skills
+copilot plugin install dependabot-safe-merge@tfsugjp-agent-skills
 ```
 
 ## Install from the Codex repository-local marketplace
@@ -39,6 +42,7 @@ Set `REPO_ROOT` to the checked-out repository directory. Codex uses the reposito
 codex plugin marketplace add "$REPO_ROOT"
 codex plugin add azure-devops-toolkit@tfsugjp-agent-skills
 codex plugin add nuget-validate@tfsugjp-agent-skills
+codex plugin add dependabot-safe-merge@tfsugjp-agent-skills
 ```
 
 The Codex local marketplace is intended for development and team distribution. Public Codex listing submission is a separate release step after the plugins pass validation.

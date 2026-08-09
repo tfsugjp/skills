@@ -1,0 +1,16 @@
+{
+  "name": "dependabot-safe-merge",
+  "version": "0.1.0",
+  "description": "Safely refresh, review, and merge eligible Dependabot pull requests.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dependabot",
+    "dependencies",
+    "github",
+    "security"
+  ],
+  "skills": "./skills/"
+}

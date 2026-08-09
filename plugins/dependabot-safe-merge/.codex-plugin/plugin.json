@@ -1,0 +1,31 @@
+{
+  "name": "dependabot-safe-merge",
+  "version": "0.1.0",
+  "description": "Safely refresh, review, and merge eligible Dependabot pull requests.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dependabot",
+    "dependencies",
+    "github",
+    "security"
+  ],
+  "skills": "./skills/",
+  "apps": "./.app.json",
+  "interface": {
+    "displayName": "Dependabot Safe Merge",
+    "shortDescription": "Safely refresh and merge Dependabot PRs",
+    "longDescription": "Refresh Dependabot pull requests to a verified release at least 24 hours old, review breaking changes, and enable auto-merge only after every repository gate passes.",
+    "developerName": "Team Foundation Users Japan",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use $dependabot-safe-merge to review and safely merge this Dependabot pull request."
+    ]
+  }
+}
