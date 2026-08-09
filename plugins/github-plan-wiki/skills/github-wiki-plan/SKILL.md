@@ -81,11 +81,7 @@ git -C <scratch-dir>/wiki commit -m "add: plan <slug>"
 git -C <scratch-dir>/wiki push origin master
 ```
 
-After pushing, verify both the new page and the Home link resolve:
-
-```bash
-gh api repos/<owner>/<repo>/wiki 2>/dev/null || true   # no wiki content API — verify by opening the URL instead
-```
+After pushing, verify both the new page and the Home link resolve. There is no REST API for wiki page content, so this is a browser check, not a `gh`/`curl` command:
 
 Open `https://github.com/<owner>/<repo>/wiki/plan/<date>/<slug>` and confirm it's not a 404, and that the link from Home lands there.
 
