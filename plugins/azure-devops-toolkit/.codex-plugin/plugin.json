@@ -1,12 +1,17 @@
 {
   "name": "azure-devops-toolkit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Azure DevOps skills and agents for Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security.",
   "author": {
     "name": "Team Foundation Users Japan"
   },
   "license": "MIT",
-  "keywords": ["azure", "azure-devops", "devops", "security"],
+  "keywords": [
+    "azure",
+    "azure-devops",
+    "devops",
+    "security"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Azure DevOps Toolkit",
@@ -14,9 +19,12 @@
     "longDescription": "A plugin with skills and custom agents for Azure Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security workflows.",
     "developerName": "Team Foundation Users Japan",
     "category": "Developer Tools",
-    "capabilities": ["Read", "Write"],
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
     "defaultPrompt": [
-      "Review this Azure DevOps workflow and identify the next action.",
+      "Create a process-aware Azure Boards work item with safe traceability.",
       "Help me triage this Azure DevOps security alert.",
       "Plan the safest Azure DevOps pipeline change."
     ]

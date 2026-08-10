@@ -1,11 +1,16 @@
 {
   "name": "azure-devops-toolkit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Azure DevOps skills and agents for Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security.",
   "author": {
     "name": "Team Foundation Users Japan"
   },
   "license": "MIT",
-  "keywords": ["azure", "azure-devops", "devops", "security"],
+  "keywords": [
+    "azure",
+    "azure-devops",
+    "devops",
+    "security"
+  ],
   "skills": "./skills/"
 }

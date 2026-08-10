@@ -6,7 +6,7 @@ Personal plugins for Azure DevOps and .NET package maintenance (skills + agents)
 
 | Plugin | Included skills and agents |
 |---|---|
-| `azure-devops-toolkit` | Skills: Azure DevOps Foundation, Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, Advanced Security, CLI, security triage. Agents: Azure DevOps Agent, Azure DevOps Work Item Agent |
+| `azure-devops-toolkit` | Skills: Azure DevOps Foundation, Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, Advanced Security, CLI, security triage. Boards uses native PowerShell on Windows and Feature-equivalent Work Items require Wiki traceability. Agents: Azure DevOps Agent, Azure DevOps Work Item Agent |
 | `nuget-validate` | NuGet vulnerability, deprecation, listing, freshness, and project-audit validation |
 | `dependabot-safe-merge` | Safe Dependabot refresh, release-age policy, merge gates, and major-upgrade planning |
 | `github-plan-wiki` | Skills: GitHub Plan Issues (parent + sub-issue hierarchy via `gh`), GitHub Wiki Plan (bilingual GitHub wiki publishing and Home index maintenance) |

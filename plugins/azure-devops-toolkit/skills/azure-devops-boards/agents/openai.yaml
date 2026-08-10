@@ -1,0 +1,4 @@
+interface:
+  display_name: "Azure DevOps Boards"
+  short_description: "Create process-aware Azure DevOps work items"
+  default_prompt: "Use $azure-devops-boards to register a process-aware work item and apply the required Feature Wiki gate."
