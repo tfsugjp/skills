@@ -12,7 +12,7 @@ Never use MSYS2, Git Bash, WSL, bash, or sh for Azure DevOps work on Windows. Do
 
 ## UTF-8 REST writes
 
-Keep the organization URL, project, and token in environment variables. Do not print the token.
+Keep the organization URL, project, and credential in environment variables. In the PowerShell example below, `ADO_TOKEN` must be an Entra ID access token because it is sent as a Bearer token. A PAT is not a Bearer token; use an `Authorization: Basic` header with the PAT instead, following the authentication guidance in the foundation skill. Never print credentials.
 
 PowerShell example:
 
