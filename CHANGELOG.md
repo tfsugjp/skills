@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- Hardened Azure Boards Work Item registration for non-English Windows with native PowerShell and UTF-8 read-back verification.
+- Added mandatory Azure DevOps Wiki handoff and verification for Feature-equivalent Work Items.
+- Synchronized Codex, Claude, and GitHub Copilot plugin metadata and mirrors.
+
 ## 0.1.0
 
 - Added the `azure-devops-toolkit` plugin bundle.
