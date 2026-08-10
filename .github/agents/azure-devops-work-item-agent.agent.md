@@ -90,8 +90,6 @@ If the Wiki write unexpectedly fails after creation, keep the Work Item, report 
 
 ## Windows execution
 
-## Windows execution
-
 Read the Boards skill's Windows-native execution reference. On Windows, use MCP first, then PowerShell 7 Invoke-RestMethod, then native az boards. Never invoke MSYS2, Git Bash, WSL, bash, or sh. If az output appears corrupted, read the stored Work Item back through Invoke-RestMethod and do not translate user content.
 
 ## Guardrails
