@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Fixed GitHub Wiki Home and verification links to use flattened public page routes.
+- Added collision guidance and English/Japanese Wiki template-link regression tests.
+
 ## 0.2.0
 
 - Hardened Azure Boards Work Item registration for non-English Windows with native PowerShell and UTF-8 read-back verification.

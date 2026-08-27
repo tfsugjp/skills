@@ -57,9 +57,10 @@ Run the repository validator from the repository root:
 
 ```text
 python scripts/validate_marketplaces.py
+python -m unittest discover -s plugins/github-plan-wiki/skills/github-wiki-plan/tests -p 'test_*.py'
 ```
 
-The validator checks JSON syntax, matching plugin names and versions, skill frontmatter, source paths, relative links, and plugin-root boundaries. The same check runs in GitHub Actions for pushes to `main` and pull requests.
+The validators check JSON syntax, matching plugin names and versions, skill frontmatter, source paths, relative links, plugin-root boundaries, and flattened GitHub Wiki template routes. The same checks run in GitHub Actions for pushes to `main` and pull requests.
 
 When editing a plugin during local Codex development, refresh the local installation after changing the manifest and start a new conversation to pick up the updated skills.
 

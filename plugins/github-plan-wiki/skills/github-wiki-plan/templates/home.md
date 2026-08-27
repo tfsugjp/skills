@@ -18,4 +18,4 @@ the GitHub issue/sub-issues that track the work. Plans live under
 
 | Plan | Date | Tracking | 日本語 |
 |---|---|---|---|
-| [<Plan Title>](plan/<yyyy-MM-dd>/<slug>) | <yyyy-MM-dd> | [Issue #<n>](https://github.com/<owner>/<repo>/issues/<n>) | [日本語](plan/<yyyy-MM-dd>/<slug>_ja) |
+| [<Plan Title>](<slug>) | <yyyy-MM-dd> | [Issue #<n>](https://github.com/<owner>/<repo>/issues/<n>) | [日本語](<slug>_ja) |
