@@ -16,4 +16,4 @@ Home.md の日本語版の雛形。既存の Home_ja.md がある場合はこれ
 
 | プラン | 日付 | 追跡 | English |
 |---|---|---|---|
-| [<プランタイトル>](plan/<yyyy-MM-dd>/<slug>_ja) | <yyyy-MM-dd> | [Issue #<n>](https://github.com/<owner>/<repo>/issues/<n>) | [English](plan/<yyyy-MM-dd>/<slug>) |
+| [<プランタイトル>](<slug>_ja) | <yyyy-MM-dd> | [Issue #<n>](https://github.com/<owner>/<repo>/issues/<n>) | [English](<slug>) |

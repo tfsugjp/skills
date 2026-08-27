@@ -59,9 +59,10 @@ Codex の local marketplace は開発・チーム配布用です。公開 listin
 
 ```text
 python scripts/validate_marketplaces.py
+python -m unittest discover -s plugins/github-plan-wiki/skills/github-wiki-plan/tests -p 'test_*.py'
 ```
 
-JSON、plugin 名とバージョン、skill frontmatter、source path、相対リンク、plugin root 外参照を検証します。GitHub Actions でも `main` への push と pull request に対して同じ検証を実行します。
+JSON、plugin 名とバージョン、skill frontmatter、source path、相対リンク、plugin root 外参照、GitHub Wiki template の平坦化された公開 route を検証します。GitHub Actions でも `main` への push と pull request に対して同じ検証を実行します。
 
 ## ライセンス
 

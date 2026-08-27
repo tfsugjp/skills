@@ -8,6 +8,8 @@
 - Added a bundled, CLI-independent manifest checker covering both platforms, with unit tests and fixtures, and a CI job that runs every plugin's test suite.
 - Added `Assignments`, `Categories`, and macOS pre/post-install `Scripts` authoring and validation guidance, shared between Windows and macOS where the target schema shares the field.
 - Added synchronized Claude/Copilot, Codex, and bilingual marketplace documentation.
+- Fixed GitHub Wiki Home and verification links to use flattened public page routes.
+- Added collision guidance and English/Japanese Wiki template-link regression tests.
 
 ## 0.2.0
 

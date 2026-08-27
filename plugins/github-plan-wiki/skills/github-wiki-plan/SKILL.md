@@ -27,16 +27,19 @@ git ls-remote https://github.com/<owner>/<repo>.wiki.git
 git clone https://github.com/<owner>/<repo>.wiki.git <scratch-dir>/wiki
 ```
 
-| Content | Path |
-|---|---|
-| Plan (English) | `plan/<yyyy-MM-dd>/<slug>.md` |
-| Plan (Japanese) | `plan/<yyyy-MM-dd>/<slug>_ja.md` |
-| Index (English) | `Home.md` |
-| Index (Japanese) | `Home_ja.md` |
+GitHub preserves subdirectories in the wiki Git repository but publishes every page at a route derived from the file's basename. Keep these two namespaces separate:
+
+| Content | Git path | Wiki link target |
+|---|---|---|
+| Plan (English) | `plan/<yyyy-MM-dd>/<slug>.md` | `<slug>` |
+| Plan (Japanese) | `plan/<yyyy-MM-dd>/<slug>_ja.md` | `<slug>_ja` |
+| Index (English) | `Home.md` | `Home` |
+| Index (Japanese) | `Home_ja.md` | `Home_ja` |
 
 - `<yyyy-MM-dd>` is the plan's approval date (ISO, hyphenated — matches the reference wiki).
 - `<slug>` is lowercase, hyphen-separated, derived from the plan title.
-- **Wiki-internal links have no file extension** — link to a page's path without `.md` (a page saved as `plan/2026-07-19/approval-mode-picker.md` is linked as `plan/2026-07-19/approval-mode-picker`). A trailing `.md` produces a 404.
+- **Wiki-internal links use only the page basename without `.md`** — a page stored as `plan/2026-07-19/approval-mode-picker.md` is linked as `approval-mode-picker`. Both `plan/2026-07-19/approval-mode-picker` and a target ending in `.md` produce a 404.
+- Before creating a page, search the entire wiki checkout for `<slug>.md` and `<slug>_ja.md`. For a new plan, any match is a collision. For an update, only the intended pair at the exact target paths may match. Choose a different globally unique slug instead of relying on the date directory to disambiguate it.
 - The Japanese page is a translation of the same document, not a separate one — keep headings and tables in 1:1 correspondence with the English page.
 
 ## Phase 2 — Write the plan page
@@ -60,7 +63,7 @@ Match the reference wiki's structure exactly (verified against the live page):
 
 | Plan | Date | Tracking | 日本語 |
 |---|---|---|---|
-| <plan title, linked to its wiki path> | 2026-07-19 | <issue title, linked to the issue URL> | <"日本語", linked to the _ja page path> |
+| Plan title → `<slug>` | 2026-07-19 | Issue title → issue URL | 日本語 → `<slug>_ja` |
 ```
 
 **Read the existing `Home.md` first** — do not copy group names from [templates/home.md](templates/home.md) mechanically. Steps:
@@ -81,15 +84,17 @@ git -C <scratch-dir>/wiki commit -m "add: plan <slug>"
 git -C <scratch-dir>/wiki push origin master
 ```
 
-After pushing, verify both the new page and the Home link resolve. There is no REST API for wiki page content, so this is a browser check, not a `gh`/`curl` command:
+After pushing, verify both new pages and all navigation links resolve. There is no REST API for wiki page content, so this is a browser check, not a `gh`/`curl` command:
 
-Open `https://github.com/<owner>/<repo>/wiki/plan/<date>/<slug>` and confirm it's not a 404, and that the link from Home lands there.
+1. Open `https://github.com/<owner>/<repo>/wiki/<slug>` and `https://github.com/<owner>/<repo>/wiki/<slug>_ja`; confirm neither is a 404.
+2. Open `Home` and `Home_ja` and follow each plan link instead of validating only the rendered `href` value.
+3. Follow the language-switch link on each plan page and confirm it lands on the other language.
 
 ## Pitfalls
 
 - An uninitialized wiki cannot be cloned or pushed to, no matter what — `hasWikiEnabled: true` only means the feature is turned on, not that content exists. There is no API-based way to create the first page.
-- Wiki-internal links with a `.md` suffix 404. Omit the extension.
-- The wiki's own page list/sidebar is flat regardless of your `plan/<date>/` subdirectories — `Home.md` is the only real navigation. Skipping the Home update leaves the new page effectively unreachable.
+- Wiki-internal links use the file basename and omit both the Git directory and `.md` suffix. Reusing `plan/<date>/<slug>` as a public link produces a 404.
+- The wiki's public page namespace and page list/sidebar are flat regardless of the Git repository's `plan/<date>/` subdirectories. Basenames must therefore be globally unique, and `Home.md` is the only real grouped navigation. Skipping the Home update leaves the new page effectively unreachable.
 - The wiki is a separate git repository from the main one — no branch protection, no PR review; a push is instantly live.
 - The `_ja` suffix is a naming convention this team uses, not a GitHub feature — cross-links between language pairs must be added by hand in both directions.
 
