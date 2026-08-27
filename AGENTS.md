@@ -20,3 +20,4 @@
 | [github-plan-issues](plugins/github-plan-wiki/skills/github-plan-issues/SKILL.md) | Break an approved plan into a parent GitHub issue plus sub-issues using the gh CLI's native sub-issue support, instead of flat unrelated issues. |
 | [github-wiki-plan](plugins/github-plan-wiki/skills/github-wiki-plan/SKILL.md) | Publish an approved feature/refactor/perf plan to a repository's GitHub wiki, bilingually (English + `_ja` Japanese), and keep the Home index table up to date. |
 | [nuget-validate](plugins/nuget-validate/skills/nuget-validate/SKILL.md) | Validate NuGet package versions for vulnerabilities, deprecation, freshness, and listing status before package changes. |
+| [relaypublisher-manifest](plugins/relaypublisher-manifest/skills/relaypublisher-manifest/SKILL.md) | Create, update, and statically validate Relaypublisher manifests, including multi-bundle macOS PKG and LOB primary detection. |

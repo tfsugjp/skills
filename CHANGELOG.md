@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Added the `relaypublisher-manifest` plugin for manifest authoring and static validation.
+- Added multi-bundle macOS PKG and LOB primary detection guidance.
+- Added synchronized Claude/Copilot, Codex, and bilingual marketplace documentation.
+
 ## 0.2.0
 
 - Hardened Azure Boards Work Item registration for non-English Windows with native PowerShell and UTF-8 read-back verification.

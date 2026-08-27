@@ -4,8 +4,8 @@
     "name": "Team Foundation Users Japan"
   },
   "metadata": {
-    "description": "Skills and plugins for Azure DevOps, .NET, and NuGet workflows.",
-    "version": "0.2.0"
+    "description": "Skills and plugins for Azure DevOps, GitHub, .NET, NuGet, and Relaypublisher workflows.",
+    "version": "0.3.0"
   },
   "plugins": [
     {
@@ -61,6 +61,20 @@
         "sub-issues",
         "wiki",
         "planning"
+      ],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "relaypublisher-manifest",
+      "description": "Create, update, and statically validate Relaypublisher manifests, including multi-bundle macOS PKG and LOB detection.",
+      "version": "0.1.0",
+      "source": "./plugins/relaypublisher-manifest",
+      "license": "MIT",
+      "keywords": [
+        "relaypublisher",
+        "intune",
+        "macos",
+        "manifest"
       ],
       "category": "Developer Tools"
     }
