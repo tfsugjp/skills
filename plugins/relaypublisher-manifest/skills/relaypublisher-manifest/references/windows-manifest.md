@@ -128,7 +128,7 @@ Assignments:
     Intent: required           # required when Mode is include; required | available | uninstall
     FilterId: "<guid>"        # optional; assignment filter GUID
     FilterMode: include        # required when FilterId is set; include | exclude
-    Settings:                  # optional; Win32 only
+    Settings:                  # optional; meaningful for Win32 only (see note below)
       Notifications: showAll   # showAll | showReboot | hideAll
       RestartGracePeriodMinutes: 1440
 ```
@@ -139,6 +139,16 @@ in one app's `Assignments` list may resolve to the same
 `exclude` assignment for the same group are different Graph targets and are
 not duplicates. A macOS `AppType: pkg` entry (the default) forbids
 `Intent: uninstall`; macOS `AppType: lob` and every Windows entry allow it.
+
+`Settings` (and its `Notifications`/`RestartGracePeriodMinutes` fields) is
+schema-legal on any platform, but the target tool's own model documents it as
+"Win32 only optional settings" because notification/restart-grace behavior
+has no effect outside Win32 installs. The bundled checker validates the
+`Notifications` enum whenever `Settings` is present, on any platform, but
+does not reject `Settings` on a macOS entry — the target validator itself
+imposes no such restriction, so adding one here would invent a rule the
+authoritative schema does not have. If a future schema revision does forbid
+it, tighten this check to match.
 
 ## Categories (shared with macOS)
 

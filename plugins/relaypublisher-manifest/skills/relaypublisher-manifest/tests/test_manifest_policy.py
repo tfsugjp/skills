@@ -844,6 +844,21 @@ class MacOsScriptsTests(unittest.TestCase):
         findings = evaluate(manifest_with_apps(app))
         self.assertIn("RP073", codes(errors(findings)))
 
+    def test_drive_relative_windows_path_is_rejected(self):
+        # "C:foo" has no separator after the colon, so PureWindowsPath("C:foo").is_absolute()
+        # is False even though .NET's Path.IsPathRooted("C:foo") — what the target tool's
+        # PathSafety.cs actually calls — is True. Must be rejected either way.
+        app = base_pkg_app(Scripts={"PreInstall": "C:foo.sh"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP072", codes(errors(findings)))
+
+    def test_symlink_escaping_repo_root_is_rejected_with_repo_root(self):
+        # scripts/escape-symlink.sh is a real on-disk symlink pointing outside FIXTURES;
+        # resolve()-ing it must not be treated as a validated in-repo asset.
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/escape-symlink.sh"})
+        findings = evaluate(manifest_with_apps(app), repo_root=FIXTURES)
+        self.assertIn("RP074", codes(errors(findings)))
+
     def test_missing_script_file_is_rejected_with_repo_root(self):
         app = base_pkg_app(Scripts={"PreInstall": "scripts/does-not-exist.sh"})
         findings = evaluate(manifest_with_apps(app), repo_root=FIXTURES)

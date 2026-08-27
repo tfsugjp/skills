@@ -99,19 +99,44 @@ def _is_valid_guid(value: Any) -> bool:
     return True
 
 
+_DRIVE_LETTER_PREFIX_RE = re.compile(r"^[A-Za-z]:")
+
+
 def _is_safe_relative_path(value: Any) -> bool:
     """Mirror Relaypublisher's PathSafety.IsSafeRelativePath: non-blank, not absolute
     (checked against both POSIX and Windows conventions, since a manifest may be
-    authored on either OS), and no ".." traversal segment."""
+    authored on either OS), and no ".." traversal segment.
+
+    A drive-relative Windows path like "C:foo" (no separator after the colon) is
+    checked explicitly: PureWindowsPath("C:foo").is_absolute() is False, but .NET's
+    Path.IsPathRooted("C:foo") — what PathSafety.cs actually calls — is True, so a
+    bare .is_absolute() check alone would let it through.
+    """
     if not _is_nonblank_str(value):
         return False
     if value.startswith("/") or value.startswith("\\"):
+        return False
+    if _DRIVE_LETTER_PREFIX_RE.match(value):
         return False
     if PureWindowsPath(value).is_absolute():
         return False
     if ".." in re.split(r"[/\\]", value):
         return False
     return True
+
+
+def _resolve_within_repo_root(repo_root: Path, relative_path: str) -> Path | None:
+    """Resolve `relative_path` under `repo_root`, following symlinks, and confirm the
+    result still stays inside the root — mirroring PathSafety.ResolveWithin. Returns
+    None when it escapes (e.g. a symlink inside the repo pointing outside it), so the
+    caller never treats an out-of-root file as a validated manifest asset."""
+    root_resolved = repo_root.resolve()
+    candidate = (root_resolved / relative_path).resolve()
+    try:
+        candidate.relative_to(root_resolved)
+    except ValueError:
+        return None
+    return candidate
 
 
 def _resolve_primary(selector: str, bundle_ids: list[str]) -> list[str]:
@@ -400,7 +425,17 @@ def _evaluate_macos_scripts(app_path: str, platform: str, app_type: str, scripts
 
 def _evaluate_macos_script_file(field_path: str, field: str, relative_path: str, repo_root: Path) -> list[Finding]:
     findings: list[Finding] = []
-    full_path = (repo_root / relative_path).resolve()
+    full_path = _resolve_within_repo_root(repo_root, relative_path)
+    if full_path is None:
+        findings.append(
+            _finding(
+                "RP074",
+                "error",
+                field_path,
+                f"{field} '{relative_path}' resolves outside the repository root (after following symlinks)",
+            )
+        )
+        return findings
     if not full_path.is_file():
         findings.append(_finding("RP074", "error", field_path, f"{field} '{relative_path}' does not exist under the repository root"))
         return findings
@@ -620,8 +655,12 @@ def _evaluate_macos_app(index: int, app: dict, root: dict, repo_root: Path | Non
     if app_type == "lob" and not _is_nonblank_str(root.get("Icon")):
         findings.append(_finding("RP011", "error", "Icon", "AppType: lob requires a non-empty root Icon path"))
     elif app_type == "lob" and repo_root is not None:
-        icon_path = (repo_root / root["Icon"]).resolve()
-        if not icon_path.is_file():
+        icon_path = _resolve_within_repo_root(repo_root, root["Icon"])
+        if icon_path is None:
+            findings.append(
+                _finding("RP011", "error", "Icon", f"Icon path resolves outside the repository root (after following symlinks): {root['Icon']}")
+            )
+        elif not icon_path.is_file():
             findings.append(_finding("RP011", "error", "Icon", f"Icon path does not exist under repo root: {root['Icon']}"))
 
     findings.extend(_evaluate_assignments(app_path, app.get("Assignments"), is_macos_pkg=(app_type == "pkg")))
