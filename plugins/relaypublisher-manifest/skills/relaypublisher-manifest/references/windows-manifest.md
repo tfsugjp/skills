@@ -118,6 +118,57 @@ exactly (ordinal comparison) — a mismatch is rejected, not silently corrected.
 `Requirements.MinimumOSVersion` is required for both Windows and macOS
 entries.
 
+## Assignments (shared with macOS)
+
+```yaml
+Assignments:
+  - Target: group             # group (default) | allDevices | allLicensedUsers
+    GroupId: "<guid>"         # required (valid GUID) when Target is group; forbidden otherwise
+    Mode: include              # include (default) | exclude
+    Intent: required           # required when Mode is include; required | available | uninstall
+    FilterId: "<guid>"        # optional; assignment filter GUID
+    FilterMode: include        # required when FilterId is set; include | exclude
+    Settings:                  # optional; meaningful for Win32 only (see note below)
+      Notifications: showAll   # showAll | showReboot | hideAll
+      RestartGracePeriodMinutes: 1440
+```
+
+`Assignments` is shared verbatim by Windows and macOS entries. No two entries
+in one app's `Assignments` list may resolve to the same
+`(effective Target, GroupId, effective Mode)` tuple — an `include` and an
+`exclude` assignment for the same group are different Graph targets and are
+not duplicates. A macOS `AppType: pkg` entry (the default) forbids
+`Intent: uninstall`; macOS `AppType: lob` and every Windows entry allow it.
+
+`Settings` (and its `Notifications`/`RestartGracePeriodMinutes` fields) is
+schema-legal on any platform, but the target tool's own model documents it as
+"Win32 only optional settings" because notification/restart-grace behavior
+has no effect outside Win32 installs. The bundled checker validates the
+`Notifications` enum whenever `Settings` is present, on any platform, but
+does not reject `Settings` on a macOS entry — the target validator itself
+imposes no such restriction, so adding one here would invent a rule the
+authoritative schema does not have. If a future schema revision does forbid
+it, tighten this check to match.
+
+## Categories (shared with macOS)
+
+```yaml
+Apps:
+  - Platform: windows
+    Categories:
+      - Business Apps
+      - Productivity
+```
+
+Every element must be non-blank, have no leading/trailing whitespace, and be
+unique within the entry's list under a case-insensitive comparison — no count
+or length limit is imposed locally. `Categories` is nullable: omitting it
+leaves existing app-category relationships untouched (no Graph call at all);
+`Categories: []` clears all of them; one or more entries fully synchronizes
+the desired set. Category names are matched against the tenant catalog only
+at publish/dry-run time — this checker never resolves them against Graph, so
+a name that does not exist in the tenant is not caught here.
+
 ## Static validation checklist
 
 Review these invariants before invoking the CLI. The bundled checker
@@ -138,11 +189,15 @@ reports each violation under the listed `RP0xx` code.
    every present `ReturnCodes[].Type` is a supported value (`RP035`-`RP039`).
 7. `Detection.Type` is `script` and `Detection.ScriptFile` is non-empty
    (`RP040`, `RP041`).
-8. The YAML order and unrelated fields remain unchanged.
+8. `Assignments` entries use supported `Target`/`Mode`/`Intent`/`FilterMode`/
+   `Settings.Notifications` values, `GroupId`/`FilterId` are valid GUIDs when
+   present, and no two entries duplicate the same target (`RP050`-`RP057`).
+9. `Categories` entries are non-blank, have no outer whitespace, and contain
+   no case-insensitive duplicates (`RP060`-`RP062`).
+10. The YAML order and unrelated fields remain unchanged.
 
-Items not covered by this checklist or the bundled checker — `Assignments`,
-`Categories`, and the `.intunewin` build itself — are out of scope for this
-skill; see `docs/plan/relaypublisher-manifest.md`.
+The `.intunewin` build itself is out of scope for this skill — this contract
+only governs the manifest, never the packaging step.
 
 ## Fixtures
 
@@ -157,6 +212,10 @@ by `../tests/test_manifest_policy.py`:
 | `invalid-windows-missing-package.yaml` | Rejects a Windows entry with no `Package` block (`RP032`, item 5) |
 | `invalid-windows-bad-restart-behavior.yaml` | Rejects an unsupported `RestartBehavior` value (`RP038`, item 6) |
 | `invalid-unsupported-platform.yaml` | Rejects a `Platform` that is neither `windows` nor `macos` (`RP013`, item 1) |
+| `valid-assignments-categories-scripts.yaml` | Valid `Assignments`/`Categories` (macOS entry; the Windows shape is identical) (items 8-9) |
+| `invalid-assignment-duplicate-target.yaml` | Rejects two assignments resolving to the same target (`RP057`, item 8) |
+| `invalid-categories-duplicate.yaml` | Rejects a case-insensitive duplicate category name (`RP062`, item 9) |
+| `invalid-scripts-on-windows.yaml` | Rejects macOS-only `Scripts` set on a Windows entry (`RP070`; see [macos-manifest.md](macos-manifest.md#static-validation-checklist)) |
 
 ## Complete examples
 

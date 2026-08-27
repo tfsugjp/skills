@@ -111,11 +111,46 @@ This means omission is intentional even when the package contains the updater. T
 remaining listed apps must still be real bundles installed by the PKG; omission is
 not permission to fabricate a substitute bundle.
 
+## Pre/post-install Scripts (`AppType: pkg` only)
+
+```yaml
+Scripts:
+  PreInstall: scripts/macos/contoso-tool/preinstall.sh   # optional
+  PostInstall: scripts/macos/contoso-tool/postinstall.sh # optional
+```
+
+`Scripts` maps to the Graph `macOSPkgApp` resource's `preInstallScript`/
+`postInstallScript` and only exists for `AppType: pkg`; `AppType: lob` and
+every `Platform: windows` entry must not set it. When `Scripts` is present,
+at least one of `PreInstall`/`PostInstall` is required (both null is
+invalid). Each set value must be a repository-relative path with no
+traversal segments or absolute-path prefix, and must have a `.sh` extension.
+
+When the bundled checker is run with `--repo-root`, it additionally confirms
+the script file exists, has no UTF-8 byte-order mark (a BOM before the
+shebang stops macOS from launching the script at all), starts with a
+shebang (`#!`), and stays under the target Graph resource's documented
+15,360-character limit after CRLF/CR-to-LF normalization. Without
+`--repo-root`, only the path shape and extension are checked — the same
+shape-only/existence-gated split used for the root `Icon`.
+
+Script contents are never included in any hash this checker computes (there
+is none today); a script-only change does not require re-uploading the PKG.
+
+## Assignments and Categories (shared with Windows)
+
+`Assignments` and `Categories` use the identical shape on macOS and Windows
+entries. See
+[windows-manifest.md](windows-manifest.md#assignments-shared-with-macos) for
+the full field tables, enum values, and duplicate/uniqueness rules. The one
+macOS-specific rule: `AppType: pkg` (the default) forbids
+`Assignments[].Intent: uninstall`; `AppType: lob` allows it.
+
 ## Static validation checklist
 
 Review these invariants before invoking the CLI. The bundled checker
-(`scripts/manifest_policy.py`) enforces items 0–6 automatically and reports each
-violation under the listed `RP0xx` code; items 7–8 are authoring discipline the
+(`scripts/manifest_policy.py`) enforces items 0–8 automatically and reports each
+violation under the listed `RP0xx` code; items 9–10 are authoring discipline the
 checker cannot fully verify on its own.
 
 0. `Platform` is `macos` (`RP013`); `Architecture` is `x64` or `arm64` and matches
@@ -137,9 +172,17 @@ checker cannot fully verify on its own.
    (`RP011`).
 6. A present `PrimaryBundleId` is non-blank (`RP009`) and has exactly one exact or
    dot-segment-prefix match (`RP010`).
-7. Updaters are omitted deliberately rather than represented by a new exclusion
+7. `Scripts` (if present) is set only on `AppType: pkg`, sets at least one of
+   `PreInstall`/`PostInstall`, uses a safe repository-relative `.sh` path, and
+   (with `--repo-root`) exists, has no BOM, starts with a shebang, and stays
+   under the character limit (`RP070`-`RP079`).
+8. `Assignments`/`Categories` satisfy the shared rules in
+   [windows-manifest.md](windows-manifest.md#assignments-shared-with-macos)
+   (`RP050`-`RP062`), including the macOS `AppType: pkg` + `Intent: uninstall`
+   restriction (`RP058`).
+9. Updaters are omitted deliberately rather than represented by a new exclusion
    property.
-8. The YAML order and unrelated fields remain unchanged.
+10. The YAML order and unrelated fields remain unchanged.
 
 Use the Relaypublisher CLI without packaging or publication:
 
@@ -257,7 +300,7 @@ mapping.
 
 | Fixture | Checklist item(s) exercised |
 |---|---|
-| `valid-pkg-multibundle.yaml` | Full valid shape; the updater is intentionally omitted from `IncludedApps` (item 7) |
+| `valid-pkg-multibundle.yaml` | Full valid shape; the updater is intentionally omitted from `IncludedApps` (item 9) |
 | `valid-lob-multibundle.yaml` | Full valid LOB shape, including `BundleBuildVersion` and root `Icon` (items 5, 6) |
 | `valid-primary-prefix-match.yaml` | Dot-segment-prefix primary match (item 6) |
 | `invalid-dmg.yaml` | Rejects `InstallerType: dmg` (`RP001`, item 1) |
@@ -267,5 +310,9 @@ mapping.
 | `invalid-lob-missing-build.yaml` | Rejects a `lob` entry missing `BundleBuildVersion` (`RP007`, item 5) |
 | `invalid-pkg-with-build.yaml` | Rejects a `pkg` entry that fabricates `BundleBuildVersion` (`RP008`, item 5) |
 | `invalid-unsupported-platform.yaml` | Rejects a `Platform` that is neither `macos` nor `windows` (`RP013`, item 0) |
+| `valid-assignments-categories-scripts.yaml` | Valid `Scripts`/`Categories`/`Assignments` together on a macOS `pkg` entry (items 7, 8) |
+| `invalid-assignment-duplicate-target.yaml` | Rejects two assignments resolving to the same target (`RP057`, item 8) |
+| `invalid-categories-duplicate.yaml` | Rejects a case-insensitive duplicate category name (`RP062`, item 8) |
+| `invalid-scripts-on-windows.yaml` | Rejects macOS-only `Scripts` set on a Windows entry (`RP070`, item 7) |
 
 See [windows-manifest.md](windows-manifest.md#fixtures) for the Windows-side fixtures.

@@ -8,12 +8,11 @@ not the Relaypublisher schema validator and passing it is not equivalent to a
 passing ``relaypublisher validate`` run: it only catches the manifest-authoring
 mistakes this skill is responsible for (wrong installer type per platform,
 malformed ``IncludedApps``/``Package``/``Install``/``Detection`` blocks,
-ambiguous or unresolved macOS primary-bundle selectors, and cross-platform
-field misuse). It never downloads, unpacks, or inspects a package or
-``.intunewin``, and it never calls Microsoft Graph or changes tenant state.
-
-Assignments, Categories, and macOS pre/post-install Scripts are out of scope
-for this checker; see docs/plan/relaypublisher-manifest.md.
+ambiguous or unresolved macOS primary-bundle selectors, cross-platform field
+misuse, and malformed ``Assignments``/``Categories``/macOS ``Scripts``
+blocks). It never downloads, unpacks, or inspects a package or
+``.intunewin``, and it never calls Microsoft Graph or changes tenant state —
+Category names are never resolved against a tenant catalog.
 """
 
 from __future__ import annotations
@@ -22,8 +21,9 @@ import argparse
 import json
 import re
 import sys
+import uuid
 from dataclasses import asdict, dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 SUPPORTED_PLATFORMS = {"windows", "macos"}
@@ -50,6 +50,19 @@ RESTART_BEHAVIORS = {"suppress", "allow", "force"}
 RETURN_CODE_TYPES = {"success", "softReboot", "hardReboot", "retry", "failed"}
 WINDOWS_DETECTION_TYPES = {"script"}
 
+ASSIGNMENT_TARGETS = {"group", "allDevices", "allLicensedUsers"}
+DEFAULT_ASSIGNMENT_TARGET = "group"
+ASSIGNMENT_MODES = {"include", "exclude"}
+DEFAULT_ASSIGNMENT_MODE = "include"
+ASSIGNMENT_INTENTS = {"required", "available", "uninstall"}
+FILTER_MODES = {"include", "exclude"}
+NOTIFICATION_VALUES = {"showAll", "showReboot", "hideAll"}
+
+MACOS_SCRIPT_EXTENSION = ".sh"
+MAX_MACOS_SCRIPT_CHARS = 15360
+MAX_MACOS_SCRIPT_BYTES = MAX_MACOS_SCRIPT_CHARS * 4 + 3
+UTF8_BOM = b"\xef\xbb\xbf"
+
 
 class MissingDependencyError(RuntimeError):
     """Raised when PyYAML is required but not installed."""
@@ -74,6 +87,56 @@ def _finding(code: str, severity: str, path: str, message: str) -> Finding:
 
 def _is_nonblank_str(value: Any) -> bool:
     return isinstance(value, str) and value.strip() != ""
+
+
+def _is_valid_guid(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
+_DRIVE_LETTER_PREFIX_RE = re.compile(r"^[A-Za-z]:")
+
+
+def _is_safe_relative_path(value: Any) -> bool:
+    """Mirror Relaypublisher's PathSafety.IsSafeRelativePath: non-blank, not absolute
+    (checked against both POSIX and Windows conventions, since a manifest may be
+    authored on either OS), and no ".." traversal segment.
+
+    A drive-relative Windows path like "C:foo" (no separator after the colon) is
+    checked explicitly: PureWindowsPath("C:foo").is_absolute() is False, but .NET's
+    Path.IsPathRooted("C:foo") — what PathSafety.cs actually calls — is True, so a
+    bare .is_absolute() check alone would let it through.
+    """
+    if not _is_nonblank_str(value):
+        return False
+    if value.startswith("/") or value.startswith("\\"):
+        return False
+    if _DRIVE_LETTER_PREFIX_RE.match(value):
+        return False
+    if PureWindowsPath(value).is_absolute():
+        return False
+    if ".." in re.split(r"[/\\]", value):
+        return False
+    return True
+
+
+def _resolve_within_repo_root(repo_root: Path, relative_path: str) -> Path | None:
+    """Resolve `relative_path` under `repo_root`, following symlinks, and confirm the
+    result still stays inside the root — mirroring PathSafety.ResolveWithin. Returns
+    None when it escapes (e.g. a symlink inside the repo pointing outside it), so the
+    caller never treats an out-of-root file as a validated manifest asset."""
+    root_resolved = repo_root.resolve()
+    candidate = (root_resolved / relative_path).resolve()
+    try:
+        candidate.relative_to(root_resolved)
+    except ValueError:
+        return None
+    return candidate
 
 
 def _resolve_primary(selector: str, bundle_ids: list[str]) -> list[str]:
@@ -185,6 +248,235 @@ def _evaluate_common_app(index: int, app: dict) -> list[Finding]:
                     f"Requirements.Architecture {requirements_architecture!r} must match the app Architecture {architecture!r}",
                 )
             )
+
+    return findings
+
+
+def _evaluate_assignments(app_path: str, assignments: Any, is_macos_pkg: bool) -> list[Finding]:
+    """RP050-RP058: the `Assignments` block, shared by Windows and macOS entries."""
+    findings: list[Finding] = []
+    if assignments is None:
+        return findings
+    if not isinstance(assignments, list):
+        findings.append(_finding("RP050", "error", f"{app_path}.Assignments", "Assignments must be a list"))
+        return findings
+
+    seen_keys: set[str] = set()
+    for i, entry in enumerate(assignments):
+        entry_path = f"{app_path}.Assignments[{i}]"
+        if not isinstance(entry, dict):
+            findings.append(_finding("RP050", "error", entry_path, "entry must be a mapping"))
+            continue
+
+        target = entry.get("Target")
+        if target is not None and target not in ASSIGNMENT_TARGETS:
+            findings.append(
+                _finding(
+                    "RP050",
+                    "error",
+                    f"{entry_path}.Target",
+                    f"unsupported Target (must be one of {sorted(ASSIGNMENT_TARGETS)}): {target!r}",
+                )
+            )
+        effective_target = target if target in ASSIGNMENT_TARGETS else DEFAULT_ASSIGNMENT_TARGET
+
+        group_id = entry.get("GroupId")
+        if effective_target == "group":
+            if not _is_valid_guid(group_id):
+                findings.append(
+                    _finding("RP051", "error", f"{entry_path}.GroupId", f"GroupId must be a valid GUID for Target 'group': {group_id!r}")
+                )
+        elif group_id is not None:
+            findings.append(
+                _finding("RP051", "error", f"{entry_path}.GroupId", f"GroupId must not be set when Target is {effective_target!r}")
+            )
+
+        mode = entry.get("Mode")
+        if mode is not None and mode not in ASSIGNMENT_MODES:
+            findings.append(
+                _finding("RP052", "error", f"{entry_path}.Mode", f"unsupported Mode (must be one of {sorted(ASSIGNMENT_MODES)}): {mode!r}")
+            )
+        effective_mode = mode if mode in ASSIGNMENT_MODES else DEFAULT_ASSIGNMENT_MODE
+
+        intent = entry.get("Intent")
+        if effective_mode == "include" and not _is_nonblank_str(intent):
+            findings.append(_finding("RP053", "error", f"{entry_path}.Intent", "Intent is required for include assignments"))
+        elif intent is not None and intent not in ASSIGNMENT_INTENTS:
+            findings.append(
+                _finding("RP053", "error", f"{entry_path}.Intent", f"unsupported Intent (must be one of {sorted(ASSIGNMENT_INTENTS)}): {intent!r}")
+            )
+
+        filter_id = entry.get("FilterId")
+        if filter_id is not None and not _is_valid_guid(filter_id):
+            findings.append(_finding("RP054", "error", f"{entry_path}.FilterId", f"FilterId must be a valid GUID: {filter_id!r}"))
+
+        filter_mode = entry.get("FilterMode")
+        if filter_id is not None and filter_mode not in FILTER_MODES:
+            findings.append(
+                _finding(
+                    "RP055",
+                    "error",
+                    f"{entry_path}.FilterMode",
+                    f"FilterMode ('include' or 'exclude') is required when FilterId is set: {filter_mode!r}",
+                )
+            )
+
+        settings = entry.get("Settings")
+        if isinstance(settings, dict):
+            notifications = settings.get("Notifications")
+            if notifications is not None and notifications not in NOTIFICATION_VALUES:
+                findings.append(
+                    _finding(
+                        "RP056",
+                        "error",
+                        f"{entry_path}.Settings.Notifications",
+                        f"unsupported Notifications (must be one of {sorted(NOTIFICATION_VALUES)}): {notifications!r}",
+                    )
+                )
+
+        key = f"{effective_target}|{group_id.lower() if isinstance(group_id, str) else group_id}|{effective_mode}"
+        if key in seen_keys:
+            findings.append(_finding("RP057", "error", entry_path, f"duplicate assignment target: {key}"))
+        seen_keys.add(key)
+
+        if is_macos_pkg and intent == "uninstall":
+            findings.append(
+                _finding("RP058", "error", f"{entry_path}.Intent", "Intent 'uninstall' is not supported for macOS AppType 'pkg' apps")
+            )
+
+    return findings
+
+
+def _evaluate_categories(app_path: str, categories: Any) -> list[Finding]:
+    """RP060-RP062: the `Categories` field, shared by Windows and macOS entries.
+
+    Category names are matched verbatim against the tenant catalog at publish
+    time; that resolution is a Graph preflight concern and out of scope here.
+    Omitting `Categories` entirely (None) is intentionally left unflagged and
+    unprocessed: it means "leave existing app-category relationships
+    untouched", which is different from `Categories: []` ("clear all").
+    """
+    findings: list[Finding] = []
+    if categories is None:
+        return findings
+    if not isinstance(categories, list):
+        findings.append(_finding("RP060", "error", f"{app_path}.Categories", "Categories must be a list"))
+        return findings
+
+    seen_lower: set[str] = set()
+    for i, name in enumerate(categories):
+        entry_path = f"{app_path}.Categories[{i}]"
+        if not _is_nonblank_str(name):
+            findings.append(_finding("RP060", "error", entry_path, "Categories entries must not be empty or whitespace-only"))
+            continue
+        if name != name.strip():
+            findings.append(_finding("RP061", "error", entry_path, f"Categories entry must not have leading/trailing whitespace: {name!r}"))
+        lowered = name.lower()
+        if lowered in seen_lower:
+            findings.append(_finding("RP062", "error", entry_path, f"duplicate Categories name (case-insensitive): {name!r}"))
+        seen_lower.add(lowered)
+
+    return findings
+
+
+def _evaluate_macos_scripts(app_path: str, platform: str, app_type: str, scripts: Any, repo_root: Path | None) -> list[Finding]:
+    """RP070-RP079: the macOS `Scripts` (pre/post-install) block, `AppType: pkg` only."""
+    findings: list[Finding] = []
+    if scripts is None:
+        return findings
+
+    if platform == "windows" or app_type == "lob":
+        findings.append(
+            _finding(
+                "RP070",
+                "error",
+                f"{app_path}.Scripts",
+                "Scripts must not be set for Platform 'windows' or macOS AppType 'lob'; pre/post-install scripts are only supported for AppType 'pkg'",
+            )
+        )
+        return findings
+
+    if not isinstance(scripts, dict):
+        findings.append(_finding("RP070", "error", f"{app_path}.Scripts", "Scripts must be a mapping"))
+        return findings
+
+    pre_install = scripts.get("PreInstall")
+    post_install = scripts.get("PostInstall")
+    if pre_install is None and post_install is None:
+        findings.append(_finding("RP071", "error", f"{app_path}.Scripts", "Scripts must set at least one of PreInstall or PostInstall"))
+
+    for field, value in (("PreInstall", pre_install), ("PostInstall", post_install)):
+        if value is None:
+            continue
+        field_path = f"{app_path}.Scripts.{field}"
+        if not _is_safe_relative_path(value):
+            findings.append(
+                _finding("RP072", "error", field_path, f"{field} must be a repository-relative path without traversal segments: {value!r}")
+            )
+            continue
+        if Path(value).suffix.lower() != MACOS_SCRIPT_EXTENSION:
+            findings.append(_finding("RP073", "error", field_path, f"{field} must have the '{MACOS_SCRIPT_EXTENSION}' extension: {value!r}"))
+            continue
+        if repo_root is not None:
+            findings.extend(_evaluate_macos_script_file(field_path, field, value, repo_root))
+
+    return findings
+
+
+def _evaluate_macos_script_file(field_path: str, field: str, relative_path: str, repo_root: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    full_path = _resolve_within_repo_root(repo_root, relative_path)
+    if full_path is None:
+        findings.append(
+            _finding(
+                "RP074",
+                "error",
+                field_path,
+                f"{field} '{relative_path}' resolves outside the repository root (after following symlinks)",
+            )
+        )
+        return findings
+    if not full_path.is_file():
+        findings.append(_finding("RP074", "error", field_path, f"{field} '{relative_path}' does not exist under the repository root"))
+        return findings
+
+    size = full_path.stat().st_size
+    if size > MAX_MACOS_SCRIPT_BYTES:
+        findings.append(
+            _finding(
+                "RP076",
+                "error",
+                field_path,
+                f"{field} '{relative_path}' is {size} bytes, exceeding the maximum of {MAX_MACOS_SCRIPT_BYTES} bytes",
+            )
+        )
+        return findings
+
+    raw = full_path.read_bytes()
+    has_bom = raw.startswith(UTF8_BOM)
+    if has_bom:
+        findings.append(_finding("RP075", "error", field_path, f"{field} '{relative_path}' must not have a UTF-8 byte order mark (BOM)"))
+
+    try:
+        text = raw.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        findings.append(_finding("RP079", "error", field_path, f"{field} '{relative_path}' must be valid UTF-8 without invalid byte sequences"))
+        return findings
+
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    if len(normalized) >= MAX_MACOS_SCRIPT_CHARS:
+        findings.append(
+            _finding(
+                "RP077",
+                "error",
+                field_path,
+                f"{field} '{relative_path}' is {len(normalized)} characters, meeting or exceeding the maximum of {MAX_MACOS_SCRIPT_CHARS}",
+            )
+        )
+
+    text_after_bom = normalized[1:] if has_bom and normalized.startswith("﻿") else normalized
+    if not text_after_bom.startswith("#!"):
+        findings.append(_finding("RP078", "error", field_path, f"{field} '{relative_path}' must start with a shebang ('#!')"))
 
     return findings
 
@@ -363,9 +655,17 @@ def _evaluate_macos_app(index: int, app: dict, root: dict, repo_root: Path | Non
     if app_type == "lob" and not _is_nonblank_str(root.get("Icon")):
         findings.append(_finding("RP011", "error", "Icon", "AppType: lob requires a non-empty root Icon path"))
     elif app_type == "lob" and repo_root is not None:
-        icon_path = (repo_root / root["Icon"]).resolve()
-        if not icon_path.is_file():
+        icon_path = _resolve_within_repo_root(repo_root, root["Icon"])
+        if icon_path is None:
+            findings.append(
+                _finding("RP011", "error", "Icon", f"Icon path resolves outside the repository root (after following symlinks): {root['Icon']}")
+            )
+        elif not icon_path.is_file():
             findings.append(_finding("RP011", "error", "Icon", f"Icon path does not exist under repo root: {root['Icon']}"))
+
+    findings.extend(_evaluate_assignments(app_path, app.get("Assignments"), is_macos_pkg=(app_type == "pkg")))
+    findings.extend(_evaluate_categories(app_path, app.get("Categories")))
+    findings.extend(_evaluate_macos_scripts(app_path, "macos", app_type, app.get("Scripts"), repo_root))
 
     return findings
 
@@ -509,6 +809,9 @@ def _evaluate_windows_app(index: int, app: dict) -> list[Finding]:
     findings.extend(_evaluate_windows_package(app_path, app.get("Package")))
     findings.extend(_evaluate_windows_install(app_path, app.get("Install")))
     findings.extend(_evaluate_windows_detection(app_path, app.get("Detection")))
+    findings.extend(_evaluate_assignments(app_path, app.get("Assignments"), is_macos_pkg=False))
+    findings.extend(_evaluate_categories(app_path, app.get("Categories")))
+    findings.extend(_evaluate_macos_scripts(app_path, "windows", None, app.get("Scripts"), None))
 
     return findings
 

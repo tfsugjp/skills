@@ -1,0 +1,34 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.DuplicateAssignment
+PackageName: Contoso Duplicate Assignment
+Publisher: Contoso Ltd.
+Description: Two assignments target the same group with the same Mode.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: macos
+    Architecture: arm64
+    InstallerType: pkg
+    AppType: pkg
+    Source:
+      Type: azureBlob
+      AccountName: examplepackages
+      Container: intune-packages
+      BlobName: macos/contoso-dup/1.0.0/Contoso.pkg
+      Destination: Contoso.pkg
+      Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      Auth:
+        Type: workloadIdentity
+    Requirements:
+      MinimumOSVersion: "13.0"
+    Detection:
+      IncludedApps:
+        - BundleId: com.example.contoso.client
+          BundleVersion: "1.0.0"
+    Assignments:
+      - Target: group
+        GroupId: "00000000-0000-0000-0000-000000000001"
+        Intent: required
+      - Target: group
+        GroupId: "00000000-0000-0000-0000-000000000001"
+        Intent: available

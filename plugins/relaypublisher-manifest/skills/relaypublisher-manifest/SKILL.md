@@ -59,9 +59,10 @@ field mapping, examples, and static-validation checklist for each platform.
 - Do not add an updater exclusion list or an automatic updater allow/deny
   heuristic. Omit an updater from macOS `IncludedApps` when it must not
   participate in detection.
-- `Assignments`, `Categories`, and macOS pre/post-install `Scripts` are out of
-  scope for this skill even though the target schema defines them; do not
-  author or validate those fields.
+- `Assignments` and `Categories` (shared by both platforms) and macOS
+  pre/post-install `Scripts` may be authored and statically validated, but
+  only the manifest fields — never call Microsoft Graph to resolve a category
+  name against a tenant or to apply an assignment.
 
 ## Author or update a Windows Win32 manifest
 
@@ -90,6 +91,9 @@ field mapping, examples, and static-validation checklist for each platform.
 6. Set `Requirements.MinimumOSVersion` to the real minimum build, and
    `Requirements.Architecture` (if set) to match the app-level `Architecture`
    exactly.
+7. If the user asks for `Assignments` or `Categories`, follow the shared rules
+   in step 8 of "Author or update a macOS manifest" below — they are identical
+   on Windows.
 
 If required installer metadata is unavailable, stop with a clear request for
 the exact values and leave the manifest unchanged.
@@ -122,6 +126,22 @@ the exact values and leave the manifest unchanged.
    represented by omission from `IncludedApps`, never by an invented exclude field.
 7. Preserve the manifest's declared order even when a non-first entry is selected as
    primary. Do not rewrite other entries around the selector.
+8. If the user asks for `Assignments` (shared by both platforms): use a real
+   Entra ID group GUID for `Target: group`, set no `GroupId` for
+   `allDevices`/`allLicensedUsers`, set `Intent` for every `include`-mode entry
+   (default), and never add `Intent: uninstall` to a macOS `AppType: pkg`
+   entry — `AppType: lob` and Windows both allow it. Never add a second entry
+   that resolves to the same `(Target, GroupId, Mode)` as an existing one. For
+   `Categories` (also shared): use the tenant's real category display names
+   verbatim (no trimming), keep them unique per entry (case-insensitive), and
+   distinguish omitting `Categories` (leaves existing relationships alone)
+   from `Categories: []` (clears all of them) — never emit an empty list only
+   to make omission "explicit".
+9. If the user asks for pre/post-install `Scripts` on an `AppType: pkg` entry:
+   set at least one of `PreInstall`/`PostInstall` to the real script's
+   repository-relative `.sh` path. Never set `Scripts` on `AppType: lob` or a
+   Windows entry. Do not alter the referenced script's content — that is a
+   separately authorized task, not manifest authoring.
 
 If required bundle metadata is unavailable, stop with a clear request for the exact
 values and leave the manifest unchanged. A syntactically valid but fabricated
@@ -158,7 +178,10 @@ This checker is not the Relaypublisher schema authority — it only catches the
 manifest-authoring mistakes this skill is responsible for (wrong installer
 type per platform, malformed `Package`/`Install`/`Detection`/`IncludedApps`
 blocks, ambiguous/unresolved macOS primary selectors, cross-platform field
-misuse, and source-item shape errors).
+misuse, source-item shape errors, and malformed `Assignments`/`Categories`/
+macOS `Scripts`). It never resolves a `Categories` name against a tenant
+catalog or applies an `Assignments` entry — those remain Graph-side concerns
+outside this skill's boundary.
 
 ### 2. Relaypublisher CLI (when available)
 
