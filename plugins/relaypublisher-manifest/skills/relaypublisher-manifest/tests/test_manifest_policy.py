@@ -610,6 +610,268 @@ class CrossPlatformFieldMisuseTests(unittest.TestCase):
         self.assertIn("RP044", codes(errors(findings)))
 
 
+VALID_GROUP_ID = "00000000-0000-0000-0000-000000000001"
+OTHER_GROUP_ID = "00000000-0000-0000-0000-000000000002"
+VALID_FILTER_ID = "00000000-0000-0000-0000-0000000000ff"
+
+
+class AssignmentsTests(unittest.TestCase):
+    """RP050-RP058: the `Assignments` block, shared by Windows and macOS entries."""
+
+    def test_valid_group_assignment_has_no_errors(self):
+        app = base_pkg_app(Assignments=[{"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "required"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_valid_all_devices_assignment_has_no_errors(self):
+        app = base_pkg_app(Assignments=[{"Target": "allDevices", "Intent": "required"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_unsupported_target_is_rejected(self):
+        app = base_pkg_app(Assignments=[{"Target": "allComputers", "Intent": "required"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP050", codes(errors(findings)))
+
+    def test_group_id_required_for_group_target(self):
+        app = base_pkg_app(Assignments=[{"Target": "group", "Intent": "required"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP051", codes(errors(findings)))
+
+    def test_group_id_must_be_guid(self):
+        app = base_pkg_app(Assignments=[{"Target": "group", "GroupId": "not-a-guid", "Intent": "required"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP051", codes(errors(findings)))
+
+    def test_group_id_forbidden_for_non_group_target(self):
+        app = base_pkg_app(Assignments=[{"Target": "allDevices", "GroupId": VALID_GROUP_ID, "Intent": "required"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP051", codes(errors(findings)))
+
+    def test_unsupported_mode_is_rejected(self):
+        app = base_pkg_app(Assignments=[{"Target": "allDevices", "Mode": "sometimes", "Intent": "required"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP052", codes(errors(findings)))
+
+    def test_intent_required_for_include_mode(self):
+        app = base_pkg_app(Assignments=[{"Target": "allDevices", "Mode": "include"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP053", codes(errors(findings)))
+
+    def test_intent_not_required_for_exclude_mode(self):
+        app = base_pkg_app(Assignments=[{"Target": "allDevices", "Mode": "exclude"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_unsupported_intent_is_rejected(self):
+        app = base_pkg_app(Assignments=[{"Target": "allDevices", "Intent": "delete"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP053", codes(errors(findings)))
+
+    def test_filter_id_must_be_guid(self):
+        app = base_pkg_app(Assignments=[{"Target": "allDevices", "Intent": "required", "FilterId": "not-a-guid", "FilterMode": "include"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP054", codes(errors(findings)))
+
+    def test_filter_mode_required_when_filter_id_set(self):
+        app = base_pkg_app(Assignments=[{"Target": "allDevices", "Intent": "required", "FilterId": VALID_FILTER_ID}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP055", codes(errors(findings)))
+
+    def test_valid_filter_has_no_errors(self):
+        app = base_pkg_app(
+            Assignments=[{"Target": "allDevices", "Intent": "required", "FilterId": VALID_FILTER_ID, "FilterMode": "include"}]
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_unsupported_notifications_is_rejected(self):
+        app = base_windows_app(Assignments=[{"Target": "allDevices", "Intent": "required", "Settings": {"Notifications": "showSome"}}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP056", codes(errors(findings)))
+
+    def test_valid_notifications_has_no_errors(self):
+        app = base_windows_app(
+            Assignments=[{"Target": "allDevices", "Intent": "required", "Settings": {"Notifications": "showReboot", "RestartGracePeriodMinutes": 60}}]
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_duplicate_target_is_rejected(self):
+        app = base_pkg_app(
+            Assignments=[
+                {"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "required"},
+                {"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "available"},
+            ]
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP057", codes(errors(findings)))
+
+    def test_same_group_different_mode_is_not_duplicate(self):
+        app = base_pkg_app(
+            Assignments=[
+                {"Target": "group", "GroupId": VALID_GROUP_ID, "Mode": "include", "Intent": "required"},
+                {"Target": "group", "GroupId": VALID_GROUP_ID, "Mode": "exclude"},
+            ]
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_different_groups_are_not_duplicates(self):
+        app = base_pkg_app(
+            Assignments=[
+                {"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "required"},
+                {"Target": "group", "GroupId": OTHER_GROUP_ID, "Intent": "available"},
+            ]
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_uninstall_intent_forbidden_for_macos_pkg(self):
+        app = base_pkg_app(Assignments=[{"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "uninstall"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP058", codes(errors(findings)))
+
+    def test_uninstall_intent_allowed_for_macos_lob(self):
+        app = base_pkg_app(
+            AppType="lob",
+            Detection={
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0", "BundleBuildVersion": "1"}],
+            },
+            Assignments=[{"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "uninstall"}],
+        )
+        findings = evaluate(manifest_with_apps(app, Icon="icons/contoso.png"))
+        self.assertEqual(errors(findings), [])
+
+    def test_uninstall_intent_allowed_for_windows(self):
+        app = base_windows_app(Assignments=[{"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "uninstall"}])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_omitted_assignments_has_no_errors(self):
+        findings = evaluate(manifest_with_apps(base_pkg_app()))
+        self.assertEqual(errors(findings), [])
+
+
+class CategoriesTests(unittest.TestCase):
+    """RP060-RP062: the `Categories` field, shared by Windows and macOS entries."""
+
+    def test_valid_categories_have_no_errors(self):
+        app = base_pkg_app(Categories=["Business Apps", "Productivity"])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_omitted_categories_has_no_errors(self):
+        findings = evaluate(manifest_with_apps(base_pkg_app()))
+        self.assertEqual(errors(findings), [])
+
+    def test_empty_categories_list_has_no_errors(self):
+        app = base_pkg_app(Categories=[])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_blank_category_is_rejected(self):
+        app = base_pkg_app(Categories=["Business Apps", "   "])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP060", codes(errors(findings)))
+
+    def test_outer_whitespace_is_rejected(self):
+        app = base_pkg_app(Categories=[" Business Apps"])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP061", codes(errors(findings)))
+
+    def test_case_insensitive_duplicate_is_rejected(self):
+        app = base_pkg_app(Categories=["Business Apps", "business apps"])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP062", codes(errors(findings)))
+
+    def test_exact_duplicate_is_rejected(self):
+        app = base_pkg_app(Categories=["Business Apps", "Business Apps"])
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP062", codes(errors(findings)))
+
+
+class MacOsScriptsTests(unittest.TestCase):
+    """RP070-RP079: the macOS `Scripts` (pre/post-install) block, AppType: pkg only."""
+
+    def test_valid_scripts_have_no_errors(self):
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/macos/tool/preinstall.sh", "PostInstall": "scripts/macos/tool/postinstall.sh"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_only_pre_install_is_valid(self):
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/macos/tool/preinstall.sh"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_omitted_scripts_has_no_errors(self):
+        findings = evaluate(manifest_with_apps(base_pkg_app()))
+        self.assertEqual(errors(findings), [])
+
+    def test_scripts_on_windows_is_rejected(self):
+        app = base_windows_app(Scripts={"PreInstall": "scripts/preinstall.sh"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP070", codes(errors(findings)))
+
+    def test_scripts_on_macos_lob_is_rejected(self):
+        app = base_pkg_app(
+            AppType="lob",
+            Detection={
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0", "BundleBuildVersion": "1"}],
+            },
+            Scripts={"PreInstall": "scripts/preinstall.sh"},
+        )
+        findings = evaluate(manifest_with_apps(app, Icon="icons/contoso.png"))
+        self.assertIn("RP070", codes(errors(findings)))
+
+    def test_both_null_scripts_is_rejected(self):
+        app = base_pkg_app(Scripts={})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP071", codes(errors(findings)))
+
+    def test_absolute_path_is_rejected(self):
+        app = base_pkg_app(Scripts={"PreInstall": "/etc/preinstall.sh"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP072", codes(errors(findings)))
+
+    def test_traversal_path_is_rejected(self):
+        app = base_pkg_app(Scripts={"PreInstall": "../preinstall.sh"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP072", codes(errors(findings)))
+
+    def test_wrong_extension_is_rejected(self):
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/preinstall.py"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP073", codes(errors(findings)))
+
+    def test_missing_script_file_is_rejected_with_repo_root(self):
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/does-not-exist.sh"})
+        findings = evaluate(manifest_with_apps(app), repo_root=FIXTURES)
+        self.assertIn("RP074", codes(errors(findings)))
+
+    def test_valid_script_file_has_no_errors_with_repo_root(self):
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/valid-preinstall.sh"})
+        findings = evaluate(manifest_with_apps(app), repo_root=FIXTURES)
+        self.assertEqual(errors(findings), [])
+
+    def test_bom_script_file_is_rejected_with_repo_root(self):
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/with-bom.sh"})
+        findings = evaluate(manifest_with_apps(app), repo_root=FIXTURES)
+        self.assertIn("RP075", codes(errors(findings)))
+
+    def test_no_shebang_script_file_is_rejected_with_repo_root(self):
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/no-shebang.sh"})
+        findings = evaluate(manifest_with_apps(app), repo_root=FIXTURES)
+        self.assertIn("RP078", codes(errors(findings)))
+
+    def test_script_shape_only_check_without_repo_root(self):
+        # No --repo-root supplied: only path shape/extension are checked, matching Icon's
+        # existing behavior. A nonexistent file is not itself an error here.
+        app = base_pkg_app(Scripts={"PreInstall": "scripts/does-not-exist.sh"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+
 @unittest.skipUnless(HAS_YAML, "PyYAML is not installed")
 class FixtureFileTests(unittest.TestCase):
     """End-to-end tests that load the checked-in YAML fixtures."""
@@ -625,6 +887,7 @@ class FixtureFileTests(unittest.TestCase):
             "valid-primary-prefix-match.yaml",
             "valid-windows-win32-x64.yaml",
             "valid-windows-win32-arm64.yaml",
+            "valid-assignments-categories-scripts.yaml",
         ):
             with self.subTest(fixture=name):
                 findings = evaluate(self._load(name), repo_root=FIXTURES)
@@ -642,6 +905,9 @@ class FixtureFileTests(unittest.TestCase):
             "invalid-windows-apptype-set.yaml": "RP030",
             "invalid-windows-missing-package.yaml": "RP032",
             "invalid-windows-bad-restart-behavior.yaml": "RP038",
+            "invalid-assignment-duplicate-target.yaml": "RP057",
+            "invalid-categories-duplicate.yaml": "RP062",
+            "invalid-scripts-on-windows.yaml": "RP070",
         }
         for name, expected_code in expectations.items():
             with self.subTest(fixture=name):
