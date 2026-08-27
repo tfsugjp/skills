@@ -1,0 +1,33 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.LobMissingBuild
+PackageName: Contoso Lob Missing Build
+Publisher: Contoso Ltd.
+Description: Every lob entry requires BundleBuildVersion; one is missing here.
+PackageVersion: "1.0.0"
+Icon: icons/contoso.png
+
+Apps:
+  - Platform: macos
+    Architecture: arm64
+    InstallerType: pkg
+    AppType: lob
+    DisplayName: Contoso Lob Missing Build [macOS Arm64]
+    Source:
+      Type: azureBlob
+      AccountName: examplepackages
+      Container: intune-packages
+      BlobName: macos/contoso-lob-missing/1.0.0/ContosoLob.pkg
+      Destination: ContosoLob.pkg
+      Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      Auth:
+        Type: workloadIdentity
+    Requirements:
+      MinimumOSVersion: "13.0"
+    Detection:
+      PrimaryBundleId: com.example.contoso.lob.main
+      IncludedApps:
+        - BundleId: com.example.contoso.lob.main
+          BundleVersion: "1.0.0"
+          BundleBuildVersion: "1000"
+        - BundleId: com.example.contoso.lob.helper
+          BundleVersion: "1.0.0"

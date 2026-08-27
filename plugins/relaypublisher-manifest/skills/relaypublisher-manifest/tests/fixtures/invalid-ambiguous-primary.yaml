@@ -1,0 +1,31 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.AmbiguousPrimary
+PackageName: Contoso Ambiguous Primary
+Publisher: Contoso Ltd.
+Description: PrimaryBundleId matches two declared bundles and must be rejected.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: macos
+    Architecture: arm64
+    InstallerType: pkg
+    AppType: pkg
+    DisplayName: Contoso Ambiguous Primary [macOS Arm64]
+    Source:
+      Type: azureBlob
+      AccountName: examplepackages
+      Container: intune-packages
+      BlobName: macos/contoso-ambiguous/1.0.0/Contoso.pkg
+      Destination: Contoso.pkg
+      Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      Auth:
+        Type: workloadIdentity
+    Requirements:
+      MinimumOSVersion: "13.0"
+    Detection:
+      PrimaryBundleId: com.example.client
+      IncludedApps:
+        - BundleId: com.example.client.main
+          BundleVersion: "1.0.0"
+        - BundleId: com.example.client.agent
+          BundleVersion: "1.0.0"
