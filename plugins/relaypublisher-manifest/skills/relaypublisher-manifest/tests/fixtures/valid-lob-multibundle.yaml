@@ -1,0 +1,34 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.MultiBundleLob
+PackageName: Contoso Multi Bundle LOB
+Publisher: Contoso Ltd.
+Description: Multi-bundle macOS LOB example.
+PackageVersion: "4.2.0"
+Icon: icons/contoso.png
+
+Apps:
+  - Platform: macos
+    Architecture: arm64
+    InstallerType: pkg
+    AppType: lob
+    DisplayName: Contoso Multi Bundle LOB [macOS Arm64]
+    Source:
+      Type: azureBlob
+      AccountName: examplepackages
+      Container: intune-packages
+      BlobName: macos/contoso-lob/4.2.0/ContosoLob.pkg
+      Destination: ContosoLob.pkg
+      Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      Auth:
+        Type: workloadIdentity
+    Requirements:
+      MinimumOSVersion: "13.0"
+    Detection:
+      PrimaryBundleId: com.example.contoso.lob.main
+      IncludedApps:
+        - BundleId: com.example.contoso.lob.main
+          BundleVersion: "4.2.0"
+          BundleBuildVersion: "4200"
+        - BundleId: com.example.contoso.lob.helper
+          BundleVersion: "4.2.0"
+          BundleBuildVersion: "4200"

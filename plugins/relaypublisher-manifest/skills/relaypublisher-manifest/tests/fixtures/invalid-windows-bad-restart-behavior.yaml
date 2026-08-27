@@ -1,0 +1,37 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.WindowsBadRestartBehavior
+PackageName: Contoso Windows Bad Restart Behavior
+Publisher: Contoso Ltd.
+Description: >-
+  RestartBehavior must be one of suppress, allow, or force; "reboot" is not a
+  recognized value.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: windows
+    Architecture: x64
+    InstallerType: win32
+    DisplayName: Contoso Windows Bad Restart Behavior [Windows x64]
+
+    Package:
+      IntuneWin:
+        SetupFile: install.ps1
+      ExternalFiles:
+        - Type: publicHttp
+          Url: https://example.com/downloads/contoso-tool-1.0.0-x64.exe
+          Destination: bin/contoso-tool.exe
+          Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+    Install:
+      CommandLine: powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+      UninstallCommandLine: powershell.exe -ExecutionPolicy Bypass -File .\uninstall.ps1
+      InstallExperience: system
+      RestartBehavior: reboot
+
+    Detection:
+      Type: script
+      ScriptFile: scripts/windows/common/detect.ps1
+
+    Requirements:
+      MinimumOSVersion: "10.0.19045"
+      Architecture: x64
