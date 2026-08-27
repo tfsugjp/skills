@@ -10,7 +10,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, and Relaypu
 | `nuget-validate` | NuGet vulnerability, deprecation, listing, freshness, and project-audit validation |
 | `dependabot-safe-merge` | Safe Dependabot refresh, release-age policy, merge gates, and major-upgrade planning |
 | `github-plan-wiki` | Skills: GitHub Plan Issues (parent + sub-issue hierarchy via `gh`), GitHub Wiki Plan (bilingual GitHub wiki publishing and Home index maintenance) |
-| `relaypublisher-manifest` | Relaypublisher manifest creation, updates, and static validation, including multi-bundle macOS PKG and LOB primary detection |
+| `relaypublisher-manifest` | Relaypublisher manifest creation, updates, and static validation, including Windows Win32 and multi-bundle macOS PKG/LOB primary detection |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 

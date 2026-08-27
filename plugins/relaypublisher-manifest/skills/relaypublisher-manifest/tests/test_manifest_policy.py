@@ -27,19 +27,71 @@ def codes(findings):
     return {f.code for f in findings}
 
 
+VALID_SHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+
+def valid_azure_blob_source(**overrides):
+    source = {
+        "Type": "azureBlob",
+        "AccountName": "examplepackages",
+        "Container": "intune-packages",
+        "BlobName": "contoso/1.0.0/Contoso.pkg",
+        "Destination": "Contoso.pkg",
+        "Sha256": VALID_SHA256,
+        "Auth": {"Type": "workloadIdentity"},
+    }
+    source.update(overrides)
+    return source
+
+
 def base_pkg_app(**overrides):
     app = {
         "Platform": "macos",
         "Architecture": "arm64",
         "InstallerType": "pkg",
         "AppType": "pkg",
-        "Source": {"Type": "azureBlob"},
+        "Source": valid_azure_blob_source(),
         "Requirements": {"MinimumOSVersion": "13.0"},
         "Detection": {
             "IncludedApps": [
                 {"BundleId": "com.example.client", "BundleVersion": "1.0.0"},
             ],
         },
+    }
+    app.update(overrides)
+    return app
+
+
+def base_windows_app(**overrides):
+    app = {
+        "Platform": "windows",
+        "Architecture": "x64",
+        "InstallerType": "win32",
+        "Package": {
+            "IntuneWin": {"SetupFile": "install.ps1"},
+            "RepositoryFiles": [
+                {"Source": "scripts/install.ps1", "Destination": "install.ps1"},
+            ],
+            "ExternalFiles": [
+                {
+                    "Type": "publicHttp",
+                    "Url": "https://example.com/downloads/contoso-tool-1.0.0-x64.exe",
+                    "Destination": "bin/contoso-tool.exe",
+                    "Sha256": VALID_SHA256,
+                },
+            ],
+        },
+        "Install": {
+            "CommandLine": r"powershell.exe -ExecutionPolicy Bypass -File .\install.ps1",
+            "UninstallCommandLine": r"powershell.exe -ExecutionPolicy Bypass -File .\uninstall.ps1",
+            "InstallExperience": "system",
+            "RestartBehavior": "suppress",
+        },
+        "Detection": {
+            "Type": "script",
+            "ScriptFile": "scripts/detect.ps1",
+        },
+        "Requirements": {"MinimumOSVersion": "10.0.19045", "Architecture": "x64"},
     }
     app.update(overrides)
     return app
@@ -272,11 +324,36 @@ class EvaluateDictTests(unittest.TestCase):
         findings = evaluate(manifest_with_apps(app))
         self.assertEqual(errors(findings), [])
 
-    def test_non_macos_entry_is_skipped_not_checked(self):
-        windows_app = {"Platform": "windows", "InstallerType": "exe"}
-        findings = evaluate(manifest_with_apps(windows_app))
+    def test_unsupported_platform_is_rejected(self):
+        linux_app = {"Platform": "linux", "InstallerType": "deb"}
+        findings = evaluate(manifest_with_apps(linux_app))
+        self.assertIn("RP013", codes(errors(findings)))
+
+    def test_missing_architecture_is_rejected(self):
+        app = base_pkg_app()
+        del app["Architecture"]
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP014", codes(errors(findings)))
+
+    def test_unsupported_architecture_is_rejected(self):
+        app = base_pkg_app(Architecture="arm")
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP014", codes(errors(findings)))
+
+    def test_missing_minimum_os_version_is_rejected(self):
+        app = base_pkg_app(Requirements={})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP015", codes(errors(findings)))
+
+    def test_requirements_architecture_mismatch_is_rejected(self):
+        app = base_pkg_app(Requirements={"MinimumOSVersion": "13.0", "Architecture": "x64"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP016", codes(errors(findings)))
+
+    def test_requirements_architecture_match_is_valid(self):
+        app = base_pkg_app(Requirements={"MinimumOSVersion": "13.0", "Architecture": "arm64"})
+        findings = evaluate(manifest_with_apps(app))
         self.assertEqual(errors(findings), [])
-        self.assertIn("RP-SKIP", codes(findings))
 
     def test_default_app_type_is_treated_as_pkg(self):
         app = base_pkg_app()
@@ -298,6 +375,241 @@ class EvaluateDictTests(unittest.TestCase):
         self.assertEqual(manifest, before)
 
 
+class SourceItemTests(unittest.TestCase):
+    """RP020-RP027: the source-item shape shared by macOS Source and Windows ExternalFiles."""
+
+    def test_unsupported_source_type_is_rejected(self):
+        app = base_pkg_app(Source=valid_azure_blob_source(Type="ftp"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP020", codes(errors(findings)))
+
+    def test_missing_destination_is_rejected(self):
+        source = valid_azure_blob_source()
+        del source["Destination"]
+        app = base_pkg_app(Source=source)
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP021", codes(errors(findings)))
+
+    def test_invalid_sha256_is_rejected(self):
+        app = base_pkg_app(Source=valid_azure_blob_source(Sha256="not-a-sha256"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP022", codes(errors(findings)))
+
+    def test_public_http_requires_url(self):
+        source = {
+            "Type": "publicHttp",
+            "Destination": "bin/tool.exe",
+            "Sha256": VALID_SHA256,
+        }
+        app = base_pkg_app(Source=source)
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP023", codes(errors(findings)))
+
+    def test_github_release_requires_owner_repository_tag_asset_name(self):
+        source = {
+            "Type": "githubRelease",
+            "Destination": "bin/tool.exe",
+            "Sha256": VALID_SHA256,
+        }
+        app = base_pkg_app(Source=source)
+        findings = evaluate(manifest_with_apps(app))
+        error_codes_by_path = {f.path for f in errors(findings)}
+        for field in ("Owner", "Repository", "Tag", "AssetName"):
+            self.assertIn(f"Apps[0].Source.{field}", error_codes_by_path)
+
+    def test_azure_blob_requires_account_container_blob_name(self):
+        source = {
+            "Type": "azureBlob",
+            "Destination": "bin/tool.exe",
+            "Sha256": VALID_SHA256,
+            "Auth": {"Type": "workloadIdentity"},
+        }
+        app = base_pkg_app(Source=source)
+        findings = evaluate(manifest_with_apps(app))
+        error_codes_by_path = {f.path for f in errors(findings)}
+        for field in ("AccountName", "Container", "BlobName"):
+            self.assertIn(f"Apps[0].Source.{field}", error_codes_by_path)
+
+    def test_unsupported_auth_type_is_rejected(self):
+        app = base_pkg_app(Source=valid_azure_blob_source(Auth={"Type": "basic"}))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP024", codes(errors(findings)))
+
+    def test_token_auth_requires_secret_name(self):
+        source = {
+            "Type": "publicHttp",
+            "Url": "https://example.com/tool.exe",
+            "Destination": "bin/tool.exe",
+            "Sha256": VALID_SHA256,
+            "Auth": {"Type": "token"},
+        }
+        app = base_pkg_app(Source=source)
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP025", codes(errors(findings)))
+
+    def test_github_release_forbids_workload_identity(self):
+        source = {
+            "Type": "githubRelease",
+            "Owner": "contoso",
+            "Repository": "tool",
+            "Tag": "v1.0.0",
+            "AssetName": "tool.exe",
+            "Destination": "bin/tool.exe",
+            "Sha256": VALID_SHA256,
+            "Auth": {"Type": "workloadIdentity"},
+        }
+        app = base_pkg_app(Source=source)
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP026", codes(errors(findings)))
+
+    def test_azure_blob_requires_workload_identity(self):
+        app = base_pkg_app(Source=valid_azure_blob_source(Auth={"Type": "none"}))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP027", codes(errors(findings)))
+
+    def test_valid_source_has_no_errors(self):
+        app = base_pkg_app()
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+
+class WindowsEvaluateDictTests(unittest.TestCase):
+    """Windows Win32 structural checks: RP029-RP041."""
+
+    def test_valid_windows_win32_has_no_errors(self):
+        findings = evaluate(manifest_with_apps(base_windows_app()))
+        self.assertEqual(errors(findings), [])
+
+    def test_unsupported_installer_type_is_rejected(self):
+        app = base_windows_app(InstallerType="msi")
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP029", codes(errors(findings)))
+
+    def test_app_type_on_windows_is_rejected(self):
+        app = base_windows_app(AppType="pkg")
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP030", codes(errors(findings)))
+
+    def test_source_on_windows_is_rejected(self):
+        app = base_windows_app(Source=valid_azure_blob_source())
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP031", codes(errors(findings)))
+
+    def test_missing_package_is_rejected(self):
+        app = base_windows_app()
+        del app["Package"]
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP032", codes(errors(findings)))
+
+    def test_missing_intune_win_setup_file_is_rejected(self):
+        app = base_windows_app()
+        app["Package"] = dict(app["Package"])
+        app["Package"]["IntuneWin"] = {}
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP033", codes(errors(findings)))
+
+    def test_repository_file_missing_destination_is_rejected(self):
+        app = base_windows_app()
+        app["Package"] = dict(app["Package"])
+        app["Package"]["RepositoryFiles"] = [{"Source": "scripts/install.ps1"}]
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP034", codes(errors(findings)))
+
+    def test_external_file_invalid_source_is_rejected(self):
+        app = base_windows_app()
+        app["Package"] = dict(app["Package"])
+        app["Package"]["ExternalFiles"] = [{"Type": "publicHttp", "Destination": "bin/tool.exe"}]
+        findings = evaluate(manifest_with_apps(app))
+        # Missing Sha256 (RP022) and missing Url for publicHttp (RP023).
+        self.assertIn("RP022", codes(errors(findings)))
+        self.assertIn("RP023", codes(errors(findings)))
+
+    def test_missing_install_is_rejected(self):
+        app = base_windows_app()
+        del app["Install"]
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP035", codes(errors(findings)))
+
+    def test_missing_command_lines_are_rejected(self):
+        app = base_windows_app()
+        app["Install"] = {"InstallExperience": "system", "RestartBehavior": "suppress"}
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP036", codes(errors(findings)))
+
+    def test_unsupported_install_experience_is_rejected(self):
+        app = base_windows_app()
+        app["Install"] = dict(app["Install"])
+        app["Install"]["InstallExperience"] = "kiosk"
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP037", codes(errors(findings)))
+
+    def test_unsupported_restart_behavior_is_rejected(self):
+        app = base_windows_app()
+        app["Install"] = dict(app["Install"])
+        app["Install"]["RestartBehavior"] = "reboot"
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP038", codes(errors(findings)))
+
+    def test_unsupported_return_code_type_is_rejected(self):
+        app = base_windows_app()
+        app["Install"] = dict(app["Install"])
+        app["Install"]["ReturnCodes"] = [{"Code": 1602, "Type": "cancelled"}]
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP039", codes(errors(findings)))
+
+    def test_valid_return_codes_have_no_errors(self):
+        app = base_windows_app()
+        app["Install"] = dict(app["Install"])
+        app["Install"]["ReturnCodes"] = [{"Code": 0, "Type": "success"}, {"Code": 3010, "Type": "softReboot"}]
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_missing_detection_is_rejected(self):
+        app = base_windows_app()
+        del app["Detection"]
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP040", codes(errors(findings)))
+
+    def test_unsupported_detection_type_is_rejected(self):
+        app = base_windows_app(Detection={"Type": "msi", "ScriptFile": "scripts/detect.ps1"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP040", codes(errors(findings)))
+
+    def test_missing_detection_script_file_is_rejected(self):
+        app = base_windows_app(Detection={"Type": "script"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP041", codes(errors(findings)))
+
+    def test_arm64_windows_has_no_errors(self):
+        app = base_windows_app(Architecture="arm64", Requirements={"MinimumOSVersion": "10.0.22621", "Architecture": "arm64"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+
+class CrossPlatformFieldMisuseTests(unittest.TestCase):
+    """RP003/RP044: fields belonging to the other platform must not leak across entries."""
+
+    def test_package_on_macos_is_rejected(self):
+        app = base_pkg_app(Package={"IntuneWin": {"SetupFile": "install.ps1"}})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP003", codes(errors(findings)))
+
+    def test_install_on_macos_is_rejected(self):
+        app = base_pkg_app(Install={"CommandLine": "true"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP003", codes(errors(findings)))
+
+    def test_detection_type_on_macos_is_rejected(self):
+        app = base_pkg_app(
+            Detection={
+                "Type": "script",
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}],
+            }
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP044", codes(errors(findings)))
+
+
 @unittest.skipUnless(HAS_YAML, "PyYAML is not installed")
 class FixtureFileTests(unittest.TestCase):
     """End-to-end tests that load the checked-in YAML fixtures."""
@@ -311,6 +623,8 @@ class FixtureFileTests(unittest.TestCase):
             "valid-pkg-multibundle.yaml",
             "valid-lob-multibundle.yaml",
             "valid-primary-prefix-match.yaml",
+            "valid-windows-win32-x64.yaml",
+            "valid-windows-win32-arm64.yaml",
         ):
             with self.subTest(fixture=name):
                 findings = evaluate(self._load(name), repo_root=FIXTURES)
@@ -324,6 +638,10 @@ class FixtureFileTests(unittest.TestCase):
             "invalid-duplicate-bundleid.yaml": "RP006",
             "invalid-lob-missing-build.yaml": "RP007",
             "invalid-pkg-with-build.yaml": "RP008",
+            "invalid-unsupported-platform.yaml": "RP013",
+            "invalid-windows-apptype-set.yaml": "RP030",
+            "invalid-windows-missing-package.yaml": "RP032",
+            "invalid-windows-bad-restart-behavior.yaml": "RP038",
         }
         for name, expected_code in expectations.items():
             with self.subTest(fixture=name):

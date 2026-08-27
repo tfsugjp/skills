@@ -66,13 +66,14 @@
     },
     {
       "name": "relaypublisher-manifest",
-      "description": "Create, update, and statically validate Relaypublisher manifests, including multi-bundle macOS PKG and LOB detection.",
+      "description": "Create, update, and statically validate Relaypublisher manifests, including Windows Win32 and multi-bundle macOS PKG/LOB detection.",
       "version": "0.1.0",
       "source": "./plugins/relaypublisher-manifest",
       "license": "MIT",
       "keywords": [
         "relaypublisher",
         "intune",
+        "windows",
         "macos",
         "manifest"
       ],

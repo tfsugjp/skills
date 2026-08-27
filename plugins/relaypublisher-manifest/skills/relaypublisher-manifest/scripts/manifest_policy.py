@@ -1,24 +1,33 @@
 #!/usr/bin/env python3
-"""Statically check a Relaypublisher manifest against the macOS PKG/LOB contract.
+"""Statically check a Relaypublisher manifest against the Windows Win32 and macOS
+PKG/LOB contracts.
 
 This is a bundled, CLI-independent checker for the invariants documented in
-``references/macos-manifest.md``. It is not the Relaypublisher schema
-validator and passing it is not equivalent to a passing
-``relaypublisher validate`` run: it only catches the manifest-authoring
-mistakes this skill is responsible for (unsupported DMG entries, malformed
-``IncludedApps``, ambiguous or unresolved primary-bundle selectors, and
-LOB/PKG field misuse). It never downloads, unpacks, or inspects a package,
-and it never calls Microsoft Graph or changes tenant state.
+``references/windows-manifest.md`` and ``references/macos-manifest.md``. It is
+not the Relaypublisher schema validator and passing it is not equivalent to a
+passing ``relaypublisher validate`` run: it only catches the manifest-authoring
+mistakes this skill is responsible for (wrong installer type per platform,
+malformed ``IncludedApps``/``Package``/``Install``/``Detection`` blocks,
+ambiguous or unresolved macOS primary-bundle selectors, and cross-platform
+field misuse). It never downloads, unpacks, or inspects a package or
+``.intunewin``, and it never calls Microsoft Graph or changes tenant state.
+
+Assignments, Categories, and macOS pre/post-install Scripts are out of scope
+for this checker; see docs/plan/relaypublisher-manifest.md.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+SUPPORTED_PLATFORMS = {"windows", "macos"}
+SUPPORTED_ARCHITECTURES = {"x64", "arm64"}
 
 SUPPORTED_APP_TYPES = {"pkg", "lob"}
 DEFAULT_APP_TYPE = "pkg"
@@ -26,6 +35,20 @@ WINDOWS_ONLY_KEYS = ("Package", "Install")
 ALLOWED_INCLUDED_APP_KEYS = {"BundleId", "BundleVersion", "BundleBuildVersion"}
 MIN_INCLUDED_APPS = 1
 MAX_INCLUDED_APPS = 500
+
+SOURCE_TYPES = {"publicHttp", "githubRelease", "azureBlob"}
+SOURCE_TYPE_REQUIRED_FIELDS = {
+    "publicHttp": ("Url",),
+    "githubRelease": ("Owner", "Repository", "Tag", "AssetName"),
+    "azureBlob": ("AccountName", "Container", "BlobName"),
+}
+AUTH_TYPES = {"none", "token", "workloadIdentity"}
+SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+
+INSTALL_EXPERIENCES = {"system", "user"}
+RESTART_BEHAVIORS = {"suppress", "allow", "force"}
+RETURN_CODE_TYPES = {"success", "softReboot", "hardReboot", "retry", "failed"}
+WINDOWS_DETECTION_TYPES = {"script"}
 
 
 class MissingDependencyError(RuntimeError):
@@ -60,6 +83,110 @@ def _resolve_primary(selector: str, bundle_ids: list[str]) -> list[str]:
         if bundle_id == selector or bundle_id.startswith(selector + "."):
             matches.append(bundle_id)
     return matches
+
+
+def _evaluate_source_item(path: str, source: Any) -> list[Finding]:
+    """Check one source-provider item: macOS `Source` or one Windows `ExternalFiles[i]`.
+
+    Both use the same shape (RP020-RP027), matching Relaypublisher's shared
+    SourceManifest model: Type-specific required fields, a 64-hex-char Sha256,
+    and Auth rules (token requires SecretName; azureBlob requires
+    workloadIdentity; githubRelease forbids workloadIdentity).
+    """
+    findings: list[Finding] = []
+    if not isinstance(source, dict):
+        findings.append(_finding("RP020", "error", path, "source item must be a mapping"))
+        return findings
+
+    source_type = source.get("Type")
+    if source_type not in SOURCE_TYPES:
+        findings.append(
+            _finding("RP020", "error", f"{path}.Type", f"unsupported source Type (must be one of {sorted(SOURCE_TYPES)}): {source_type!r}")
+        )
+
+    if not _is_nonblank_str(source.get("Destination")):
+        findings.append(_finding("RP021", "error", f"{path}.Destination", "Destination is required and must be non-empty"))
+
+    sha256 = source.get("Sha256")
+    if not (_is_nonblank_str(sha256) and SHA256_RE.fullmatch(sha256.strip())):
+        findings.append(_finding("RP022", "error", f"{path}.Sha256", "Sha256 must be a 64 character hexadecimal string"))
+
+    for field in SOURCE_TYPE_REQUIRED_FIELDS.get(source_type, ()):
+        if not _is_nonblank_str(source.get(field)):
+            findings.append(
+                _finding("RP023", "error", f"{path}.{field}", f"{field} is required for source Type {source_type!r}")
+            )
+
+    auth = source.get("Auth")
+    auth_type = auth.get("Type") if isinstance(auth, dict) else None
+    if auth is not None:
+        if not isinstance(auth, dict):
+            findings.append(_finding("RP024", "error", f"{path}.Auth", "Auth must be a mapping"))
+        elif auth_type is not None and auth_type not in AUTH_TYPES:
+            findings.append(
+                _finding("RP024", "error", f"{path}.Auth.Type", f"unsupported Auth.Type (must be one of {sorted(AUTH_TYPES)}): {auth_type!r}")
+            )
+        if auth_type == "token" and not _is_nonblank_str(auth.get("SecretName")):
+            findings.append(
+                _finding("RP025", "error", f"{path}.Auth.SecretName", "Auth.SecretName is required when Auth.Type is 'token'")
+            )
+        if source_type == "githubRelease" and auth_type == "workloadIdentity":
+            findings.append(
+                _finding(
+                    "RP026",
+                    "error",
+                    f"{path}.Auth.Type",
+                    "Auth.Type 'workloadIdentity' is not supported for source Type 'githubRelease'; use 'token' or 'none'",
+                )
+            )
+
+    if source_type == "azureBlob" and auth_type != "workloadIdentity":
+        findings.append(
+            _finding(
+                "RP027",
+                "error",
+                f"{path}.Auth.Type",
+                "Auth.Type must be 'workloadIdentity' for source Type 'azureBlob'",
+            )
+        )
+
+    return findings
+
+
+def _evaluate_common_app(index: int, app: dict) -> list[Finding]:
+    """Checks that apply to every recognized-platform entry: RP014-RP016."""
+    app_path = f"Apps[{index}]"
+    findings: list[Finding] = []
+
+    architecture = app.get("Architecture")
+    if architecture not in SUPPORTED_ARCHITECTURES:
+        findings.append(
+            _finding(
+                "RP014",
+                "error",
+                f"{app_path}.Architecture",
+                f"unsupported Architecture (must be one of {sorted(SUPPORTED_ARCHITECTURES)}): {architecture!r}",
+            )
+        )
+
+    requirements = app.get("Requirements")
+    if not isinstance(requirements, dict) or not _is_nonblank_str(requirements.get("MinimumOSVersion")):
+        findings.append(
+            _finding("RP015", "error", f"{app_path}.Requirements.MinimumOSVersion", "Requirements.MinimumOSVersion is required and must be non-empty")
+        )
+    elif "Architecture" in requirements and requirements.get("Architecture") is not None:
+        requirements_architecture = requirements.get("Architecture")
+        if requirements_architecture != architecture:
+            findings.append(
+                _finding(
+                    "RP016",
+                    "error",
+                    f"{app_path}.Requirements.Architecture",
+                    f"Requirements.Architecture {requirements_architecture!r} must match the app Architecture {architecture!r}",
+                )
+            )
+
+    return findings
 
 
 def _evaluate_included_apps(
@@ -212,12 +339,23 @@ def _evaluate_macos_app(index: int, app: dict, root: dict, repo_root: Path | Non
     source = app.get("Source")
     if not isinstance(source, dict):
         findings.append(_finding("RP003", "error", f"{app_path}.Source", "macOS entry must declare exactly one Source object"))
+    else:
+        findings.extend(_evaluate_source_item(f"{app_path}.Source", source))
 
     detection = app.get("Detection")
     bundle_ids: list[str] = []
     if not isinstance(detection, dict):
         findings.append(_finding("RP004", "error", f"{app_path}.Detection", "Detection is required for a macOS entry"))
     else:
+        if detection.get("Type") is not None or detection.get("ScriptFile") is not None:
+            findings.append(
+                _finding(
+                    "RP044",
+                    "error",
+                    f"{app_path}.Detection",
+                    "Detection.Type/ScriptFile are Windows-only and must not be set for a macOS entry",
+                )
+            )
         included_findings, bundle_ids = _evaluate_included_apps(app_path, app_type, detection.get("IncludedApps"))
         findings.extend(included_findings)
         findings.extend(_evaluate_primary_selector(app_path, detection, bundle_ids))
@@ -232,13 +370,158 @@ def _evaluate_macos_app(index: int, app: dict, root: dict, repo_root: Path | Non
     return findings
 
 
+def _evaluate_windows_package(app_path: str, package: Any) -> list[Finding]:
+    findings: list[Finding] = []
+    package_path = f"{app_path}.Package"
+    if not isinstance(package, dict):
+        findings.append(_finding("RP032", "error", package_path, "Package is required for Platform 'windows'"))
+        return findings
+
+    intune_win = package.get("IntuneWin")
+    if not isinstance(intune_win, dict) or not _is_nonblank_str(intune_win.get("SetupFile")):
+        findings.append(
+            _finding("RP033", "error", f"{package_path}.IntuneWin.SetupFile", "IntuneWin.SetupFile is required and must be non-empty")
+        )
+
+    repository_files = package.get("RepositoryFiles") or []
+    if isinstance(repository_files, list):
+        for i, entry in enumerate(repository_files):
+            entry_path = f"{package_path}.RepositoryFiles[{i}]"
+            if not isinstance(entry, dict) or not _is_nonblank_str(entry.get("Source")) or not _is_nonblank_str(entry.get("Destination")):
+                findings.append(_finding("RP034", "error", entry_path, "RepositoryFiles entry requires non-empty Source and Destination"))
+    else:
+        findings.append(_finding("RP034", "error", f"{package_path}.RepositoryFiles", "RepositoryFiles must be a list"))
+
+    external_files = package.get("ExternalFiles") or []
+    if isinstance(external_files, list):
+        for i, entry in enumerate(external_files):
+            findings.extend(_evaluate_source_item(f"{package_path}.ExternalFiles[{i}]", entry))
+    else:
+        findings.append(_finding("RP020", "error", f"{package_path}.ExternalFiles", "ExternalFiles must be a list"))
+
+    return findings
+
+
+def _evaluate_windows_install(app_path: str, install: Any) -> list[Finding]:
+    findings: list[Finding] = []
+    install_path = f"{app_path}.Install"
+    if not isinstance(install, dict):
+        findings.append(_finding("RP035", "error", install_path, "Install is required for Platform 'windows'"))
+        return findings
+
+    if not _is_nonblank_str(install.get("CommandLine")):
+        findings.append(_finding("RP036", "error", f"{install_path}.CommandLine", "CommandLine is required and must be non-empty"))
+    if not _is_nonblank_str(install.get("UninstallCommandLine")):
+        findings.append(_finding("RP036", "error", f"{install_path}.UninstallCommandLine", "UninstallCommandLine is required and must be non-empty"))
+
+    install_experience = install.get("InstallExperience")
+    if install_experience not in INSTALL_EXPERIENCES:
+        findings.append(
+            _finding(
+                "RP037",
+                "error",
+                f"{install_path}.InstallExperience",
+                f"unsupported InstallExperience (must be one of {sorted(INSTALL_EXPERIENCES)}): {install_experience!r}",
+            )
+        )
+
+    restart_behavior = install.get("RestartBehavior")
+    if restart_behavior not in RESTART_BEHAVIORS:
+        findings.append(
+            _finding(
+                "RP038",
+                "error",
+                f"{install_path}.RestartBehavior",
+                f"unsupported RestartBehavior (must be one of {sorted(RESTART_BEHAVIORS)}): {restart_behavior!r}",
+            )
+        )
+
+    return_codes = install.get("ReturnCodes")
+    if return_codes is not None:
+        if isinstance(return_codes, list):
+            for i, entry in enumerate(return_codes):
+                entry_type = entry.get("Type") if isinstance(entry, dict) else None
+                if entry_type not in RETURN_CODE_TYPES:
+                    findings.append(
+                        _finding(
+                            "RP039",
+                            "error",
+                            f"{install_path}.ReturnCodes[{i}].Type",
+                            f"unsupported ReturnCodes Type (must be one of {sorted(RETURN_CODE_TYPES)}): {entry_type!r}",
+                        )
+                    )
+        else:
+            findings.append(_finding("RP039", "error", f"{install_path}.ReturnCodes", "ReturnCodes must be a list"))
+
+    return findings
+
+
+def _evaluate_windows_detection(app_path: str, detection: Any) -> list[Finding]:
+    findings: list[Finding] = []
+    detection_path = f"{app_path}.Detection"
+    if not isinstance(detection, dict):
+        findings.append(_finding("RP040", "error", detection_path, "Detection is required for Platform 'windows'"))
+        return findings
+
+    detection_type = detection.get("Type")
+    if detection_type not in WINDOWS_DETECTION_TYPES:
+        findings.append(
+            _finding(
+                "RP040",
+                "error",
+                f"{detection_path}.Type",
+                f"unsupported Detection.Type (must be one of {sorted(WINDOWS_DETECTION_TYPES)}): {detection_type!r}",
+            )
+        )
+    elif not _is_nonblank_str(detection.get("ScriptFile")):
+        findings.append(
+            _finding("RP041", "error", f"{detection_path}.ScriptFile", "Detection.ScriptFile is required when Detection.Type is 'script'")
+        )
+
+    return findings
+
+
+def _evaluate_windows_app(index: int, app: dict) -> list[Finding]:
+    app_path = f"Apps[{index}]"
+    findings: list[Finding] = []
+
+    installer_type = app.get("InstallerType")
+    if installer_type != "win32":
+        findings.append(
+            _finding(
+                "RP029",
+                "error",
+                f"{app_path}.InstallerType",
+                f"unsupported Windows InstallerType (only win32 is supported): {installer_type!r}",
+            )
+        )
+
+    if "AppType" in app and app.get("AppType") is not None:
+        findings.append(
+            _finding("RP030", "error", f"{app_path}.AppType", "AppType must not be set for Platform 'windows'; it only applies to macOS")
+        )
+
+    if "Source" in app and app.get("Source") is not None:
+        findings.append(
+            _finding("RP031", "error", f"{app_path}.Source", "Source must not be set for Platform 'windows'; use Package instead")
+        )
+
+    findings.extend(_evaluate_windows_package(app_path, app.get("Package")))
+    findings.extend(_evaluate_windows_install(app_path, app.get("Install")))
+    findings.extend(_evaluate_windows_detection(app_path, app.get("Detection")))
+
+    return findings
+
+
 def evaluate(manifest: dict, repo_root: Path | None = None) -> list[Finding]:
-    """Check `manifest` (a parsed dict) against the macOS PKG/LOB contract.
+    """Check `manifest` (a parsed dict) against the Windows Win32 and macOS
+    PKG/LOB contracts.
 
     Pure function: does not touch YAML parsing, the filesystem (unless
     `repo_root` is given, to check an LOB Icon's existence), or the network.
-    Non-macOS entries are intentionally left untouched and reported as
-    skipped (severity "info") — this contract only governs macOS entries.
+    An app entry with a `Platform` other than `windows` or `macos` is rejected
+    (RP013) rather than silently skipped, since Relaypublisher itself only
+    recognizes those two platform values.
     """
     findings: list[Finding] = []
     if not isinstance(manifest, dict):
@@ -254,17 +537,22 @@ def evaluate(manifest: dict, repo_root: Path | None = None) -> list[Finding]:
             findings.append(_finding("RP000", "error", app_path, "app entry must be a mapping"))
             continue
         platform = app.get("Platform")
-        if platform != "macos":
+        if platform not in SUPPORTED_PLATFORMS:
             findings.append(
                 _finding(
-                    "RP-SKIP",
-                    "info",
-                    app_path,
-                    f"non-macOS entry left unchanged and unchecked (Platform={platform!r})",
+                    "RP013",
+                    "error",
+                    f"{app_path}.Platform",
+                    f"unsupported Platform (must be one of {sorted(SUPPORTED_PLATFORMS)}): {platform!r}",
                 )
             )
             continue
-        findings.extend(_evaluate_macos_app(index, app, manifest, repo_root))
+
+        findings.extend(_evaluate_common_app(index, app))
+        if platform == "macos":
+            findings.extend(_evaluate_macos_app(index, app, manifest, repo_root))
+        else:
+            findings.extend(_evaluate_windows_app(index, app))
 
     return findings
 

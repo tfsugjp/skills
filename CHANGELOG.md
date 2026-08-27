@@ -4,7 +4,8 @@
 
 - Added the `relaypublisher-manifest` plugin for manifest authoring and static validation.
 - Added multi-bundle macOS PKG and LOB primary detection guidance.
-- Added a bundled, CLI-independent manifest checker with unit tests and fixtures, and a CI job that runs every plugin's test suite.
+- Added Windows Win32 manifest authoring and validation guidance (Package/Install/Detection, and the source-item shape shared with macOS `Source`).
+- Added a bundled, CLI-independent manifest checker covering both platforms, with unit tests and fixtures, and a CI job that runs every plugin's test suite.
 - Added synchronized Claude/Copilot, Codex, and bilingual marketplace documentation.
 
 ## 0.2.0

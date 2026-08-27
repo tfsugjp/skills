@@ -1,8 +1,11 @@
 # macOS Manifest Contract
 
 Use this reference when authoring or reviewing a macOS entry in a Relaypublisher
-manifest. The target repository's schema and validator remain authoritative if a
-future schema revision changes a field outside this contract.
+manifest. See [windows-manifest.md](windows-manifest.md) for the Windows Win32
+counterpart; `Architecture`, `Requirements.MinimumOSVersion`, and the source-item
+shape below are shared by both platforms. The target repository's schema and
+validator remain authoritative if a future schema revision changes a field
+outside this contract.
 
 ## Supported shape
 
@@ -10,7 +13,7 @@ The supported macOS installer is a PKG. The app entry must use:
 
 ```yaml
 Platform: macos
-Architecture: arm64       # or x64, as supported by the target repository
+Architecture: arm64       # or x64
 InstallerType: pkg
 AppType: pkg               # unmanaged macOS PKG app; often the default
 # or: AppType: lob         # macOS LOB app
@@ -21,9 +24,13 @@ DMG as a PKG and do not add multiple independent `Source` values to represent fi
 inside one installer. A multi-bundle PKG still has one `Source`; its installed apps
 are declared under `Detection.IncludedApps`.
 
-The normal macOS entry has one PKG `Source`, `Requirements`, and `Detection`. Use the
-target repository's required source-provider fields and checksum rules. Do not copy
-Windows-only `Package` or `Install` blocks into a macOS entry.
+The normal macOS entry has one PKG `Source`, `Requirements`, and `Detection`. `Source`
+uses the same source-item shape as a Windows `Package.ExternalFiles` entry (`Type:
+publicHttp | githubRelease | azureBlob`, a required 64-hex-char `Sha256`,
+type-specific required fields, and `Auth` rules — see
+[windows-manifest.md](windows-manifest.md#source-item-shape-shared-with-macos-source)
+for the full table). Do not copy Windows-only `Package`, `Install`, or
+`Detection.Type`/`Detection.ScriptFile` fields into a macOS entry.
 
 ## IncludedApps rules
 
@@ -107,12 +114,17 @@ not permission to fabricate a substitute bundle.
 ## Static validation checklist
 
 Review these invariants before invoking the CLI. The bundled checker
-(`scripts/manifest_policy.py`) enforces items 1–6 automatically and reports each
+(`scripts/manifest_policy.py`) enforces items 0–6 automatically and reports each
 violation under the listed `RP0xx` code; items 7–8 are authoring discipline the
 checker cannot fully verify on its own.
 
-1. `Platform` is `macos` and `InstallerType` is `pkg` (`RP001`), with no Windows-only
-   `Package`/`Install` fields on the entry and exactly one `Source` object (`RP003`).
+0. `Platform` is `macos` (`RP013`); `Architecture` is `x64` or `arm64` and matches
+   `Requirements.Architecture` when the latter is set (`RP014`, `RP016`);
+   `Requirements.MinimumOSVersion` is non-empty (`RP015`).
+1. `InstallerType` is `pkg` (`RP001`), with no Windows-only `Package`/`Install`/
+   `Detection.Type`/`Detection.ScriptFile` fields on the entry (`RP003`, `RP044`)
+   and exactly one `Source` object (`RP003`) satisfying the shared source-item
+   shape (`RP020`-`RP027`; see [windows-manifest.md](windows-manifest.md#source-item-shape-shared-with-macos-source)).
 2. `AppType` is `pkg` or `lob` (or is omitted only where the target schema explicitly
    defines the default as `pkg`) (`RP002`).
 3. The entry has one PKG `Source`, required `Requirements`, and `Detection` fields
@@ -254,3 +266,6 @@ mapping.
 | `invalid-duplicate-bundleid.yaml` | Rejects an ordinal, case-sensitive duplicate `BundleId` (`RP006`, item 4) |
 | `invalid-lob-missing-build.yaml` | Rejects a `lob` entry missing `BundleBuildVersion` (`RP007`, item 5) |
 | `invalid-pkg-with-build.yaml` | Rejects a `pkg` entry that fabricates `BundleBuildVersion` (`RP008`, item 5) |
+| `invalid-unsupported-platform.yaml` | Rejects a `Platform` that is neither `macos` nor `windows` (`RP013`, item 0) |
+
+See [windows-manifest.md](windows-manifest.md#fixtures) for the Windows-side fixtures.
