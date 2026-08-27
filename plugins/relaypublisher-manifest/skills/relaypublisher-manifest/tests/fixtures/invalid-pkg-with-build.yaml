@@ -1,0 +1,31 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.PkgWithBuild
+PackageName: Contoso Pkg With Build
+Publisher: Contoso Ltd.
+Description: >-
+  BundleBuildVersion is not part of the pkg mapping and must not be
+  fabricated merely because a PKG has a build number.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: macos
+    Architecture: arm64
+    InstallerType: pkg
+    AppType: pkg
+    DisplayName: Contoso Pkg With Build [macOS Arm64]
+    Source:
+      Type: azureBlob
+      AccountName: examplepackages
+      Container: intune-packages
+      BlobName: macos/contoso-pkg-build/1.0.0/Contoso.pkg
+      Destination: Contoso.pkg
+      Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      Auth:
+        Type: workloadIdentity
+    Requirements:
+      MinimumOSVersion: "13.0"
+    Detection:
+      IncludedApps:
+        - BundleId: com.example.contoso.client
+          BundleVersion: "1.0.0"
+          BundleBuildVersion: "1000"

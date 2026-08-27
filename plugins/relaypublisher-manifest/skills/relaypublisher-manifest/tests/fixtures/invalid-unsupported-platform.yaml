@@ -1,0 +1,12 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.UnsupportedPlatform
+PackageName: Contoso Unsupported Platform
+Publisher: Contoso Ltd.
+Description: Relaypublisher only recognizes Platform windows and macos.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: linux
+    Architecture: x64
+    InstallerType: deb
+    DisplayName: Contoso Unsupported Platform [Linux x64]

@@ -1,0 +1,32 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.UnresolvedPrimary
+PackageName: Contoso Unresolved Primary
+Publisher: Contoso Ltd.
+Description: >-
+  PrimaryBundleId com.example.app must not match com.example.application;
+  the dot is part of the prefix rule, so this selector resolves to zero
+  entries and must be rejected.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: macos
+    Architecture: arm64
+    InstallerType: pkg
+    AppType: pkg
+    DisplayName: Contoso Unresolved Primary [macOS Arm64]
+    Source:
+      Type: azureBlob
+      AccountName: examplepackages
+      Container: intune-packages
+      BlobName: macos/contoso-unresolved/1.0.0/Contoso.pkg
+      Destination: Contoso.pkg
+      Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      Auth:
+        Type: workloadIdentity
+    Requirements:
+      MinimumOSVersion: "13.0"
+    Detection:
+      PrimaryBundleId: com.example.app
+      IncludedApps:
+        - BundleId: com.example.application
+          BundleVersion: "1.0.0"
