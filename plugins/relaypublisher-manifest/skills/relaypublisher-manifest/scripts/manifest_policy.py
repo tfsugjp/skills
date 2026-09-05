@@ -649,7 +649,9 @@ def _evaluate_macos_app(index: int, app: dict, root: dict, repo_root: Path | Non
         findings.append(_finding("RP004", "error", f"{app_path}.Detection", "Detection is required for a macOS entry"))
     else:
         windows_only_detection_keys = sorted(
-            key for key in ("Type", "ScriptFile", *FILE_ONLY_DETECTION_KEYS) if detection.get(key) is not None
+            key
+            for key in ("Type", *SCRIPT_ONLY_DETECTION_KEYS, *FILE_ONLY_DETECTION_KEYS)
+            if detection.get(key) is not None
         )
         if windows_only_detection_keys:
             findings.append(

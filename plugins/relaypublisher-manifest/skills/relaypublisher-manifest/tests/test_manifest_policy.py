@@ -717,6 +717,19 @@ class CrossPlatformFieldMisuseTests(unittest.TestCase):
         findings = evaluate(manifest_with_apps(app))
         self.assertIn("RP044", codes(errors(findings)))
 
+    def test_script_only_detection_fields_on_macos_are_rejected(self):
+        # RunAs32Bit/EnforceSignatureCheck are Windows script-detection-only
+        # fields (not just ScriptFile) and must be rejected on macOS too.
+        app = base_pkg_app(
+            Detection={
+                "RunAs32Bit": True,
+                "EnforceSignatureCheck": True,
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}],
+            }
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP044", codes(errors(findings)))
+
     def test_ignore_app_version_on_macos_has_no_errors(self):
         app = base_pkg_app(
             Detection={

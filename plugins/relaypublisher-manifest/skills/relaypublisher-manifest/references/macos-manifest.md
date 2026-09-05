@@ -151,10 +151,13 @@ checker cannot fully verify on its own.
 0. `Platform` is `macos` (`RP013`); `Architecture` is `x64` or `arm64` and matches
    `Requirements.Architecture` when the latter is set (`RP014`, `RP016`);
    `Requirements.MinimumOSVersion` is non-empty (`RP015`).
-1. `InstallerType` is `pkg` (`RP001`), with no Windows-only `Package`/`Install`/
-   `Detection.Type`/`Detection.ScriptFile` fields on the entry (`RP003`, `RP044`)
-   and exactly one `Source` object (`RP003`) satisfying the shared source-item
-   shape (`RP020`-`RP027`; see [windows-manifest.md](windows-manifest.md#source-item-shape-shared-with-macos-source)).
+1. `InstallerType` is `pkg` (`RP001`), with no Windows-only `Package`/`Install` fields
+   or Windows-only `Detection` fields — `Type` and every script- or file-detection
+   field (`ScriptFile`, `RunAs32Bit`, `EnforceSignatureCheck`, `Path`,
+   `FileOrFolderName`, `OperationType`, `Operator`, `ComparisonValue`,
+   `Check32BitOn64System`) — on the entry (`RP003`, `RP044`), and exactly one
+   `Source` object (`RP003`) satisfying the shared source-item shape (`RP020`-`RP027`;
+   see [windows-manifest.md](windows-manifest.md#source-item-shape-shared-with-macos-source)).
 2. `AppType` is `pkg` or `lob` (or is omitted only where the target schema explicitly
    defines the default as `pkg`) (`RP002`).
 3. The entry has one PKG `Source`, required `Requirements`, and `Detection` fields
