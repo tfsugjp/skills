@@ -7,9 +7,9 @@ This is a bundled, CLI-independent checker for the invariants documented in
 not the Relaypublisher schema validator and passing it is not equivalent to a
 passing ``relaypublisher validate`` run: it only catches the manifest-authoring
 mistakes this skill is responsible for (wrong installer type per platform,
-malformed ``IncludedApps``/``Package``/``Install``/``Detection`` blocks,
-ambiguous or unresolved macOS primary-bundle selectors, cross-platform field
-misuse, and malformed ``Assignments``/``Categories``/macOS ``Scripts``
+malformed ``IncludedApps``/``Package``/``Install``/``Detection`` blocks —
+including Windows script- and file-system detection rules — cross-platform
+field misuse, and malformed ``Assignments``/``Categories``/macOS ``Scripts``
 blocks). It never downloads, unpacks, or inspects a package or
 ``.intunewin``, and it never calls Microsoft Graph or changes tenant state —
 Category names are never resolved against a tenant catalog.
@@ -21,6 +21,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path, PureWindowsPath
@@ -32,7 +33,10 @@ SUPPORTED_ARCHITECTURES = {"x64", "arm64"}
 SUPPORTED_APP_TYPES = {"pkg", "lob"}
 DEFAULT_APP_TYPE = "pkg"
 WINDOWS_ONLY_KEYS = ("Package", "Install")
-ALLOWED_INCLUDED_APP_KEYS = {"BundleId", "BundleVersion", "BundleBuildVersion"}
+# BundleBuildVersion does not exist in the v1.1.0 IncludedAppManifest model; an
+# entry carrying it is rejected as an unsupported field (RP012), not silently
+# mapped anywhere.
+ALLOWED_INCLUDED_APP_KEYS = {"BundleId", "BundleVersion"}
 MIN_INCLUDED_APPS = 1
 MAX_INCLUDED_APPS = 500
 
@@ -48,7 +52,19 @@ SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 INSTALL_EXPERIENCES = {"system", "user"}
 RESTART_BEHAVIORS = {"suppress", "allow", "force"}
 RETURN_CODE_TYPES = {"success", "softReboot", "hardReboot", "retry", "failed"}
-WINDOWS_DETECTION_TYPES = {"script"}
+# "file" was added in Relaypublisher v1.1.0 (additive; SchemaVersion stays "1.0").
+WINDOWS_DETECTION_TYPES = {"script", "file"}
+FILE_OPERATION_TYPES = {"exists", "version"}
+FILE_OPERATORS = {"equal", "notEqual", "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual"}
+FILE_VERSION_RE = re.compile(r"^\d{1,5}(\.\d{1,5}){0,3}$")
+# Mirrors ManifestValues.TargetDevicePathRootRegex: drive-rooted, root-relative,
+# UNC, or environment-variable-rooted. Detection.Path/FileOrFolderName are
+# evaluated on the target device, not resolved against --repo-root.
+TARGET_DEVICE_PATH_ROOT_RE = re.compile(
+    r"^[A-Za-z]:\\|^\\[^\\]|^\\\\[^\\]+\\[^\\]+(?:\\.*)?$|^%[A-Za-z_][A-Za-z0-9_()]*%\\"
+)
+SCRIPT_ONLY_DETECTION_KEYS = ("ScriptFile", "RunAs32Bit", "EnforceSignatureCheck")
+FILE_ONLY_DETECTION_KEYS = ("Path", "FileOrFolderName", "OperationType", "Operator", "ComparisonValue", "Check32BitOn64System")
 
 ASSIGNMENT_TARGETS = {"group", "allDevices", "allLicensedUsers"}
 DEFAULT_ASSIGNMENT_TARGET = "group"
@@ -139,13 +155,55 @@ def _resolve_within_repo_root(repo_root: Path, relative_path: str) -> Path | Non
     return candidate
 
 
-def _resolve_primary(selector: str, bundle_ids: list[str]) -> list[str]:
-    """Return every bundle id that matches `selector` under the dot-prefix rule."""
-    matches = []
-    for bundle_id in bundle_ids:
-        if bundle_id == selector or bundle_id.startswith(selector + "."):
-            matches.append(bundle_id)
-    return matches
+_INVALID_TARGET_DEVICE_CHARS = set('*?<>"|/')
+
+
+def _has_invalid_target_device_text(value: str) -> bool:
+    if not _is_nonblank_str(value):
+        return True
+    if value != value.strip():
+        return True
+    if any(char in _INVALID_TARGET_DEVICE_CHARS for char in value):
+        return True
+    if any(unicodedata.category(char) == "Cc" for char in value):
+        return True
+    return False
+
+
+def _has_traversal_segment(value: str) -> bool:
+    return any(segment in (".", "..") for segment in value.split("\\"))
+
+
+def _has_valid_target_device_path_colon_placement(value: str) -> bool:
+    colon_index = value.find(":")
+    if colon_index < 0:
+        return True
+    return colon_index == 1 and value.count(":") == 1
+
+
+def _is_valid_target_device_path(value: str) -> bool:
+    """Mirror ManifestValues.IsValidTargetDevicePath: `value` is evaluated on the
+    target Windows device, so drive-rooted, root-relative, UNC, and
+    environment-variable-rooted paths are all valid — it is never treated as a
+    repository-relative path."""
+    return (
+        not _has_invalid_target_device_text(value)
+        and TARGET_DEVICE_PATH_ROOT_RE.match(value) is not None
+        and _has_valid_target_device_path_colon_placement(value)
+        and not _has_traversal_segment(value)
+    )
+
+
+def _is_valid_target_device_leaf_name(value: str) -> bool:
+    """Mirror ManifestValues.IsValidTargetDeviceLeafName: exactly one target-device
+    leaf name, with no directory separator, drive letter, or `.`/`..` segment."""
+    return (
+        not _has_invalid_target_device_text(value)
+        and "\\" not in value
+        and "/" not in value
+        and value not in (".", "..")
+        and ":" not in value
+    )
 
 
 def _evaluate_source_item(path: str, source: Any) -> list[Finding]:
@@ -483,7 +541,6 @@ def _evaluate_macos_script_file(field_path: str, field: str, relative_path: str,
 
 def _evaluate_included_apps(
     app_path: str,
-    app_type: str,
     included_apps: Any,
 ) -> tuple[list[Finding], list[str]]:
     findings: list[Finding] = []
@@ -545,54 +602,7 @@ def _evaluate_included_apps(
                 _finding("RP005", "error", f"{entry_path}.BundleVersion", "BundleVersion is required and must be non-empty")
             )
 
-        build_version = entry.get("BundleBuildVersion")
-        if app_type == "lob":
-            if not _is_nonblank_str(build_version):
-                findings.append(
-                    _finding(
-                        "RP007",
-                        "error",
-                        f"{entry_path}.BundleBuildVersion",
-                        "BundleBuildVersion is required for every lob entry",
-                    )
-                )
-        elif app_type == "pkg" and "BundleBuildVersion" in entry:
-            findings.append(
-                _finding(
-                    "RP008",
-                    "error",
-                    f"{entry_path}.BundleBuildVersion",
-                    "BundleBuildVersion is not part of the pkg mapping; omit it",
-                )
-            )
-
     return findings, bundle_ids
-
-
-def _evaluate_primary_selector(app_path: str, detection: dict, bundle_ids: list[str]) -> list[Finding]:
-    findings: list[Finding] = []
-    if "PrimaryBundleId" not in detection:
-        return findings
-
-    selector = detection.get("PrimaryBundleId")
-    selector_path = f"{app_path}.Detection.PrimaryBundleId"
-    if not _is_nonblank_str(selector):
-        findings.append(_finding("RP009", "error", selector_path, "PrimaryBundleId must not be empty or whitespace-only"))
-        return findings
-
-    matches = _resolve_primary(selector, bundle_ids)
-    if len(matches) == 0:
-        findings.append(_finding("RP010", "error", selector_path, f"PrimaryBundleId matches no declared bundle: {selector}"))
-    elif len(matches) > 1:
-        findings.append(
-            _finding(
-                "RP010",
-                "error",
-                selector_path,
-                f"PrimaryBundleId is ambiguous: {selector} matches {matches}",
-            )
-        )
-    return findings
 
 
 def _evaluate_macos_app(index: int, app: dict, root: dict, repo_root: Path | None) -> list[Finding]:
@@ -635,22 +645,35 @@ def _evaluate_macos_app(index: int, app: dict, root: dict, repo_root: Path | Non
         findings.extend(_evaluate_source_item(f"{app_path}.Source", source))
 
     detection = app.get("Detection")
-    bundle_ids: list[str] = []
     if not isinstance(detection, dict):
         findings.append(_finding("RP004", "error", f"{app_path}.Detection", "Detection is required for a macOS entry"))
     else:
-        if detection.get("Type") is not None or detection.get("ScriptFile") is not None:
+        windows_only_detection_keys = sorted(
+            key
+            for key in ("Type", *SCRIPT_ONLY_DETECTION_KEYS, *FILE_ONLY_DETECTION_KEYS)
+            if detection.get(key) is not None
+        )
+        if windows_only_detection_keys:
             findings.append(
                 _finding(
                     "RP044",
                     "error",
                     f"{app_path}.Detection",
-                    "Detection.Type/ScriptFile are Windows-only and must not be set for a macOS entry",
+                    f"Windows-only Detection field(s) {windows_only_detection_keys} must not be set for a macOS entry",
                 )
             )
-        included_findings, bundle_ids = _evaluate_included_apps(app_path, app_type, detection.get("IncludedApps"))
+        if "PrimaryBundleId" in detection:
+            findings.append(
+                _finding(
+                    "RP009",
+                    "error",
+                    f"{app_path}.Detection.PrimaryBundleId",
+                    "PrimaryBundleId does not exist in the v1.1.0 manifest schema; IncludedApps[0] is always "
+                    "the primary entry and ManifestLoader silently ignores this field rather than failing on it",
+                )
+            )
+        included_findings, _bundle_ids = _evaluate_included_apps(app_path, detection.get("IncludedApps"))
         findings.extend(included_findings)
-        findings.extend(_evaluate_primary_selector(app_path, detection, bundle_ids))
 
     if app_type == "lob" and not _is_nonblank_str(root.get("Icon")):
         findings.append(_finding("RP011", "error", "Icon", "AppType: lob requires a non-empty root Icon path"))
@@ -773,10 +796,158 @@ def _evaluate_windows_detection(app_path: str, detection: Any) -> list[Finding]:
                 f"unsupported Detection.Type (must be one of {sorted(WINDOWS_DETECTION_TYPES)}): {detection_type!r}",
             )
         )
-    elif not _is_nonblank_str(detection.get("ScriptFile")):
+        return findings
+
+    if detection_type == "script":
+        findings.extend(_evaluate_windows_script_detection(detection_path, detection))
+    else:
+        findings.extend(_evaluate_windows_file_detection(detection_path, detection))
+
+    return findings
+
+
+def _evaluate_windows_script_detection(detection_path: str, detection: dict) -> list[Finding]:
+    """RP041/RP049: `Detection.Type: script`. File-detection fields are mutually
+    exclusive with a detection script (ManifestValidator.DetectionManifestValidator)."""
+    findings: list[Finding] = []
+
+    if not _is_nonblank_str(detection.get("ScriptFile")):
         findings.append(
             _finding("RP041", "error", f"{detection_path}.ScriptFile", "Detection.ScriptFile is required when Detection.Type is 'script'")
         )
+
+    file_only_keys_present = sorted(key for key in FILE_ONLY_DETECTION_KEYS if detection.get(key) is not None)
+    if file_only_keys_present:
+        findings.append(
+            _finding(
+                "RP049",
+                "error",
+                detection_path,
+                f"file-detection field(s) {file_only_keys_present} must not be set when Detection.Type is 'script'",
+            )
+        )
+
+    return findings
+
+
+def _evaluate_windows_file_detection(detection_path: str, detection: dict) -> list[Finding]:
+    """RP042/RP043/RP045-RP049: `Detection.Type: file`, added in Relaypublisher
+    v1.1.0 (doc/01-manifest-schema.md §5.2.1). Detects a file or folder on the
+    target device without a detection script."""
+    findings: list[Finding] = []
+
+    script_only_keys_present = sorted(key for key in SCRIPT_ONLY_DETECTION_KEYS if detection.get(key) is not None)
+    if script_only_keys_present:
+        findings.append(
+            _finding(
+                "RP048",
+                "error",
+                detection_path,
+                f"script-detection field(s) {script_only_keys_present} must not be set when Detection.Type is 'file'",
+            )
+        )
+
+    path = detection.get("Path")
+    if not _is_nonblank_str(path):
+        findings.append(_finding("RP042", "error", f"{detection_path}.Path", "Detection.Path is required when Detection.Type is 'file'"))
+    elif not _is_valid_target_device_path(path):
+        findings.append(
+            _finding(
+                "RP042",
+                "error",
+                f"{detection_path}.Path",
+                "Detection.Path must be a non-wildcard target-device drive-rooted, root-relative, UNC, or "
+                f"environment-variable-rooted path without traversal segments: {path!r}",
+            )
+        )
+
+    file_or_folder_name = detection.get("FileOrFolderName")
+    if not _is_nonblank_str(file_or_folder_name):
+        findings.append(
+            _finding(
+                "RP043",
+                "error",
+                f"{detection_path}.FileOrFolderName",
+                "Detection.FileOrFolderName is required when Detection.Type is 'file'",
+            )
+        )
+    elif not _is_valid_target_device_leaf_name(file_or_folder_name):
+        findings.append(
+            _finding(
+                "RP043",
+                "error",
+                f"{detection_path}.FileOrFolderName",
+                f"Detection.FileOrFolderName must be a single non-wildcard target-device leaf name: {file_or_folder_name!r}",
+            )
+        )
+
+    operation_type = detection.get("OperationType")
+    if not _is_nonblank_str(operation_type) or operation_type not in FILE_OPERATION_TYPES:
+        findings.append(
+            _finding(
+                "RP045",
+                "error",
+                f"{detection_path}.OperationType",
+                f"Detection.OperationType is required and must be one of {sorted(FILE_OPERATION_TYPES)} when "
+                f"Detection.Type is 'file'. 'notConfigured' is a Graph unset sentinel and is not valid manifest "
+                f"input: {operation_type!r}",
+            )
+        )
+        return findings
+
+    operator = detection.get("Operator")
+    comparison_value = detection.get("ComparisonValue")
+
+    if operation_type == "exists":
+        if operator is not None:
+            findings.append(
+                _finding(
+                    "RP046",
+                    "error",
+                    f"{detection_path}.Operator",
+                    "Detection.Operator must not be set when Detection.OperationType is 'exists'",
+                )
+            )
+        if comparison_value is not None:
+            findings.append(
+                _finding(
+                    "RP047",
+                    "error",
+                    f"{detection_path}.ComparisonValue",
+                    "Detection.ComparisonValue must not be set when Detection.OperationType is 'exists'",
+                )
+            )
+    else:  # "version"
+        if not _is_nonblank_str(operator) or operator not in FILE_OPERATORS:
+            findings.append(
+                _finding(
+                    "RP046",
+                    "error",
+                    f"{detection_path}.Operator",
+                    f"Detection.Operator is required and must be one of {sorted(FILE_OPERATORS)} when "
+                    f"Detection.OperationType is 'version'. 'notConfigured' is a Graph unset sentinel and is not "
+                    f"valid manifest input: {operator!r}",
+                )
+            )
+        if not _is_nonblank_str(comparison_value):
+            findings.append(
+                _finding(
+                    "RP047",
+                    "error",
+                    f"{detection_path}.ComparisonValue",
+                    "Detection.ComparisonValue is required when Detection.OperationType is 'version'",
+                )
+            )
+        elif not FILE_VERSION_RE.fullmatch(comparison_value.strip()):
+            findings.append(
+                _finding(
+                    "RP047",
+                    "error",
+                    f"{detection_path}.ComparisonValue",
+                    "Detection.ComparisonValue must be a numeric version with one to four parts of one to five "
+                    f"digits each: {comparison_value!r}",
+                )
+            )
 
     return findings
 

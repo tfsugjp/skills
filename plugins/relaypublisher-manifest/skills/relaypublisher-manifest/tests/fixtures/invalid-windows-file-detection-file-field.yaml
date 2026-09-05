@@ -1,0 +1,40 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.Tool.FileDetectionOnScript
+PackageName: Contoso Tool File Detection On Script
+Publisher: Contoso Ltd.
+Description: >-
+  Detection.Type: script must not also carry file-detection fields such
+  as Path; script and file detection are mutually exclusive.
+PackageVersion: "1.2.3"
+
+Apps:
+  - Platform: windows
+    Architecture: x64
+    InstallerType: win32
+    DisplayName: Contoso Tool File Detection On Script [Windows x64]
+
+    Package:
+      IntuneWin:
+        SetupFile: install.ps1
+      RepositoryFiles:
+        - Source: scripts/windows/x64/install.ps1
+          Destination: install.ps1
+        - Source: scripts/windows/common/uninstall.ps1
+          Destination: uninstall.ps1
+        - Source: scripts/windows/common/detect.ps1
+          Destination: detect.ps1
+
+    Install:
+      CommandLine: powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+      UninstallCommandLine: powershell.exe -ExecutionPolicy Bypass -File .\uninstall.ps1
+      InstallExperience: system
+      RestartBehavior: suppress
+
+    Detection:
+      Type: script
+      ScriptFile: scripts/windows/common/detect.ps1
+      Path: 'C:\Program Files\Contoso Tool'
+
+    Requirements:
+      MinimumOSVersion: "10.0.19045"
+      Architecture: x64

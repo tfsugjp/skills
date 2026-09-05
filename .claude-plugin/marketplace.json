@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Skills and plugins for Azure DevOps, GitHub, .NET, NuGet, and Relaypublisher workflows.",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "plugins": [
     {
@@ -66,8 +66,8 @@
     },
     {
       "name": "relaypublisher-manifest",
-      "description": "Create, update, and statically validate Relaypublisher manifests, including Windows Win32 and multi-bundle macOS PKG/LOB detection.",
-      "version": "0.1.0",
+      "description": "Create, update, and statically validate Relaypublisher manifests for v1.1.0, including Windows Win32 script/file-system detection and multi-bundle macOS PKG/LOB detection.",
+      "version": "0.2.0",
       "source": "./plugins/relaypublisher-manifest",
       "license": "MIT",
       "keywords": [

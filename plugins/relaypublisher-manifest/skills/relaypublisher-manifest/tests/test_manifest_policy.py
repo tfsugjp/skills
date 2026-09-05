@@ -9,7 +9,11 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 sys.path.insert(0, str(SCRIPTS))
 
-from manifest_policy import evaluate  # noqa: E402
+from manifest_policy import (  # noqa: E402
+    _is_valid_target_device_leaf_name,
+    _is_valid_target_device_path,
+    evaluate,
+)
 
 try:
     import yaml
@@ -109,7 +113,6 @@ class EvaluateDictTests(unittest.TestCase):
     def test_valid_pkg_multibundle_has_no_errors(self):
         app = base_pkg_app(
             Detection={
-                "PrimaryBundleId": "com.example.client",
                 "IncludedApps": [
                     {"BundleId": "com.example.client", "BundleVersion": "4.2.0"},
                     {"BundleId": "com.example.helper", "BundleVersion": "4.2.0"},
@@ -123,10 +126,9 @@ class EvaluateDictTests(unittest.TestCase):
         app = base_pkg_app(
             AppType="lob",
             Detection={
-                "PrimaryBundleId": "com.example.lob.main",
                 "IncludedApps": [
-                    {"BundleId": "com.example.lob.main", "BundleVersion": "4.2.0", "BundleBuildVersion": "4200"},
-                    {"BundleId": "com.example.lob.helper", "BundleVersion": "4.2.0", "BundleBuildVersion": "4200"},
+                    {"BundleId": "com.example.lob.main", "BundleVersion": "4.2.0"},
+                    {"BundleId": "com.example.lob.helper", "BundleVersion": "4.2.0"},
                 ],
             },
         )
@@ -199,31 +201,24 @@ class EvaluateDictTests(unittest.TestCase):
         findings = evaluate(manifest_with_apps(app))
         self.assertNotIn("RP006", codes(errors(findings)))
 
-    def test_lob_missing_build_version_is_rejected(self):
+    def test_bundle_build_version_is_rejected_as_unknown_field(self):
+        # BundleBuildVersion does not exist in the v1.1.0 IncludedAppManifest model
+        # for either pkg or lob; it is rejected as an unsupported field (RP012),
+        # not mapped to buildNumber/versionNumber.
         app = base_pkg_app(
             AppType="lob",
-            Detection={"IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}]},
-        )
-        findings = evaluate(manifest_with_apps(app, Icon="icons/contoso.png"))
-        self.assertIn("RP007", codes(errors(findings)))
-
-    def test_pkg_with_build_version_is_rejected(self):
-        app = base_pkg_app(
             Detection={
                 "IncludedApps": [
                     {"BundleId": "com.example.client", "BundleVersion": "1.0.0", "BundleBuildVersion": "1000"},
                 ],
-            }
+            },
         )
-        findings = evaluate(manifest_with_apps(app))
-        self.assertIn("RP008", codes(errors(findings)))
+        findings = evaluate(manifest_with_apps(app, Icon="icons/contoso.png"))
+        self.assertIn("RP012", codes(errors(findings)))
 
-    def test_blank_primary_bundle_id_is_rejected(self):
-        app = base_pkg_app(Detection={"PrimaryBundleId": "   ", "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}]})
-        findings = evaluate(manifest_with_apps(app))
-        self.assertIn("RP009", codes(errors(findings)))
-
-    def test_primary_bundle_id_exact_match_is_valid(self):
+    def test_primary_bundle_id_is_rejected_as_unsupported_field(self):
+        # PrimaryBundleId does not exist in the v1.1.0 manifest schema; even a
+        # would-be-valid selector is rejected outright, not resolved.
         app = base_pkg_app(
             Detection={
                 "PrimaryBundleId": "com.example.client",
@@ -234,14 +229,19 @@ class EvaluateDictTests(unittest.TestCase):
             }
         )
         findings = evaluate(manifest_with_apps(app))
-        self.assertEqual(errors(findings), [])
+        self.assertIn("RP009", codes(errors(findings)))
 
-    def test_primary_bundle_id_dot_prefix_match_is_valid(self):
+    def test_blank_primary_bundle_id_is_rejected(self):
+        app = base_pkg_app(Detection={"PrimaryBundleId": "   ", "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}]})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP009", codes(errors(findings)))
+
+    def test_omitted_primary_bundle_id_has_no_errors(self):
+        # No selector field exists; IncludedApps[0] is always primary.
         app = base_pkg_app(
             Detection={
-                "PrimaryBundleId": "com.example.client",
                 "IncludedApps": [
-                    {"BundleId": "com.example.client.main", "BundleVersion": "1.0.0"},
+                    {"BundleId": "com.example.client", "BundleVersion": "1.0.0"},
                     {"BundleId": "com.example.helper", "BundleVersion": "1.0.0"},
                 ],
             }
@@ -249,50 +249,12 @@ class EvaluateDictTests(unittest.TestCase):
         findings = evaluate(manifest_with_apps(app))
         self.assertEqual(errors(findings), [])
 
-    def test_primary_bundle_id_ambiguous_match_is_rejected(self):
-        app = base_pkg_app(
-            Detection={
-                "PrimaryBundleId": "com.example.client",
-                "IncludedApps": [
-                    {"BundleId": "com.example.client.main", "BundleVersion": "1.0.0"},
-                    {"BundleId": "com.example.client.agent", "BundleVersion": "1.0.0"},
-                ],
-            }
-        )
-        findings = evaluate(manifest_with_apps(app))
-        self.assertIn("RP010", codes(errors(findings)))
-
-    def test_primary_bundle_id_no_match_is_rejected(self):
-        app = base_pkg_app(
-            Detection={
-                "PrimaryBundleId": "com.example.app",
-                "IncludedApps": [{"BundleId": "com.example.application", "BundleVersion": "1.0.0"}],
-            }
-        )
-        findings = evaluate(manifest_with_apps(app))
-        self.assertIn("RP010", codes(errors(findings)))
-
-    def test_primary_bundle_id_segment_boundary_is_respected(self):
-        # com.example.app must NOT match com.example.application (no dot boundary).
-        app = base_pkg_app(
-            Detection={
-                "PrimaryBundleId": "com.example.app",
-                "IncludedApps": [
-                    {"BundleId": "com.example.application", "BundleVersion": "1.0.0"},
-                    {"BundleId": "com.example.app.helper", "BundleVersion": "1.0.0"},
-                ],
-            }
-        )
-        findings = evaluate(manifest_with_apps(app))
-        # Exactly one match (com.example.app.helper) — not ambiguous, not unresolved.
-        self.assertEqual(errors(findings), [])
-
     def test_lob_without_root_icon_is_rejected(self):
         app = base_pkg_app(
             AppType="lob",
             Detection={
                 "IncludedApps": [
-                    {"BundleId": "com.example.client", "BundleVersion": "1.0.0", "BundleBuildVersion": "1000"},
+                    {"BundleId": "com.example.client", "BundleVersion": "1.0.0"},
                 ],
             },
         )
@@ -358,14 +320,10 @@ class EvaluateDictTests(unittest.TestCase):
     def test_default_app_type_is_treated_as_pkg(self):
         app = base_pkg_app()
         del app["AppType"]
-        app["Detection"] = {
-            "IncludedApps": [
-                {"BundleId": "com.example.client", "BundleVersion": "1.0.0", "BundleBuildVersion": "1000"},
-            ],
-        }
+        app["Assignments"] = [{"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "uninstall"}]
         findings = evaluate(manifest_with_apps(app))
-        # Treated as pkg, so a present BundleBuildVersion is flagged (RP008).
-        self.assertIn("RP008", codes(errors(findings)))
+        # Treated as pkg, so Intent: uninstall is still forbidden (RP058).
+        self.assertIn("RP058", codes(errors(findings)))
 
     def test_evaluate_does_not_mutate_input(self):
         app = base_pkg_app()
@@ -586,6 +544,145 @@ class WindowsEvaluateDictTests(unittest.TestCase):
         self.assertEqual(errors(findings), [])
 
 
+def base_file_detection(**overrides):
+    detection = {
+        "Type": "file",
+        "Path": r"C:\Program Files\Contoso Tool",
+        "FileOrFolderName": "contoso-tool.exe",
+        "OperationType": "exists",
+    }
+    detection.update(overrides)
+    return detection
+
+
+class WindowsFileDetectionTests(unittest.TestCase):
+    """RP042-RP049: `Detection.Type: file`, added in Relaypublisher v1.1.0."""
+
+    def test_valid_exists_detection_has_no_errors(self):
+        app = base_windows_app(Detection=base_file_detection())
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_valid_version_detection_has_no_errors(self):
+        app = base_windows_app(
+            Detection=base_file_detection(OperationType="version", Operator="greaterThanOrEqual", ComparisonValue="1.2.3")
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_environment_variable_rooted_path_is_valid(self):
+        app = base_windows_app(Detection=base_file_detection(Path=r"%ProgramFiles%\Contoso Tool"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_unc_rooted_path_is_valid(self):
+        app = base_windows_app(Detection=base_file_detection(Path=r"\\server\share\Contoso Tool"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_root_relative_path_is_valid(self):
+        app = base_windows_app(Detection=base_file_detection(Path=r"\Contoso Tool"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_missing_path_is_rejected(self):
+        detection = base_file_detection()
+        del detection["Path"]
+        app = base_windows_app(Detection=detection)
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP042", codes(errors(findings)))
+
+    def test_repository_relative_path_is_rejected(self):
+        app = base_windows_app(Detection=base_file_detection(Path="scripts/windows/x64"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP042", codes(errors(findings)))
+
+    def test_path_with_traversal_segment_is_rejected(self):
+        app = base_windows_app(Detection=base_file_detection(Path=r"C:\Program Files\..\Contoso Tool"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP042", codes(errors(findings)))
+
+    def test_path_with_wildcard_is_rejected(self):
+        app = base_windows_app(Detection=base_file_detection(Path=r"C:\Program Files\Contoso*"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP042", codes(errors(findings)))
+
+    def test_missing_file_or_folder_name_is_rejected(self):
+        detection = base_file_detection()
+        del detection["FileOrFolderName"]
+        app = base_windows_app(Detection=detection)
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP043", codes(errors(findings)))
+
+    def test_file_or_folder_name_with_separator_is_rejected(self):
+        app = base_windows_app(Detection=base_file_detection(FileOrFolderName=r"sub\contoso-tool.exe"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP043", codes(errors(findings)))
+
+    def test_missing_operation_type_is_rejected(self):
+        detection = base_file_detection()
+        del detection["OperationType"]
+        app = base_windows_app(Detection=detection)
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP045", codes(errors(findings)))
+
+    def test_not_configured_operation_type_is_rejected(self):
+        # notConfigured is a Graph unset sentinel, never valid manifest input.
+        app = base_windows_app(Detection=base_file_detection(OperationType="notConfigured"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP045", codes(errors(findings)))
+
+    def test_exists_forbids_operator(self):
+        app = base_windows_app(Detection=base_file_detection(OperationType="exists", Operator="equal"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP046", codes(errors(findings)))
+
+    def test_exists_forbids_comparison_value(self):
+        app = base_windows_app(Detection=base_file_detection(OperationType="exists", ComparisonValue="1.0"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP047", codes(errors(findings)))
+
+    def test_version_requires_operator(self):
+        app = base_windows_app(Detection=base_file_detection(OperationType="version", ComparisonValue="1.0"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP046", codes(errors(findings)))
+
+    def test_version_rejects_not_configured_operator(self):
+        app = base_windows_app(Detection=base_file_detection(OperationType="version", Operator="notConfigured", ComparisonValue="1.0"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP046", codes(errors(findings)))
+
+    def test_version_requires_comparison_value(self):
+        app = base_windows_app(Detection=base_file_detection(OperationType="version", Operator="equal"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP047", codes(errors(findings)))
+
+    def test_version_rejects_non_numeric_comparison_value(self):
+        app = base_windows_app(Detection=base_file_detection(OperationType="version", Operator="equal", ComparisonValue="1.2.3-beta"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP047", codes(errors(findings)))
+
+    def test_version_accepts_four_part_numeric_comparison_value(self):
+        app = base_windows_app(Detection=base_file_detection(OperationType="version", Operator="equal", ComparisonValue="1.2.3.4"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+    def test_script_field_on_file_detection_is_rejected(self):
+        app = base_windows_app(Detection=base_file_detection(ScriptFile="scripts/detect.ps1"))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP048", codes(errors(findings)))
+
+    def test_file_field_on_script_detection_is_rejected(self):
+        app = base_windows_app(Detection={"Type": "script", "ScriptFile": "scripts/detect.ps1", "Path": r"C:\Contoso"})
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP049", codes(errors(findings)))
+
+    def test_check_32_bit_on_64_system_is_accepted(self):
+        app = base_windows_app(Detection=base_file_detection(Check32BitOn64System=True))
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
+
+
 class CrossPlatformFieldMisuseTests(unittest.TestCase):
     """RP003/RP044: fields belonging to the other platform must not leak across entries."""
 
@@ -608,6 +705,40 @@ class CrossPlatformFieldMisuseTests(unittest.TestCase):
         )
         findings = evaluate(manifest_with_apps(app))
         self.assertIn("RP044", codes(errors(findings)))
+
+    def test_file_detection_fields_on_macos_are_rejected(self):
+        app = base_pkg_app(
+            Detection={
+                "Path": r"C:\Contoso Tool",
+                "FileOrFolderName": "contoso-tool.exe",
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}],
+            }
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP044", codes(errors(findings)))
+
+    def test_script_only_detection_fields_on_macos_are_rejected(self):
+        # RunAs32Bit/EnforceSignatureCheck are Windows script-detection-only
+        # fields (not just ScriptFile) and must be rejected on macOS too.
+        app = base_pkg_app(
+            Detection={
+                "RunAs32Bit": True,
+                "EnforceSignatureCheck": True,
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}],
+            }
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertIn("RP044", codes(errors(findings)))
+
+    def test_ignore_app_version_on_macos_has_no_errors(self):
+        app = base_pkg_app(
+            Detection={
+                "IgnoreAppVersion": True,
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}],
+            }
+        )
+        findings = evaluate(manifest_with_apps(app))
+        self.assertEqual(errors(findings), [])
 
 
 VALID_GROUP_ID = "00000000-0000-0000-0000-000000000001"
@@ -736,7 +867,7 @@ class AssignmentsTests(unittest.TestCase):
         app = base_pkg_app(
             AppType="lob",
             Detection={
-                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0", "BundleBuildVersion": "1"}],
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}],
             },
             Assignments=[{"Target": "group", "GroupId": VALID_GROUP_ID, "Intent": "uninstall"}],
         )
@@ -817,7 +948,7 @@ class MacOsScriptsTests(unittest.TestCase):
         app = base_pkg_app(
             AppType="lob",
             Detection={
-                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0", "BundleBuildVersion": "1"}],
+                "IncludedApps": [{"BundleId": "com.example.client", "BundleVersion": "1.0.0"}],
             },
             Scripts={"PreInstall": "scripts/preinstall.sh"},
         )
@@ -887,6 +1018,64 @@ class MacOsScriptsTests(unittest.TestCase):
         self.assertEqual(errors(findings), [])
 
 
+class TargetDevicePathValidationTests(unittest.TestCase):
+    """Boundary cases for the ManifestValues.IsValidTargetDevicePath /
+    IsValidTargetDeviceLeafName ports used by Detection.Type: file."""
+
+    def test_drive_rooted_path_is_valid(self):
+        self.assertTrue(_is_valid_target_device_path(r"C:\foo"))
+
+    def test_root_relative_path_is_valid(self):
+        self.assertTrue(_is_valid_target_device_path(r"\foo"))
+
+    def test_unc_path_is_valid(self):
+        self.assertTrue(_is_valid_target_device_path(r"\\server\share\x"))
+
+    def test_environment_variable_rooted_path_is_valid(self):
+        self.assertTrue(_is_valid_target_device_path(r"%ProgramFiles(x86)%\x"))
+
+    def test_bare_leaf_without_root_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_path("foo"))
+
+    def test_relative_path_without_root_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_path(r"foo\bar"))
+
+    def test_traversal_segment_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_path(r"C:\foo\..\bar"))
+
+    def test_wildcard_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_path(r"C:\foo\*.exe"))
+
+    def test_second_colon_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_path(r"C:\foo:bar"))
+
+    def test_leading_trailing_whitespace_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_path(r"C:\foo\bar "))
+
+    def test_single_backslash_unc_prefix_is_invalid(self):
+        # A single leading backslash followed immediately by another backslash
+        # is neither root-relative (next char must not be "\\") nor a complete
+        # UNC path (needs \\server\share).
+        self.assertFalse(_is_valid_target_device_path(r"\\foo"))
+
+    def test_leaf_name_is_valid(self):
+        self.assertTrue(_is_valid_target_device_leaf_name("contoso-tool.exe"))
+
+    def test_leaf_name_with_separator_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_leaf_name(r"sub\contoso-tool.exe"))
+        self.assertFalse(_is_valid_target_device_leaf_name("sub/contoso-tool.exe"))
+
+    def test_leaf_name_dot_segments_are_invalid(self):
+        self.assertFalse(_is_valid_target_device_leaf_name("."))
+        self.assertFalse(_is_valid_target_device_leaf_name(".."))
+
+    def test_leaf_name_with_colon_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_leaf_name("C:"))
+
+    def test_leaf_name_with_wildcard_is_invalid(self):
+        self.assertFalse(_is_valid_target_device_leaf_name("*.exe"))
+
+
 @unittest.skipUnless(HAS_YAML, "PyYAML is not installed")
 class FixtureFileTests(unittest.TestCase):
     """End-to-end tests that load the checked-in YAML fixtures."""
@@ -899,9 +1088,11 @@ class FixtureFileTests(unittest.TestCase):
         for name in (
             "valid-pkg-multibundle.yaml",
             "valid-lob-multibundle.yaml",
-            "valid-primary-prefix-match.yaml",
+            "valid-macos-ignore-app-version.yaml",
             "valid-windows-win32-x64.yaml",
             "valid-windows-win32-arm64.yaml",
+            "valid-windows-file-detection-version.yaml",
+            "valid-windows-file-detection-exists.yaml",
             "valid-assignments-categories-scripts.yaml",
         ):
             with self.subTest(fixture=name):
@@ -911,15 +1102,18 @@ class FixtureFileTests(unittest.TestCase):
     def test_invalid_fixtures_are_rejected(self):
         expectations = {
             "invalid-dmg.yaml": "RP001",
-            "invalid-ambiguous-primary.yaml": "RP010",
-            "invalid-unresolved-primary.yaml": "RP010",
+            "invalid-macos-primary-bundle-id.yaml": "RP009",
+            "invalid-macos-bundle-build-version.yaml": "RP012",
             "invalid-duplicate-bundleid.yaml": "RP006",
-            "invalid-lob-missing-build.yaml": "RP007",
-            "invalid-pkg-with-build.yaml": "RP008",
             "invalid-unsupported-platform.yaml": "RP013",
             "invalid-windows-apptype-set.yaml": "RP030",
             "invalid-windows-missing-package.yaml": "RP032",
             "invalid-windows-bad-restart-behavior.yaml": "RP038",
+            "invalid-windows-file-detection-path.yaml": "RP042",
+            "invalid-windows-file-detection-exists-operator.yaml": "RP046",
+            "invalid-windows-file-detection-comparison-value.yaml": "RP047",
+            "invalid-windows-file-detection-script-field.yaml": "RP048",
+            "invalid-windows-file-detection-file-field.yaml": "RP049",
             "invalid-assignment-duplicate-target.yaml": "RP057",
             "invalid-categories-duplicate.yaml": "RP062",
             "invalid-scripts-on-windows.yaml": "RP070",

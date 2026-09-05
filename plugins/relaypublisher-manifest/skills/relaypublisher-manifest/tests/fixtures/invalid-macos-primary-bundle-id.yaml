@@ -1,8 +1,11 @@
 SchemaVersion: "1.0"
-PackageIdentifier: Contoso.AmbiguousPrimary
-PackageName: Contoso Ambiguous Primary
+PackageIdentifier: Contoso.StalePrimaryBundleId
+PackageName: Contoso Stale Primary Bundle Id
 Publisher: Contoso Ltd.
-Description: PrimaryBundleId matches two declared bundles and must be rejected.
+Description: >-
+  Detection.PrimaryBundleId does not exist in the v1.1.0 manifest schema;
+  ManifestLoader silently ignores it and the primary entry is always
+  IncludedApps[0].
 PackageVersion: "1.0.0"
 
 Apps:
@@ -10,12 +13,12 @@ Apps:
     Architecture: arm64
     InstallerType: pkg
     AppType: pkg
-    DisplayName: Contoso Ambiguous Primary [macOS Arm64]
+    DisplayName: Contoso Stale Primary Bundle Id [macOS Arm64]
     Source:
       Type: azureBlob
       AccountName: examplepackages
       Container: intune-packages
-      BlobName: macos/contoso-ambiguous/1.0.0/Contoso.pkg
+      BlobName: macos/contoso-stale-primary/1.0.0/Contoso.pkg
       Destination: Contoso.pkg
       Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       Auth:
@@ -23,9 +26,9 @@ Apps:
     Requirements:
       MinimumOSVersion: "13.0"
     Detection:
-      PrimaryBundleId: com.example.client
+      PrimaryBundleId: com.example.contoso.client
       IncludedApps:
-        - BundleId: com.example.client.main
+        - BundleId: com.example.contoso.client
           BundleVersion: "1.0.0"
-        - BundleId: com.example.client.agent
+        - BundleId: com.example.contoso.helper
           BundleVersion: "1.0.0"
