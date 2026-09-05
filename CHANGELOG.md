@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Updated the `relaypublisher-manifest` plugin for Relaypublisher v1.1.0: added Windows `Detection.Type: file` (file-system detection) authoring and static validation, alongside the existing `Detection.Type: script`.
+- Removed macOS `Detection.PrimaryBundleId` and `IncludedApps[].BundleBuildVersion` guidance and checks — neither field exists in Relaypublisher v1.1.0's manifest model; the bundled checker now rejects both as unsupported fields. The primary bundle is always `IncludedApps[0]`.
+- Added macOS `Detection.IgnoreAppVersion` authoring guidance.
+- Added and updated bundled-checker fixtures and unit tests to match the v1.1.0 contract.
+
 ## 0.3.0
 
 - Added the `relaypublisher-manifest` plugin for manifest authoring and static validation.

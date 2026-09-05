@@ -24,11 +24,8 @@ Apps:
     Requirements:
       MinimumOSVersion: "13.0"
     Detection:
-      PrimaryBundleId: com.example.contoso.lob.main
       IncludedApps:
         - BundleId: com.example.contoso.lob.main
           BundleVersion: "4.2.0"
-          BundleBuildVersion: "4200"
         - BundleId: com.example.contoso.lob.helper
           BundleVersion: "4.2.0"
-          BundleBuildVersion: "4200"

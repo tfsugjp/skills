@@ -92,17 +92,63 @@ list in the manifest merely to make it explicit.
 
 ## Detection
 
+`Detection.Type` is required and must be `script` or `file`. macOS has neither
+mechanism; it is always detected via `IncludedApps` (see
+[macos-manifest.md](macos-manifest.md)).
+
+### `Type: script`
+
 ```yaml
 Detection:
-  Type: script                  # the only supported Detection.Type
-  ScriptFile: scripts/windows/common/detect.ps1   # required when Type is script
+  Type: script
+  ScriptFile: scripts/windows/common/detect.ps1   # required, repository-relative
   RunAs32Bit: false              # optional
   EnforceSignatureCheck: false   # optional
 ```
 
-`Detection.Type` is required and must be `script`; `ScriptFile` is then
-required and non-empty. Windows has no other detection mechanism in this
-contract — do not invent a bundle-based detection scheme.
+`ScriptFile` is required and non-empty. None of the `Type: file` fields below
+(`Path`, `FileOrFolderName`, `OperationType`, `Operator`, `ComparisonValue`,
+`Check32BitOn64System`) may be set alongside `Type: script` — the two
+detection mechanisms are mutually exclusive.
+
+### `Type: file`
+
+Added in Relaypublisher v1.1.0 (additive; `SchemaVersion` stays `"1.0"`).
+Detects a file or folder on the target device without a detection script:
+
+```yaml
+Detection:
+  Type: file
+  Path: 'C:\Program Files\Contoso Tool'    # required; target-device path, see below
+  FileOrFolderName: contoso-tool.exe        # required; single target-device leaf name
+  OperationType: version                    # required: exists | version
+  Operator: greaterThanOrEqual              # required when OperationType is version
+  ComparisonValue: "1.2.3"                  # required when OperationType is version
+  Check32BitOn64System: false               # optional; default false
+```
+
+**`Path` and `FileOrFolderName` are evaluated on the target Windows device —
+they are never resolved against `--repo-root` and are not repository-relative
+paths.** `Path` must be one of four root forms: drive-rooted (`C:\...`),
+root-relative (`\...`), UNC (`\\server\share\...`), or
+environment-variable-rooted (`%ProgramFiles%\...`, `%ProgramFiles(x86)%\...`).
+Neither `Path` nor `FileOrFolderName` may contain a wildcard (`*`/`?`), a
+control character, `<`/`>`/`"`/`|`, leading/trailing whitespace, or a `.`/`..`
+traversal segment; `FileOrFolderName` is additionally a single leaf name — no
+`\`, `/`, or `:`.
+
+`OperationType` × `Operator`/`ComparisonValue`:
+
+| `OperationType` | `Operator` | `ComparisonValue` |
+|---|---|---|
+| `exists` | must not be set (Graph generates `notConfigured`) | must not be set |
+| `version` | required: `equal`, `notEqual`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, or `lessThanOrEqual` | required: 1-4 numeric parts of 1-5 digits each (e.g. `"1.2.3"`) |
+
+`notConfigured` is a Graph unset sentinel and must never appear as manifest
+input for `OperationType` or `Operator`. `Check32BitOn64System` defaults to
+`false`; when `true`, Graph expands environment variables in a 32-bit context
+on a 64-bit OS. None of `ScriptFile`, `RunAs32Bit`, or `EnforceSignatureCheck`
+may be set alongside `Type: file`.
 
 ## Requirements and Architecture
 
@@ -187,8 +233,12 @@ reports each violation under the listed `RP0xx` code.
 6. `Install.CommandLine`/`UninstallCommandLine` are non-empty, `InstallExperience`
    is `system` or `user`, `RestartBehavior` is `suppress`/`allow`/`force`, and
    every present `ReturnCodes[].Type` is a supported value (`RP035`-`RP039`).
-7. `Detection.Type` is `script` and `Detection.ScriptFile` is non-empty
-   (`RP040`, `RP041`).
+7. `Detection.Type` is `script` or `file` (`RP040`). For `script`,
+   `ScriptFile` is non-empty and no `file`-only field is set (`RP041`,
+   `RP049`). For `file`, `Path` and `FileOrFolderName` are valid target-device
+   values (`RP042`, `RP043`), `OperationType` is `exists` or `version`
+   (`RP045`), `Operator`/`ComparisonValue` match the `OperationType` table
+   above (`RP046`, `RP047`), and no `script`-only field is set (`RP048`).
 8. `Assignments` entries use supported `Target`/`Mode`/`Intent`/`FilterMode`/
    `Settings.Notifications` values, `GroupId`/`FilterId` are valid GUIDs when
    present, and no two entries duplicate the same target (`RP050`-`RP057`).
@@ -208,6 +258,13 @@ by `../tests/test_manifest_policy.py`:
 |---|---|
 | `valid-windows-win32-x64.yaml` | Full valid shape with a `publicHttp` external file and explicit `ReturnCodes` |
 | `valid-windows-win32-arm64.yaml` | Full valid shape with a `githubRelease` external file and `token` auth |
+| `valid-windows-file-detection-version.yaml` | `Type: file` with `OperationType: version` (item 7) |
+| `valid-windows-file-detection-exists.yaml` | `Type: file` with `OperationType: exists` and an environment-variable-rooted `Path` (item 7) |
+| `invalid-windows-file-detection-script-field.yaml` | Rejects `ScriptFile` set alongside `Type: file` (`RP048`, item 7) |
+| `invalid-windows-file-detection-file-field.yaml` | Rejects a `file`-only field set alongside `Type: script` (`RP049`, item 7) |
+| `invalid-windows-file-detection-exists-operator.yaml` | Rejects `Operator` set when `OperationType: exists` (`RP046`, item 7) |
+| `invalid-windows-file-detection-path.yaml` | Rejects a repository-relative (non-target-device) `Path` (`RP042`, item 7) |
+| `invalid-windows-file-detection-comparison-value.yaml` | Rejects a non-numeric `ComparisonValue` (`RP047`, item 7) |
 | `invalid-windows-apptype-set.yaml` | Rejects `AppType` set on a Windows entry (`RP030`, item 4) |
 | `invalid-windows-missing-package.yaml` | Rejects a Windows entry with no `Package` block (`RP032`, item 5) |
 | `invalid-windows-bad-restart-behavior.yaml` | Rejects an unsupported `RestartBehavior` value (`RP038`, item 6) |
@@ -328,3 +385,51 @@ Apps:
 The arm64 example omits `ReturnCodes`, so Intune's default return-code set
 applies at publish time; that is a valid, deliberate omission, not a gap to
 fill in.
+
+### Win32 x64 (file-system detection, no detection script)
+
+```yaml
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.Tool.FileDetection
+PackageName: Contoso Tool File Detection
+Publisher: Contoso Ltd.
+Description: Demonstrates Windows file-system detection without a detection script.
+PackageVersion: "1.2.3"
+
+Apps:
+  - Platform: windows
+    Architecture: x64
+    InstallerType: win32
+    DisplayName: Contoso Tool File Detection [Windows x64]
+
+    Package:
+      IntuneWin:
+        SetupFile: install.ps1
+      RepositoryFiles:
+        - Source: scripts/windows/x64/install.ps1
+          Destination: install.ps1
+        - Source: scripts/windows/common/uninstall.ps1
+          Destination: uninstall.ps1
+
+    Install:
+      CommandLine: powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+      UninstallCommandLine: powershell.exe -ExecutionPolicy Bypass -File .\uninstall.ps1
+      InstallExperience: system
+      RestartBehavior: suppress
+
+    Detection:
+      Type: file
+      Path: 'C:\Program Files\Contoso Tool'
+      FileOrFolderName: contoso-tool.exe
+      OperationType: version
+      Operator: greaterThanOrEqual
+      ComparisonValue: "1.2.3"
+      Check32BitOn64System: false
+
+    Requirements:
+      MinimumOSVersion: "10.0.19045"
+      Architecture: x64
+```
+
+`Path` and `FileOrFolderName` name a location on the target device, not a
+repository path — nothing here is resolved against `--repo-root`.

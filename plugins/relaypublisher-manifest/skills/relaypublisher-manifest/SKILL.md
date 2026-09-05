@@ -1,7 +1,7 @@
 ---
 name: relaypublisher-manifest
-description: 'Create, update, and statically validate Relaypublisher YAML manifests, including Windows Win32 manifests and macOS PKG/LOB manifests that declare multiple application bundles. Use when Win32 package/install/detection fields, macOS bundle detection, primary bundle selection, or other manifest fields need authoring or review. Do not use for packaging, publishing, force acknowledgements, Graph calls, or tenant changes.'
-compatibility: 'Bundled checker (scripts/manifest_policy.py) requires Python 3.10+ and PyYAML (pip install pyyaml). Full validation additionally requires a Relaypublisher CLI or source revision new enough to understand the manifest fields in use — for macOS multi-bundle manifests specifically, Detection.PrimaryBundleId and IncludedApps[].BundleBuildVersion.'
+description: 'Create, update, and statically validate Relaypublisher YAML manifests, including Windows Win32 manifests (script- or file-system detection) and macOS PKG/LOB manifests that declare multiple application bundles. Use when Win32 package/install/detection fields, macOS bundle detection, or other manifest fields need authoring or review. Do not use for packaging, publishing, force acknowledgements, Graph calls, or tenant changes.'
+compatibility: 'Bundled checker (scripts/manifest_policy.py) requires Python 3.10+ and PyYAML (pip install pyyaml). Full validation additionally requires a Relaypublisher CLI or source revision new enough to understand the manifest fields in use — Windows Detection.Type: file specifically requires Relaypublisher v1.1.0 or later.'
 ---
 
 # Relaypublisher Manifest
@@ -21,12 +21,12 @@ Before editing a manifest:
    model/validator over remembered Relaypublisher behavior. In the standard
    repository these are the manifest schema document and the manifest model,
    validation, bundle-selector, and platform-specific payload mapping code.
-2. For a macOS multi-bundle manifest specifically, confirm the CLI version or
-   source revision supports `Detection.PrimaryBundleId` and
-   `IncludedApps[].BundleBuildVersion`. Run `relaypublisher --version` (or the
-   target repository's equivalent) and check it against the repository's
-   changelog for the revision that introduced those fields. A CLI that ignores
-   those fields is not a compatible validator for this work.
+2. For a Windows entry that needs `Detection.Type: file`, confirm the CLI
+   version or source revision is Relaypublisher v1.1.0 or later. Run
+   `relaypublisher --version` (or the target repository's equivalent) and
+   check it against the repository's changelog. A CLI older than v1.1.0 does
+   not understand `Type: file` and is not a compatible validator for that
+   entry.
 3. Obtain every required value — bundle identifiers/versions, Win32 command
    lines, source checksums, and so on — from user-supplied or otherwise
    authoritative package metadata. Never guess a value (a bundle identifier, a
@@ -49,7 +49,8 @@ field mapping, examples, and static-validation checklist for each platform.
 - For macOS, the source is a PKG: use `InstallerType: pkg` and `AppType: pkg`
   or `AppType: lob`. DMG installers are unsupported; do not translate a DMG
   into a PKG manifest or add a guessed DMG schema. Never copy Windows-only
-  `Package`, `Install`, or script-based `Detection` fields onto a macOS entry.
+  `Package`, `Install`, or `Detection` fields — script- or file-system-based —
+  onto a macOS entry.
 - A multi-bundle macOS manifest has one PKG source and an explicit
   `Detection.IncludedApps` list. It is not a manifest containing multiple
   independent package sources.
@@ -86,13 +87,22 @@ field mapping, examples, and static-validation checklist for each platform.
    matches how the installer actually behaves. Only add `ReturnCodes` when the
    installer's codes differ from Intune's default set — do not restate the
    default set just to make it explicit.
-5. Set `Detection.Type: script` with the real detection script's path in
-   `ScriptFile`. Windows has no other detection mechanism in this contract.
+5. Choose the Windows detection mechanism that matches how the app is
+   actually detected — the two are mutually exclusive, never combine them:
+   - `Detection.Type: script` with the real detection script's path in
+     `ScriptFile`, when detection needs custom logic a file/version check
+     cannot express.
+   - `Detection.Type: file` (Relaypublisher v1.1.0+) with a real target-device
+     `Path`/`FileOrFolderName` and `OperationType` (`exists` or `version`,
+     with `Operator`/`ComparisonValue` for `version`), when detection is
+     exactly "this file or folder exists" or "this file's version compares
+     this way" and a script would be pure overhead. Never invent a
+     `ComparisonValue` — use the real version the app installs.
 6. Set `Requirements.MinimumOSVersion` to the real minimum build, and
    `Requirements.Architecture` (if set) to match the app-level `Architecture`
    exactly.
 7. If the user asks for `Assignments` or `Categories`, follow the shared rules
-   in step 8 of "Author or update a macOS manifest" below — they are identical
+   in step 5 of "Author or update a macOS manifest" below — they are identical
    on Windows.
 
 If required installer metadata is unavailable, stop with a clear request for
@@ -101,9 +111,9 @@ the exact values and leave the manifest unchanged.
 ## Author or update a macOS manifest
 
 1. Make the smallest change that satisfies the user's request. Preserve YAML key and
-   list order, comments, formatting style, and unrelated fields. Do not sort
-   `IncludedApps`; primary-first ordering is a Graph-payload concern, not a manifest
-   rewrite.
+   list order, comments, formatting style, and unrelated fields. `IncludedApps[0]` is
+   always the primary entry — there is no selector field — so only reorder the list
+   when the user explicitly asks for a different bundle to become primary.
 2. Keep the existing root and platform fields intact unless the user asks to change
    them. For each macOS entry, use one `Source` describing the PKG and keep Windows
    `Package`/`Install` fields out of the macOS entry.
@@ -111,22 +121,13 @@ the exact values and leave the manifest unchanged.
    - include one to 500 entries;
    - use a non-empty `BundleId` and `BundleVersion` for every entry;
    - compare `BundleId` values with ordinal, case-sensitive equality when checking
-     duplicates; and
-   - map `BundleVersion` to `CFBundleShortVersionString`.
-4. For `AppType: lob`, set `BundleBuildVersion` on every entry to the exact
-   `CFBundleVersion` value. For `AppType: pkg`, omit `BundleBuildVersion`; it is not
-   part of the PKG mapping. Do not create a value merely because a PKG has a build
-   number.
-5. If `Detection.PrimaryBundleId` is present, resolve it against the declared list
-   with ordinal, case-sensitive matching. A match is either an exact `BundleId` or a
-   `BundleId` beginning with `PrimaryBundleId + "."`. Exactly one entry must match;
-   reject zero and ambiguous matches. If the selector is omitted, the first list
-   entry remains primary. An empty or whitespace-only selector is invalid.
-6. Do not list a bundled updater solely because it is present in the PKG. Exclusion is
+     duplicates;
+   - map `BundleVersion` to `CFBundleShortVersionString`; and
+   - never add `BundleBuildVersion` — it does not exist in this schema for either
+     `AppType`, and `ManifestLoader` silently ignores it rather than failing on it.
+4. Do not list a bundled updater solely because it is present in the PKG. Exclusion is
    represented by omission from `IncludedApps`, never by an invented exclude field.
-7. Preserve the manifest's declared order even when a non-first entry is selected as
-   primary. Do not rewrite other entries around the selector.
-8. If the user asks for `Assignments` (shared by both platforms): use a real
+5. If the user asks for `Assignments` (shared by both platforms): use a real
    Entra ID group GUID for `Target: group`, set no `GroupId` for
    `allDevices`/`allLicensedUsers`, set `Intent` for every `include`-mode entry
    (default), and never add `Intent: uninstall` to a macOS `AppType: pkg`
@@ -137,7 +138,7 @@ the exact values and leave the manifest unchanged.
    distinguish omitting `Categories` (leaves existing relationships alone)
    from `Categories: []` (clears all of them) — never emit an empty list only
    to make omission "explicit".
-9. If the user asks for pre/post-install `Scripts` on an `AppType: pkg` entry:
+6. If the user asks for pre/post-install `Scripts` on an `AppType: pkg` entry:
    set at least one of `PreInstall`/`PostInstall` to the real script's
    repository-relative `.sh` path. Never set `Scripts` on `AppType: lob` or a
    Windows entry. Do not alter the referenced script's content — that is a
@@ -177,7 +178,8 @@ means PyYAML is not installed. Pass `--json` for machine-readable findings.
 This checker is not the Relaypublisher schema authority — it only catches the
 manifest-authoring mistakes this skill is responsible for (wrong installer
 type per platform, malformed `Package`/`Install`/`Detection`/`IncludedApps`
-blocks, ambiguous/unresolved macOS primary selectors, cross-platform field
+blocks — including Windows script- and file-system detection rules and stale
+macOS fields that no longer exist in the schema — cross-platform field
 misuse, source-item shape errors, and malformed `Assignments`/`Categories`/
 macOS `Scripts`). It never resolves a `Categories` name against a tenant
 catalog or applies an `Assignments` entry — those remain Graph-side concerns
@@ -206,16 +208,14 @@ relaypublisher validate --repo-root "$RELAYPUBLISHER_REPO" --manifest-list "$MAN
 The validation run is static. It may validate repository-backed assets such as an
 icon, but it must not download the `Source`/`ExternalFiles` payload or inspect the
 PKG/`.intunewin`. Check the output for schema errors, per-platform installer-type
-restrictions, `IncludedApps` count/duplicate errors, primary-selector errors, and
-missing LOB build values. Do not claim Relaypublisher validation passed if the
-command is unavailable.
+restrictions, `IncludedApps` count/duplicate errors, and unsupported-field errors.
+Do not claim Relaypublisher validation passed if the command is unavailable.
 
 When the CLI is unavailable, rely on the bundled checker plus a syntax and contract
 review using the target repository's schema tooling if present, then report that
-Relaypublisher validation is incomplete. When the CLI is too old or rejects the new
-fields, report a version mismatch and retain `PrimaryBundleId` and
-`BundleBuildVersion`; never delete or downgrade those fields to make an old command
-pass.
+Relaypublisher validation is incomplete. When the CLI predates Relaypublisher v1.1.0
+and a changed entry uses `Detection.Type: file`, report a version mismatch; never
+downgrade that entry to script-based detection just to make an old command pass.
 
 Finish by reporting the changed manifest path(s), the metadata source, the
 bundled-checker result, the Relaypublisher CLI command/result (or its unavailability),

@@ -42,7 +42,14 @@ Every entry requires:
 |---|---|---|
 | `BundleId` | `CFBundleIdentifier` | Required; duplicate detection uses ordinal, case-sensitive equality |
 | `BundleVersion` | `CFBundleShortVersionString` | Required for every `pkg` and `lob` entry |
-| `BundleBuildVersion` | `CFBundleVersion` | Required for every `lob` entry; omit for `pkg` |
+
+`IncludedApps[].BundleBuildVersion` does not exist in the `IncludedAppManifest`
+model — it is not a valid manifest field for either `pkg` or `lob`. An entry
+carrying it is rejected as an unsupported field, not mapped to any Graph
+property. (`ManifestLoader` ignores unmatched YAML properties rather than
+failing on them, so writing this field silently does nothing on a real
+CLI run — the bundled checker exists in part to catch that silently-ignored
+case before it reaches the CLI.)
 
 The list is declarative. Never invent a bundle identifier or version, and do not
 assume that the root `PackageVersion` is either bundle version field. If metadata is
@@ -52,48 +59,36 @@ Bundle IDs that differ only by case are distinct under this contract, although a
 actual macOS bundle normally follows a stable lower-case convention. Keep the exact
 spelling supplied by the authoritative metadata.
 
+`Detection.IgnoreAppVersion` (optional, boolean, default `false`) excludes the
+bundle version from Intune's installed-state detection (Graph
+`ignoreVersionDetection`) when set to `true`. It has no interaction with which
+entry is primary or with `IncludedApps` ordering.
+
 ## Primary bundle selection
 
-`Detection.PrimaryBundleId` is optional. When omitted, `IncludedApps[0]` is the
-primary entry. Do not materialize a default selector, because omission preserves the
-existing manifest meaning and hash behavior.
+There is no primary-bundle selector field. `IncludedApps[0]` is always the
+primary entry — the first entry is also used for report display and, for
+`AppType: pkg`, as the app's `primaryBundleId`/`primaryBundleVersion`. A
+manifest that needs a different bundle to be primary must reorder
+`IncludedApps` itself; there is no field that changes primary selection
+without reordering the list.
 
-When specified, matching is ordinal and case-sensitive. A declared entry matches if:
-
-```text
-entry.BundleId == PrimaryBundleId
-or
-entry.BundleId starts with PrimaryBundleId + "."
-```
-
-The selector must be non-empty, non-whitespace, and resolve to exactly one entry.
-Zero matches and two or more matches are validation failures. The dot is part of the
-prefix rule: a selector such as `com.example.app` must not match
-`com.example.application`.
-
-Examples of selector outcomes:
-
-| Selector | Declared IDs | Result |
-|---|---|---|
-| `com.example.client` | `com.example.client`, `com.example.helper` | exact one-match; valid |
-| `com.example.client` | `com.example.client.main`, `com.example.helper` | segment-prefix one-match; valid |
-| `com.example.client` | `com.example.client.main`, `com.example.client.agent` | two matches; reject as ambiguous |
-| `com.example.app` | `com.example.application` | no match; reject |
-
-Selecting a non-first entry changes only the Graph primary projection. Preserve the
-manifest's list order and do not move the selected entry to the top in YAML.
+`Detection.PrimaryBundleId` does not exist in this schema. Do not add it —
+`ManifestLoader` ignores unmatched properties rather than failing on them, so
+it would silently do nothing rather than select a primary bundle.
 
 ## PKG and LOB projection
 
-The target Relaypublisher mapping uses the selected entry as follows:
+The target Relaypublisher mapping uses `IncludedApps[0]` as follows:
 
-| App type | Graph collection | Selected primary fields | Build field |
+| App type | Graph collection | Primary fields | Build/version fields |
 |---|---|---|---|
-| `pkg` | `includedApps` | `primaryBundleId` and `primaryBundleVersion` | `BundleBuildVersion` is omitted and not mapped |
-| `lob` | `childApps` | top-level `bundleId`; selected version values also populate the top-level primary fields | `BundleVersion` maps to `buildNumber`; `BundleBuildVersion` maps to `versionNumber` |
+| `pkg` | `includedApps` | `primaryBundleId`/`primaryBundleVersion` from `IncludedApps[0]` | not applicable — `pkg` has no build-number concept |
+| `lob` | `childApps` | top-level `bundleId` from `IncludedApps[0]` | top-level `buildNumber` **and** `versionNumber`, and each `childApps[].buildNumber`/`versionNumber`, are all `BundleVersion` — there is no separate build-number field |
 
-The payload projection may put the selected entry first for Graph. That is not a
-reason to reorder or normalize the source manifest.
+The payload projection reads `IncludedApps[0]` for the primary/top-level
+fields. That is not a reason to reorder or normalize the source manifest —
+reorder `IncludedApps` itself if a different entry must be primary.
 
 `AppType: lob` also requires the root `Icon` according to the target schema. The
 icon must satisfy that repository's path, format, size, and existence checks. Keep
@@ -166,12 +161,13 @@ checker cannot fully verify on its own.
    required by the target schema (`RP003`).
 4. `IncludedApps` has 1–500 entries (`RP004`), no ordinal/case-sensitive duplicate
    `BundleId` (`RP006`), non-empty `BundleId`/`BundleVersion` values (`RP005`), and no
-   fields outside `BundleId`/`BundleVersion`/`BundleBuildVersion` (`RP012`).
-5. Each LOB entry has a non-empty `BundleBuildVersion` (`RP007`); no PKG entry
-   generates one (`RP008`). `AppType: lob` also requires a non-empty root `Icon`
-   (`RP011`).
-6. A present `PrimaryBundleId` is non-blank (`RP009`) and has exactly one exact or
-   dot-segment-prefix match (`RP010`).
+   fields outside `BundleId`/`BundleVersion` (`RP012`) — `BundleBuildVersion` does not
+   exist in this schema and is rejected under the same code regardless of `AppType`.
+5. `AppType: lob` requires a non-empty root `Icon` (`RP011`).
+6. `Detection.PrimaryBundleId` does not exist in this schema. If present at all — blank,
+   exact match, or not — it is rejected (`RP009`); `IncludedApps[0]` is always the
+   primary entry. (Retired: `RP007`/`RP008`, the removed `BundleBuildVersion`
+   required/forbidden checks; `RP010`, the removed selector-resolution check.)
 7. `Scripts` (if present) is set only on `AppType: pkg`, sets at least one of
    `PreInstall`/`PostInstall`, uses a safe repository-relative `.sh` path, and
    (with `--repo-root`) exists, has no BOM, starts with a shebang, and stays
@@ -197,9 +193,10 @@ relaypublisher validate --repo-root $RelaypublisherRepo --manifest $Manifest
 `validate` is not a package-inspection command and should not download the source.
 It may still check local assets referenced by the manifest. Do not add `--force`.
 
-If a CLI is not installed, or an older CLI does not understand
-`PrimaryBundleId`/`BundleBuildVersion`, report validation as unavailable or a
-version mismatch. Keep the new fields intact; do not make a lossy compatibility edit.
+If a CLI is not installed, report validation as unavailable. If the CLI is older
+than Relaypublisher v1.1.0 and a Windows entry in the same changeset uses
+`Detection.Type: file`, report a version mismatch rather than downgrading that
+entry to script-based detection to make an old command pass.
 
 ## Complete examples
 
@@ -236,7 +233,6 @@ Apps:
     Requirements:
       MinimumOSVersion: "13.0"
     Detection:
-      PrimaryBundleId: com.example.contoso.client
       IncludedApps:
         - BundleId: com.example.contoso.client
           BundleVersion: "4.2.0"
@@ -244,9 +240,9 @@ Apps:
           BundleVersion: "4.2.0"
 ```
 
-`com.example.contoso.client` is an exact, unambiguous match. An updater that is
-present in the PKG but should not gate detection is intentionally absent from this
-list.
+`com.example.contoso.client` is `IncludedApps[0]`, so it is the primary entry. An
+updater that is present in the PKG but should not gate detection is intentionally
+absent from this list.
 
 ### Multi-bundle macOS LOB
 
@@ -277,21 +273,18 @@ Apps:
     Requirements:
       MinimumOSVersion: "13.0"
     Detection:
-      PrimaryBundleId: com.example.contoso.lob.main
       IncludedApps:
         - BundleId: com.example.contoso.lob.main
           BundleVersion: "4.2.0"
-          BundleBuildVersion: "4200"
         - BundleId: com.example.contoso.lob.helper
           BundleVersion: "4.2.0"
-          BundleBuildVersion: "4200"
 ```
 
-For the LOB example, both `BundleBuildVersion` values are required and must be
-replaced with the respective bundles' actual `CFBundleVersion` values. The icon path
-must point to an existing supported image in the target repository. The PKG example
-does not contain `BundleBuildVersion` because that field is not part of the PKG
-mapping.
+For the LOB example, `com.example.contoso.lob.main` is `IncludedApps[0]`, so its
+`BundleVersion` populates both the top-level `buildNumber` and `versionNumber` (and
+each `childApps[].buildNumber`/`versionNumber`) — there is no separate build-number
+field to supply. The icon path must point to an existing supported image in the
+target repository.
 
 ## Fixtures
 
@@ -301,14 +294,12 @@ mapping.
 | Fixture | Checklist item(s) exercised |
 |---|---|
 | `valid-pkg-multibundle.yaml` | Full valid shape; the updater is intentionally omitted from `IncludedApps` (item 9) |
-| `valid-lob-multibundle.yaml` | Full valid LOB shape, including `BundleBuildVersion` and root `Icon` (items 5, 6) |
-| `valid-primary-prefix-match.yaml` | Dot-segment-prefix primary match (item 6) |
+| `valid-lob-multibundle.yaml` | Full valid LOB shape, including root `Icon` (item 5) |
+| `valid-macos-ignore-app-version.yaml` | `Detection.IgnoreAppVersion: true` on a `pkg` entry |
 | `invalid-dmg.yaml` | Rejects `InstallerType: dmg` (`RP001`, item 1) |
-| `invalid-ambiguous-primary.yaml` | Rejects a selector matching two entries (`RP010`, item 6) |
-| `invalid-unresolved-primary.yaml` | Rejects a selector with zero matches; confirms the dot is part of the prefix rule (`RP010`, item 6) |
+| `invalid-macos-primary-bundle-id.yaml` | Rejects a present `Detection.PrimaryBundleId` (`RP009`, item 6) |
+| `invalid-macos-bundle-build-version.yaml` | Rejects `IncludedApps[].BundleBuildVersion` as an unsupported field (`RP012`, item 4) |
 | `invalid-duplicate-bundleid.yaml` | Rejects an ordinal, case-sensitive duplicate `BundleId` (`RP006`, item 4) |
-| `invalid-lob-missing-build.yaml` | Rejects a `lob` entry missing `BundleBuildVersion` (`RP007`, item 5) |
-| `invalid-pkg-with-build.yaml` | Rejects a `pkg` entry that fabricates `BundleBuildVersion` (`RP008`, item 5) |
 | `invalid-unsupported-platform.yaml` | Rejects a `Platform` that is neither `macos` nor `windows` (`RP013`, item 0) |
 | `valid-assignments-categories-scripts.yaml` | Valid `Scripts`/`Categories`/`Assignments` together on a macOS `pkg` entry (items 7, 8) |
 | `invalid-assignment-duplicate-target.yaml` | Rejects two assignments resolving to the same target (`RP057`, item 8) |

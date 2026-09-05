@@ -23,7 +23,6 @@ Apps:
     Requirements:
       MinimumOSVersion: "13.0"
     Detection:
-      PrimaryBundleId: com.example.contoso.client
       IncludedApps:
         - BundleId: com.example.contoso.client
           BundleVersion: "4.2.0"

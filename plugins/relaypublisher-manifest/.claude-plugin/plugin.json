@@ -1,7 +1,7 @@
 {
   "name": "relaypublisher-manifest",
-  "version": "0.1.0",
-  "description": "Create, update, and statically validate Relaypublisher manifests, including Windows Win32 and multi-bundle macOS PKG/LOB detection.",
+  "version": "0.2.0",
+  "description": "Create, update, and statically validate Relaypublisher manifests for v1.1.0, including Windows Win32 script/file-system detection and multi-bundle macOS PKG/LOB detection.",
   "author": {
     "name": "Team Foundation Users Japan"
   },
