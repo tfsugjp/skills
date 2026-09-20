@@ -1,0 +1,11 @@
+{
+  "name": "repository-init",
+  "version": "0.1.0",
+  "description": "Explicitly initialize repository policy files once and preserve existing project rules.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["repository", "initialization", "agents", "policy"],
+  "skills": "./skills/"
+}
