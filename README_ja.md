@@ -11,9 +11,6 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `dependabot-safe-merge` | Dependabot pull request の安全な更新、公開経過時間ポリシー、マージゲート、メジャーアップグレード計画 |
 | `github-plan-wiki` | スキル: GitHub Plan Issues（親 issue と sub-issue の階層）、GitHub Wiki Plan（英日 Wiki plan と Home index の管理） |
 | `relaypublisher-manifest` | Relaypublisher manifest (v1.1.0) の作成・更新・静的検証。Windows Win32 の script/file-system detection と、複数 bundle を含む macOS PKG/LOB の detection に対応 |
-| `dependabot-safe-merge` | Dependabot の安全な再取得、リリース年齢ポリシー、マージゲート、メジャー更新計画 |
-| `github-plan-wiki` | 承認済み計画を親 Issue とサブ Issue に分解し、機能・リファクタリング・性能計画を Wiki に英日で公開 |
-| `repository-init` | ライセンス、セキュリティ、言語方針、`AGENTS.md` をリポジトリ作成時に一度だけ初期化 |
 | `repository-init` | ライセンス、セキュリティ、言語方針、`AGENTS.md` をリポジトリ作成時に一度だけ初期化 |
 
 すべて MIT License で配布します。認証情報は含めず、MCP server も自動構成しません。Azure DevOps の認証と権限は利用者が設定してください。

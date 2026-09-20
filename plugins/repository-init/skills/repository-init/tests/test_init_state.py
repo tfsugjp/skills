@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -47,6 +48,18 @@ class InitStateTests(unittest.TestCase):
     def test_non_mit_profile_can_be_saved(self) -> None:
         self.assertEqual("non-mit", state.begin(self.root, "Apache-2.0", "non-mit")["language_profile"])
 
+    def test_common_mit_names_are_stored_canonically(self) -> None:
+        for name in ("MIT License", "The MIT License"):
+            with self.subTest(name=name):
+                state.begin(self.root, name, "mit")
+                self.assertEqual("MIT", json.loads((self.root / state.MARKER).read_text(encoding="utf-8"))["license"])
+                (self.root / state.MARKER).unlink()
+
+    def test_mit_license_template_is_available_for_new_repositories(self) -> None:
+        template = Path(__file__).parents[1] / "assets" / "LICENSE_MIT"
+        self.assertIn("MIT License", template.read_text(encoding="utf-8"))
+        self.assertIn("[COPYRIGHT_HOLDER]", template.read_text(encoding="utf-8"))
+
     def test_complete_requires_governance_files_and_alternate_license(self) -> None:
         state.begin(self.root, "MIT", "mit")
         with self.assertRaises(state.StateError):
@@ -89,6 +102,23 @@ class InitStateTests(unittest.TestCase):
             state.begin(self.root, "MIT", "mit")
         self.assertTrue(lock.is_file())
         self.assertFalse((self.root / state.MARKER).exists())
+
+    def test_stale_lock_requires_explicit_token_recovery(self) -> None:
+        token = "0" * 32
+        (self.root / state.LOCK).write_text(json.dumps({"version": 1, "pid": 999999999, "created_utc": "2026-01-01T00:00:00+00:00", "token": token}), encoding="utf-8")
+        with self.assertRaisesRegex(state.StateError, "stale lock"):
+            state.begin(self.root, "MIT", "mit")
+        with self.assertRaises(state.StateError):
+            state.recover_lock(self.root, "f" * 32)
+        self.assertEqual("lock_recovered", state.recover_lock(self.root, token)["status"])
+        self.assertEqual("in_progress", state.begin(self.root, "MIT", "mit")["status"])
+
+    def test_active_lock_cannot_be_recovered(self) -> None:
+        token = "a" * 32
+        (self.root / state.LOCK).write_text(json.dumps({"version": 1, "pid": os.getpid(), "created_utc": "2026-01-01T00:00:00+00:00", "token": token}), encoding="utf-8")
+        with self.assertRaisesRegex(state.StateError, "still running"):
+            state.recover_lock(self.root, token)
+        self.assertTrue((self.root / state.LOCK).is_file())
 
     def test_failed_atomic_replace_does_not_leave_temporary_marker(self) -> None:
         with mock.patch.object(state.os, "replace", side_effect=OSError("replace failed")):

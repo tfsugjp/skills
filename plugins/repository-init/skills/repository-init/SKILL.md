@@ -12,8 +12,9 @@ Use this skill only for an explicit `$repository-init` request. It is a one-time
 - Work only in the repository root supplied by the user. Do not initialize Git, create a remote, create or update an issue or work item, publish a Wiki page, commit, or push.
 - Inspect the repository before changing anything. A missing marker does not prove that the repository is new.
 - Use `scripts/init_state.py inspect --root <repository-root>` first. If it reports `complete`, finish without writing. If it reports an invalid or unknown marker, fail without writing. If it reports `in_progress`, resume using the saved license and language profile.
-- For a new run, determine the repository's license from existing license files and authoritative project metadata. Preserve a clear existing license. If the license is absent or genuinely ambiguous, ask the user once before creating license-dependent files. For a GitHub repository with no license, offer MIT as the default candidate, but do not create it before the user chooses.
+- For a new run, determine the repository's license from existing license files and authoritative project metadata. Preserve a clear existing license. If the license is absent or genuinely ambiguous, ask the user once before creating license-dependent files. For a GitHub repository with no license, offer MIT as the default candidate, but do not create it before the user chooses. After the user chooses, create the selected license: copy [LICENSE_MIT](assets/LICENSE_MIT) to the root as `LICENSE` for MIT and replace its copyright placeholder; for a non-MIT license, use the exact license text supplied or approved by the user and do not invent it.
 - After the license and profile are known, record the choice with `scripts/init_state.py begin --root <repository-root> --license <license> --profile mit|non-mit`. The helper must reject conflicting choices and must not overwrite an existing marker.
+- If a state command reports a stale lock, inspect `.repository-init.lock`, confirm its recorded process is no longer running, and then run `scripts/init_state.py recover-lock --root <repository-root> --token <token>` with the recorded token. Never delete an active, malformed, or symbolic-link lock automatically.
 
 ## Files and language policy
 
@@ -31,7 +32,7 @@ Before completion, verify that the selected license policy, `AGENTS.md`, and (wh
 
 An interrupted run keeps its marker as `in_progress` and keeps already-created files. On resumption, reuse the recorded license and profile and do not replace existing files. A completed run is idempotent: do not rewrite files or marker data. License changes and policy changes are separate explicit tasks.
 
-The helper's marker is `.repository-init.json` with `schema_version: 1`, `status: in_progress|complete`, `license`, and `language_profile: mit|non-mit`. Do not add timestamps, repository URLs, credentials, or other mutable metadata.
+The helper's marker is `.repository-init.json` with `schema_version: 1`, `status: in_progress|complete`, `license`, and `language_profile: mit|non-mit`. Common MIT names (`MIT`, `MIT License`, and `The MIT License`) are stored canonically as `MIT`. Do not add timestamps, repository URLs, credentials, or other mutable metadata. Lock metadata is temporary and contains only a process id, creation time, and recovery token.
 
 ## Validation
 
@@ -43,10 +44,12 @@ For a direct state check, use the equivalent command for the host shell:
 python scripts/init_state.py inspect --root /path/to/repository
 python scripts/init_state.py begin --root /path/to/repository --license MIT --profile mit
 python scripts/init_state.py complete --root /path/to/repository
+python scripts/init_state.py recover-lock --root /path/to/repository --token <token>
 ```
 
 ```powershell
 python scripts/init_state.py inspect --root 'C:\path\to\repository'
 python scripts/init_state.py begin --root 'C:\path\to\repository' --license MIT --profile mit
 python scripts/init_state.py complete --root 'C:\path\to\repository'
+python scripts/init_state.py recover-lock --root 'C:\path\to\repository' --token '<token>'
 ```
