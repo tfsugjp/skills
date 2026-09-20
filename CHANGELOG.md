@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added the explicitly invoked `repository-init` plugin for one-time repository governance setup with resumable, idempotent state tracking.
+
 ## 0.4.0
 
 - Updated the `relaypublisher-manifest` plugin for Relaypublisher v1.1.0: added Windows `Detection.Type: file` (file-system detection) authoring and static validation, alongside the existing `Detection.Type: script`.

@@ -21,3 +21,4 @@
 | [github-wiki-plan](plugins/github-plan-wiki/skills/github-wiki-plan/SKILL.md) | Publish an approved feature/refactor/perf plan to a repository's GitHub wiki, bilingually (English + `_ja` Japanese), and keep the Home index table up to date. |
 | [nuget-validate](plugins/nuget-validate/skills/nuget-validate/SKILL.md) | Validate NuGet package versions for vulnerabilities, deprecation, freshness, and listing status before package changes. |
 | [relaypublisher-manifest](plugins/relaypublisher-manifest/skills/relaypublisher-manifest/SKILL.md) | Create, update, and statically validate Relaypublisher manifests, including Windows Win32 and multi-bundle macOS PKG/LOB primary detection. |
+| [repository-init](plugins/repository-init/skills/repository-init/SKILL.md) | Initialize repository policy files once, only when explicitly invoked. Preserve existing project rules and resume saved decisions. |

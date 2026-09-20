@@ -78,6 +78,15 @@
         "manifest"
       ],
       "category": "Developer Tools"
+    },
+    {
+      "name": "repository-init",
+      "description": "Explicitly initialize repository policy files once and preserve existing project rules.",
+      "version": "0.1.0",
+      "source": "./plugins/repository-init",
+      "license": "MIT",
+      "keywords": ["repository", "initialization", "agents", "policy"],
+      "category": "Developer Tools"
     }
   ]
 }

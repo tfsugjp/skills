@@ -1,0 +1,6 @@
+interface:
+  display_name: "Repository Init"
+  short_description: "Initialize repository governance files once"
+  default_prompt: "Use $repository-init to initialize this repository's governance files and persistent agent rules."
+policy:
+  allow_implicit_invocation: false

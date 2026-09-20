@@ -11,6 +11,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, and Relaypu
 | `dependabot-safe-merge` | Safe Dependabot refresh, release-age policy, merge gates, and major-upgrade planning |
 | `github-plan-wiki` | Skills: GitHub Plan Issues (parent + sub-issue hierarchy via `gh`), GitHub Wiki Plan (bilingual GitHub wiki publishing and Home index maintenance) |
 | `relaypublisher-manifest` | Relaypublisher manifest creation, updates, and static validation for v1.1.0, including Windows Win32 script/file-system detection and multi-bundle macOS PKG/LOB detection |
+| `repository-init` | Explicit repository initialization for license, security, language rules, and `AGENTS.md` guidance |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 
@@ -25,6 +26,7 @@ claude plugin install nuget-validate@tfsugjp-agent-skills
 claude plugin install dependabot-safe-merge@tfsugjp-agent-skills
 claude plugin install github-plan-wiki@tfsugjp-agent-skills
 claude plugin install relaypublisher-manifest@tfsugjp-agent-skills
+claude plugin install repository-init@tfsugjp-agent-skills
 ```
 
 ## Install from the GitHub Copilot marketplace
@@ -38,6 +40,7 @@ copilot plugin install nuget-validate@tfsugjp-agent-skills
 copilot plugin install dependabot-safe-merge@tfsugjp-agent-skills
 copilot plugin install github-plan-wiki@tfsugjp-agent-skills
 copilot plugin install relaypublisher-manifest@tfsugjp-agent-skills
+copilot plugin install repository-init@tfsugjp-agent-skills
 ```
 
 ## Install from the Codex repository-local marketplace
@@ -51,7 +54,10 @@ codex plugin add nuget-validate@tfsugjp-agent-skills
 codex plugin add dependabot-safe-merge@tfsugjp-agent-skills
 codex plugin add github-plan-wiki@tfsugjp-agent-skills
 codex plugin add relaypublisher-manifest@tfsugjp-agent-skills
+codex plugin add repository-init@tfsugjp-agent-skills
 ```
+
+Use `repository-init` only with an explicit `$repository-init` request. It initializes missing governance files in a new or existing repository, records the resolved license and language profile in `.repository-init.json`, and leaves a completed repository unchanged on later invocations. It does not initialize Git, create remotes, create issues or work items, publish Wiki pages, commit, or push.
 
 The Codex local marketplace is intended for development and team distribution. Public Codex listing submission is a separate release step after the plugins pass validation.
 
