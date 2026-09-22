@@ -13,8 +13,12 @@ from urllib.parse import unquote, urlsplit
 
 
 JST = timezone(timedelta(hours=9))
-MARKDOWN_LINK = re.compile(r"\[[^]]*\]\(([^)]+)\)")
-TABLE_SEPARATOR = re.compile(r"^:?-{3,}:?$")
+# Image embeds (`![alt](path)`) reference files, not wiki pages.
+MARKDOWN_LINK = re.compile(r"(?<!!)\[[^]]*\]\(([^)]+)\)")
+# GFM accepts a single hyphen per delimiter cell.
+TABLE_SEPARATOR = re.compile(r"^:?-+:?$")
+# A non-Markdown file extension marks an uploaded asset rather than a page.
+ASSET_SUFFIX = re.compile(r"\.(?!md$)[A-Za-z][A-Za-z0-9]{0,4}$", re.IGNORECASE)
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -47,6 +51,7 @@ def page_date(root: Path, page: Path) -> str:
 
 
 def table_cells(line: str) -> list[str]:
+    line = line.strip()
     if not line.startswith("|") or not line.endswith("|"):
         return []
     return [cell.strip() for cell in re.split(r"(?<!\\)\|", line[1:-1])]
@@ -58,13 +63,17 @@ def check_wiki_link(
     if target.startswith("#"):
         return None
     parsed = urlsplit(target)
-    prefix = f"/{owner}/{repo}/wiki/"
+    if ASSET_SUFFIX.search(parsed.path):
+        return None
+    # GitHub treats owner and repository names case-insensitively.
+    prefix = f"/{owner}/{repo}/wiki/".casefold()
+    path = parsed.path.casefold()
     if parsed.scheme or parsed.netloc:
         if parsed.netloc.casefold() != "github.com":
             return None
-        if not parsed.path.startswith(prefix) and not parsed.path.startswith(prefix[:-1]):
+        if not path.startswith(prefix) and path.rstrip("/") != prefix[:-1]:
             return None
-        if parsed.scheme != "https" or not parsed.path.startswith(prefix):
+        if parsed.scheme != "https" or not path.startswith(prefix):
             errors.append(f"{source}: noncanonical wiki link: {target}")
             return None
         name = unquote(parsed.path[len(prefix) :])

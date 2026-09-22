@@ -165,6 +165,35 @@ class WikiPreflightTests(unittest.TestCase):
         self.replace(self.english, "## setup\n\n", "")
         self.assertTrue(any("no H2 category" in error for error in self.errors()))
 
+    def test_row_with_trailing_whitespace_is_still_validated(self) -> None:
+        self.replace(self.english, "example-plan_ja) |\n", "example-plan_ja) |  \n")
+        self.replace(self.japanese, "example-plan) |\n", "example-plan) |  \n")
+        for home in (self.english, self.japanese):
+            self.replace(home, "2026-08-27", "2026-01-01")
+        self.assertTrue(any("Date must be 2026-08-27" in error for error in self.errors()))
+
+    def test_owner_and_repo_casing_is_ignored(self) -> None:
+        upper = BASE.replace(REPO, REPO.upper())
+        self.replace(self.english, BASE + "example-plan)", upper + "missing-plan)")
+        self.assertTrue(any("missing wiki page" in error for error in self.errors()))
+
+    def test_asset_links_are_not_wiki_pages(self) -> None:
+        self.replace(
+            self.plan / "example-plan.md",
+            "# Plan\n",
+            "# Plan\n\n![Flow](images/flow.png)\n[Spec](files/spec.pdf)\n",
+        )
+        self.assertEqual([], [error for error in self.errors() if "Date must be" not in error])
+
+    def test_relative_page_link_with_dotted_name_is_rejected(self) -> None:
+        self.replace(self.plan / "example-plan.md", "# Plan\n", "# Plan\n\n[Notes](release-v1.2)\n")
+        self.assertTrue(any("relative wiki link" in error for error in self.errors()))
+
+    def test_single_hyphen_table_separator_is_accepted(self) -> None:
+        for home in (self.english, self.japanese):
+            self.replace(home, "|---|---|---|---|", "|-|:-|-:|:-:|")
+        self.assertEqual([], self.errors())
+
 
 if __name__ == "__main__":
     unittest.main()
