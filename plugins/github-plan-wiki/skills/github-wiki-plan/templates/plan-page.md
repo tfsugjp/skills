@@ -6,7 +6,7 @@ Copy this, fill in the placeholders, and write the paired <slug>_ja.md as a
 
 # <Plan Title>
 
-[日本語](<slug>_ja)
+[日本語](https://github.com/<owner>/<repo>/wiki/<slug>_ja)
 
 ## Summary
 

@@ -1,11 +1,11 @@
 ---
 name: github-wiki-plan
-description: 'Publish an approved feature/refactor/perf plan to a repository''s GitHub wiki, bilingually (English + a `_ja` Japanese page), and keep the Home page''s grouped index table up to date. Use when a plan has been approved and needs to be recorded in the wiki, when the user asks to "publish this plan to the wiki", "wikiに登録して", "add this to the wiki", or "update the Home index" — and as the handoff target from github-plan-issues once tracking issues exist. Not for bug fixes, patches, or CI/CD-only changes, which skip wiki publishing entirely.'
+description: 'Publish an approved feature/refactor/perf plan to a GitHub wiki in English and Japanese, maintain category tables and last-updated dates in both Home pages, and verify every Home wiki link resolves. Use for approved wiki plans, Home index updates, and the handoff from github-plan-issues. Bug fixes, patches, and CI/CD-only changes do not trigger plan publishing by default.'
 ---
 
 # GitHub Wiki Plan
 
-Publish an approved plan to the repository's GitHub wiki as a bilingual page pair, and keep the `Home` index current. Modeled on the reference wiki at https://github.com/kkamegawa/vsextensionforcodex/wiki.
+Publish an approved plan to the repository's GitHub wiki as a bilingual page pair, and keep the `Home` index current. The Git path and the public wiki URL are different namespaces. Never derive a public link from the Git directory.
 
 Only run this for `feature`/`refactor`/`perf` work — bug fixes, patches, and CI/CD-only changes don't get wiki pages.
 
@@ -29,16 +29,16 @@ git clone https://github.com/<owner>/<repo>.wiki.git <scratch-dir>/wiki
 
 GitHub preserves subdirectories in the wiki Git repository but publishes every page at a route derived from the file's basename. Keep these two namespaces separate:
 
-| Content | Git path | Wiki link target |
+| Content | Git path | Public URL |
 |---|---|---|
-| Plan (English) | `plan/<yyyy-MM-dd>/<slug>.md` | `<slug>` |
-| Plan (Japanese) | `plan/<yyyy-MM-dd>/<slug>_ja.md` | `<slug>_ja` |
-| Index (English) | `Home.md` | `Home` |
-| Index (Japanese) | `Home_ja.md` | `Home_ja` |
+| Plan (English) | `plan/<yyyy-MM-dd>/<slug>.md` | `https://github.com/<owner>/<repo>/wiki/<slug>` |
+| Plan (Japanese) | `plan/<yyyy-MM-dd>/<slug>_ja.md` | `https://github.com/<owner>/<repo>/wiki/<slug>_ja` |
+| Index (English) | `Home.md` | `https://github.com/<owner>/<repo>/wiki/Home` |
+| Index (Japanese) | `Home_ja.md` | `https://github.com/<owner>/<repo>/wiki/Home_ja` |
 
-- `<yyyy-MM-dd>` is the plan's approval date (ISO, hyphenated — matches the reference wiki).
+- `<yyyy-MM-dd>` in the Git path is the plan's original approval date. Do not move a page merely because its Home `Date` changes.
 - `<slug>` is lowercase, hyphen-separated, derived from the plan title.
-- **Wiki-internal links use only the page basename without `.md`** — a page stored as `plan/2026-07-19/approval-mode-picker.md` is linked as `approval-mode-picker`. Both `plan/2026-07-19/approval-mode-picker` and a target ending in `.md` produce a 404.
+- **Use the complete canonical public URL for every wiki-internal link.** A page stored as `plan/2026-07-19/approval-mode-picker.md` is linked as `https://github.com/<owner>/<repo>/wiki/approval-mode-picker`. A `/wiki/plan/2026-07-19/...` URL or `.md` suffix produces a 404.
 - Before creating a page, search the entire wiki checkout for `<slug>.md` and `<slug>_ja.md`. For a new plan, any match is a collision. For an update, only the intended pair at the exact target paths may match. Choose a different globally unique slug instead of relying on the date directory to disambiguate it.
 - The Japanese page is a translation of the same document, not a separate one — keep headings and tables in 1:1 correspondence with the English page.
 
@@ -46,54 +46,61 @@ GitHub preserves subdirectories in the wiki Git repository but publishes every p
 
 Start from [templates/plan-page.md](templates/plan-page.md). Include:
 
-- Title, with a language-switch link at the top: link text "日本語" targeting `<slug>_ja` on the English page, link text "English" targeting `<slug>` on the Japanese page
+- Title, with a language-switch link at the top: "日本語" targets the canonical `<slug>_ja` public URL on the English page, and "English" targets the canonical `<slug>` public URL on the Japanese page
 - Links to the tracking issue(s) — parent issue and its sub-issues (issue links are allowed; this is the one exception to the placeholder rule below)
 - Background, design, implementation phases, verification approach — drawn from the approved plan
 - **Placeholder any URL, IP address, email address, or GUID**, per the team's documentation rules — with two exceptions: same-repo issue links, and public, unauthenticated website URLs that were actually referenced while designing the plan (e.g. a reference implementation or upstream doc the plan is modeled on). Anything else — internal/authenticated endpoints, private hosts, credentials-adjacent URLs — gets a placeholder.
 
 ## Phase 3 — Update the Home index
 
-Match the reference wiki's structure exactly (verified against the live page):
+Maintain the wiki's existing information structure:
 
-- One introductory paragraph, plus a language-switch link to the other Home page.
-- Content grouped under **H2 headings by feature area**, each with a 4-column table:
+- One introductory paragraph, plus a canonical language-switch link to the other Home page.
+- Content grouped under **H2 headings by subject area**, each with a 4-column table. Use categories that fit this wiki's content, such as setup or identity when applicable; do not impose a fixed category list:
 
 ```markdown
 ## Slash Commands & Composer
 
 | Plan | Date | Tracking | 日本語 |
 |---|---|---|---|
-| Plan title → `<slug>` | 2026-07-19 | Issue title → issue URL | 日本語 → `<slug>_ja` |
+| [Plan title](https://github.com/<owner>/<repo>/wiki/<slug>) | 2026-07-19 | [Issue title](https://github.com/<owner>/<repo>/issues/<n>) | [日本語](https://github.com/<owner>/<repo>/wiki/<slug>_ja) |
 ```
 
-**Read the existing `Home.md` first** — do not copy group names from [templates/home.md](templates/home.md) mechanically. Steps:
+**Read both existing Home pages first** — do not copy group names from [templates/home.md](templates/home.md) mechanically. Steps:
 
 1. Find the group that best fits the new plan's subject area and append a row to its table.
 2. If no existing group fits, create a new `## ` section — and tell the user you did, since it changes the page's structure.
 3. **Update `Home_ja.md` with the same row**, translated (column headers in Japanese; the "日本語" column becomes an "English" column pointing back at the non-`_ja` page). Never update only one language.
+4. Audit the existing rows in both Home pages. Replace any nested Git-path, `.md`, relative, or stale wiki-page target with the canonical public URL for the page that actually exists. Preserve issue links and intentional `—` cells for unavailable translations.
+5. `Date` means the plan pair's latest content update, not its approval date or the Home edit date. For each row, use the later Git commit date of the English and Japanese plan pages, expressed as `yyyy-MM-dd` in Asia/Tokyo. If either page has an uncommitted content change, use today's Asia/Tokyo date. Update both Home rows together; for an index-only link repair, derive dates from plan history without advancing them to today.
 
 Use [templates/home.md](templates/home.md) / [templates/home_ja.md](templates/home_ja.md) only as a starting skeleton for a wiki that has no `Home` page yet (Phase 0's uninitialized case) — an existing Home always wins over the template.
 
-## Phase 4 — Commit and push
+## Phase 4 — Validate, commit, and push
 
-Pushing to the wiki repo publishes immediately with no review step — **present the file list and the Home diff to the user and get confirmation before pushing.**
+Run [scripts/validate_wiki.py](scripts/validate_wiki.py) against the prepared wiki checkout before publishing. It checks all Home wiki links against the wiki's page files, route collisions, category tables, and paired Home dates. Pass newly edited plan pages with `--page` to check their language links too. Resolve every reported error. Then review the file list and Home diff. Pushing publishes immediately; use existing user authorization if it covers publication, otherwise obtain approval.
+
+```bash
+python <path-to-this-skill>/scripts/validate_wiki.py <scratch-dir>/wiki <owner>/<repo> --page plan/<date>/<slug>.md --page plan/<date>/<slug>_ja.md
+```
 
 ```bash
 git -C <scratch-dir>/wiki add plan/<date>/<slug>.md plan/<date>/<slug>_ja.md Home.md Home_ja.md
 git -C <scratch-dir>/wiki commit -m "add: plan <slug>"
-git -C <scratch-dir>/wiki push origin master
+git -C <scratch-dir>/wiki push origin HEAD
 ```
 
-After pushing, verify both new pages and all navigation links resolve. There is no REST API for wiki page content, so this is a browser check, not a `gh`/`curl` command:
+After pushing, verify the public pages. Local route validation cannot prove GitHub has published them:
 
 1. Open `https://github.com/<owner>/<repo>/wiki/<slug>` and `https://github.com/<owner>/<repo>/wiki/<slug>_ja`; confirm neither is a 404.
-2. Open `Home` and `Home_ja` and follow each plan link instead of validating only the rendered `href` value.
-3. Follow the language-switch link on each plan page and confirm it lands on the other language.
+2. Open `Home` and `Home_ja` and follow **every** plan and language-column link; confirm none returns 404. Repair existing broken rows as part of a Home update, not only the newly added row.
+3. Follow the language-switch link on each changed plan page and confirm it lands on the other language.
+4. Confirm the dates in both Home rows match the latest plan-page content update.
 
 ## Pitfalls
 
 - An uninitialized wiki cannot be cloned or pushed to, no matter what — `hasWikiEnabled: true` only means the feature is turned on, not that content exists. There is no API-based way to create the first page.
-- Wiki-internal links use the file basename and omit both the Git directory and `.md` suffix. Reusing `plan/<date>/<slug>` as a public link produces a 404.
+- Wiki-internal links use the public URL with the file basename and omit both the Git directory and `.md` suffix. Reusing `plan/<date>/<slug>` as a public link produces a 404.
 - The wiki's public page namespace and page list/sidebar are flat regardless of the Git repository's `plan/<date>/` subdirectories. Basenames must therefore be globally unique, and `Home.md` is the only real grouped navigation. Skipping the Home update leaves the new page effectively unreachable.
 - The wiki is a separate git repository from the main one — no branch protection, no PR review; a push is instantly live.
 - The `_ja` suffix is a naming convention this team uses, not a GitHub feature — cross-links between language pairs must be added by hand in both directions.
@@ -102,3 +109,4 @@ After pushing, verify both new pages and all navigation links resolve. There is 
 
 - [templates/plan-page.md](templates/plan-page.md) — starter structure for a new plan page.
 - [templates/home.md](templates/home.md), [templates/home_ja.md](templates/home_ja.md) — starter skeleton, English/Japanese, for a wiki with no existing Home page.
+- [scripts/validate_wiki.py](scripts/validate_wiki.py) — local Home/page URL and Date preflight.

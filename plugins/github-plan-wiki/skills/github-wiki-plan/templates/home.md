@@ -7,15 +7,17 @@ do not overwrite an existing structure with this skeleton.
 
 # <Repository Name> — Wiki
 
-[日本語](Home_ja)
+[日本語](https://github.com/<owner>/<repo>/wiki/Home_ja)
 
 Implementation plans for this repository, organized by category. Each plan is
 reviewed and (when needed) corrected before implementation starts, and records
 the GitHub issue/sub-issues that track the work. Plans live under
 `plan/<date>/<slug>.md`; a `_ja` suffix marks the Japanese translation of a page.
+The Date column records the most recent content update of either language page,
+not the initial approval date.
 
 ## <Group Name>
 
 | Plan | Date | Tracking | 日本語 |
 |---|---|---|---|
-| [<Plan Title>](<slug>) | <yyyy-MM-dd> | [Issue #<n>](https://github.com/<owner>/<repo>/issues/<n>) | [日本語](<slug>_ja) |
+| [<Plan Title>](https://github.com/<owner>/<repo>/wiki/<slug>) | <yyyy-MM-dd> | [Issue #<n>](https://github.com/<owner>/<repo>/issues/<n>) | [日本語](https://github.com/<owner>/<repo>/wiki/<slug>_ja) |
