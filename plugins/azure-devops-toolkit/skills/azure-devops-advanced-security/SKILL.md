@@ -49,14 +49,21 @@ curl -s -H "Authorization: Bearer ${ADO_TOKEN}" \
   "${ADVSEC}/alerts?criteria.states=active&criteria.severities=critical,high&api-version=7.2-preview.1"
 
 # Dismiss an alert as accepted risk (requires manage/dismiss permission)
-curl -s -X PATCH -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json" \
+request_file=$(mktemp)
+trap 'rm -f "$request_file"' EXIT
+cat > "$request_file" <<'JSON'
+{
+  "state": "dismissed",
+  "dismissedReason": "acceptedRisk",
+  "dismissedComment": "Mitigated by network isolation; revisit after Q3 migration."
+}
+JSON
+curl --fail-with-body -sS -X PATCH -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json; charset=utf-8" \
   "${ADVSEC}/alerts/{alertId}?api-version=7.2-preview.1" \
-  -d '{
-    "state": "dismissed",
-    "dismissedReason": "acceptedRisk",
-    "dismissedComment": "Mitigated by network isolation; revisit after Q3 migration."
-  }'
+  --data-binary "@$request_file"
 ```
+
+On Windows, use the PowerShell 7 file-based REST pattern in [azure-devops-foundation](../azure-devops-foundation/SKILL.md) instead of these Bash commands.
 
 Dismissal reasons are limited to **false positive** and **accepted risk** (plus a free-text comment). Dismissing an alert applies across all branches and auto-resolves the linked PR annotation. Fixed alerts close automatically when a new scan no longer finds the issue — you do not close "fixed" alerts manually.
 

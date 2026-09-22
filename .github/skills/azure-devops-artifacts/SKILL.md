@@ -40,10 +40,17 @@ Promote sends a `PackageVersionDetails` object as `application/json` (not a JSON
 
 ```bash
 # Promote my-lib 1.2.3 to the Release view (org-scoped NuGet feed)
-curl -s -X PATCH -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json" \
+request_file=$(mktemp)
+trap 'rm -f "$request_file"' EXIT
+cat > "$request_file" <<'JSON'
+{"views": {"op": "add", "path": "/views/-", "value": "Release"}}
+JSON
+curl --fail-with-body -sS -X PATCH -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json; charset=utf-8" \
   "https://pkgs.dev.azure.com/{org}/_apis/packaging/feeds/{feedId}/nuget/packages/my-lib/versions/1.2.3?api-version=7.2-preview.1" \
-  -d '{"views": {"op": "add", "path": "/views/-", "value": "Release"}}'
+  --data-binary "@$request_file"
 ```
+
+On Windows, use the PowerShell 7 file-based REST pattern in [azure-devops-foundation](../azure-devops-foundation/SKILL.md) instead of this Bash command.
 
 The same URL pattern exists per protocol: `nuget`, `npm` (batch endpoint `npm/packagesbatch`), `maven/groups/{groupId}/artifacts/{artifactId}`, `pypi`, `upack` (Universal), `cargo`.
 
