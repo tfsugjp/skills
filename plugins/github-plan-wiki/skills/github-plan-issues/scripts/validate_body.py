@@ -9,7 +9,7 @@ from typing import List
 
 
 FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})(?:[^`~]*)$")
-ESCAPED_NEWLINE = re.compile(r"(?<!\\)\\(?:r\\n|n)")
+ESCAPED_NEWLINE = re.compile(r"(?<!\\)\\r\\n|(?<!\\)\\n(?=$|[\s\\#>*+|<-]|\d+[.)]\s)|(?<=[.!?。！？])\\n")
 INLINE_CODE = re.compile(r"(?<!\x60)(\x60+).*?\1")
 
 

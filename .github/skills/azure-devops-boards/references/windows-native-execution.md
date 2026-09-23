@@ -52,7 +52,7 @@ PowerShell example:
         if ($null -eq $fenceCharacter) {
             $prose = $line -replace '(?<!`)(`+).*?\1', ''
             $proseLines += $prose
-            if ($prose -match '(?<!\\)\\(?:r\\n|n)') {
+            if ($prose -match '(?<!\\)\\r\\n|(?<!\\)\\n(?=$|[\s\\#>*+|<-]|\d+[.)]\s)|(?<=[.!?。！？])\\n') {
                 throw 'The description contains a literal escaped newline outside a code fence.'
             }
         }
@@ -88,7 +88,7 @@ PowerShell example:
         $storedDescription = [string]$readBack.fields.'System.Description'
         $storedProse = $storedDescription -replace '(?is)<pre\b[^>]*>.*?</pre>', ''
         $storedProse = $storedProse -replace '(?is)<code\b[^>]*>.*?</code>', ''
-        if ($storedProse -match '(?<!\\)\\(?:r\\n|n)' -or
+        if ($storedProse -match '(?<!\\)\\r\\n|(?<!\\)\\n(?=$|[\s\\#>*+|<-]|\d+[.)]\s)|(?<=[.!?。！？])\\n' -or
             $storedProse -match '(?i)<(?:p|div|h[1-6])[^>]*>\s*#{1,6}\s' -or
             $storedDescription -notmatch '<(?:h[1-6]|p|ul|ol|blockquote|pre)\b') {
             throw 'Work item readback is not valid rich-text description content.'
@@ -130,7 +130,7 @@ The following pattern is for Linux/macOS shells only. It must not be copied into
     json_file="$(mktemp)"
     trap 'rm -f "$json_file"' EXIT
     description_file="$ADO_WORK_ITEM_DESCRIPTION_FILE" # UTF-8 HTML source, not raw Markdown
-    python3 - "$description_file" <<'PY'
+    python3 - "$description_file" <<'PY' || exit 1
     from html.parser import HTMLParser
     from pathlib import Path
     import re
@@ -163,7 +163,7 @@ The following pattern is for Linux/macOS shells only. It must not be copied into
     parser.feed(Path(sys.argv[1]).read_text(encoding="utf-8"))
     prose = "".join(parser.prose)
     if (not parser.has_rich_text or parser.code_depth != 0 or
-            re.search(r"(?<!\\)\\(?:r\\n|n)", prose) or
+            re.search(r"(?<!\\)\\r\\n|(?<!\\)\\n(?=$|[\s\\#>*+|<-]|\d+[.)]\s)|(?<=[.!?。！？])\\n", prose) or
             re.search(r"(?m)^\s*#{1,6}\s", prose)):
         raise SystemExit("Description must contain HTML rich text and no escaped newlines or Markdown headings in prose.")
     PY

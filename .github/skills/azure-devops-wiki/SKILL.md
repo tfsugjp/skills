@@ -59,7 +59,7 @@ cat >"$markdown_file" <<'MARKDOWN'
 
 関連 Work Item: #1234
 MARKDOWN
-python3 "<skill-dir>/scripts/validate_work_item_links.py" "$markdown_file" --require-id 1234
+python3 "<skill-dir>/scripts/validate_work_item_links.py" "$markdown_file" --require-id 1234 || exit 1
 jq -Rs '{content: .}' "$markdown_file" >"$page_file"
 
 # Read and capture ETag from response headers
@@ -98,7 +98,7 @@ $uri = "$env:ADO_WIKI_URL/pages?path=/Releases/2026-06&api-version=7.1"
 try {
     & '<skill-dir>/scripts/Assert-WikiWorkItemLinks.ps1' -MarkdownPath $markdownPath -RequireId $requiredWorkItemId
     $existing = Invoke-WebRequest -Method Get -Uri "$uri&includeContent=true" -Headers $headers
-    $etag = $existing.Headers.ETag
+    $etag = @($existing.Headers.ETag)[0] # PowerShell 7 returns header values as string[]
     $markdown = Get-Content -LiteralPath $markdownPath -Raw -Encoding utf8
     $json = ConvertTo-Json -InputObject @{ content = $markdown } -Depth 10 -Compress
     [IO.File]::WriteAllText($pagePath, $json, [Text.UTF8Encoding]::new($false))
