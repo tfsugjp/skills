@@ -7,6 +7,8 @@ description: Manage Azure DevOps resources via CLI including projects, repos, pi
 
 This Skill helps manage Azure DevOps resources using the Azure CLI with Azure DevOps extension.
 
+For Windows writes containing Japanese or other non-ASCII text, read [azure-devops-foundation](../azure-devops-foundation/SKILL.md) first. Prefer Azure DevOps MCP tools, then PowerShell 7 REST requests with a UTF-8 temporary body file. `az boards work-item create/update` has no file input for title or description; do not place such content in its command-line arguments. For Wiki pages, validate work item references as `#<id>` with [azure-devops-wiki](../azure-devops-wiki/SKILL.md), use the CLI's `--file-path` and `--encoding utf-8` options, and read the saved page back through REST/MCP before diagnosing garbled CLI output. The Bash examples below are for Linux/macOS.
+
 **CLI Version:** 2.81.0 (current as of 2025)
 
 ## Prerequisites
@@ -775,6 +777,8 @@ az boards work-item show --id {work-item-id} --open
 
 ### Create Work Item
 
+For a multiline description, prepare the text with actual line breaks and use the [Boards description preflight](../azure-devops-boards/SKILL.md) before writing. The standard System.Description field is HTML rich text: submit rendered HTML, then read the item back and verify its text and structure. Do not pass a literal backslash-n sequence or raw Markdown heading as the description. On Windows, use the Boards PowerShell 7 REST file flow for non-ASCII text instead of CLI arguments.
+
 ```bash
 # Basic work item
 az boards work-item create \
@@ -1482,17 +1486,30 @@ az devops wiki page show \
   --project {project}
 
 # Create page
+wiki_file=$(mktemp)
+trap 'rm -f "$wiki_file"' EXIT
+cat > "$wiki_file" <<'MARKDOWN'
+# New Page
+
+Page content here...
+MARKDOWN
 az devops wiki page create \
   --wiki {wiki-name} \
   --path "/new-page" \
-  --content "# New Page\n\nPage content here..." \
+  --file-path "$wiki_file" --encoding utf-8 \
   --project {project}
 
 # Update page
+cat > "$wiki_file" <<'MARKDOWN'
+# Updated Page
+
+New content...
+MARKDOWN
 az devops wiki page update \
   --wiki {wiki-name} \
   --path "/existing-page" \
-  --content "# Updated Page\n\nNew content..." \
+  --file-path "$wiki_file" --encoding utf-8 \
+  --version {etag-from-get} \
   --project {project}
 
 # Delete page
@@ -1994,7 +2011,7 @@ if [[ "$RESULT" != "succeeded" ]]; then
   az boards work-item create \
     --title "Build $BUILD_NUMBER failed" \
     --type Bug \
-    --description "Pipeline run $RUN_ID failed with result: $RESULT\n\nURL: $ORG_URL/$PROJECT/_build/results?buildId=$RUN_ID"
+    --description "<p>Pipeline run $RUN_ID failed with result: $RESULT</p><p>Build: $ORG_URL/$PROJECT/_build/results?buildId=$RUN_ID</p>"
 fi
 ```
 
@@ -2310,9 +2327,14 @@ monitor_pipeline() {
     # Check if failed and not already processed
     if [[ "$RESULT" == "failed" ]]; then
       # Send Slack alert
-      curl -X POST "$slack_webhook" \
-        -H 'Content-Type: application/json' \
-        -d "{\"text\": \"Pipeline $pipeline_name failed! Run ID: $LATEST_RUN_ID\"}"
+      (
+        alert_file=$(mktemp)
+        trap 'rm -f "$alert_file"' EXIT
+        jq -n --arg text "Pipeline $pipeline_name failed! Run ID: $LATEST_RUN_ID" '{text: $text}' >"$alert_file"
+        curl -X POST "$slack_webhook" \
+          -H 'Content-Type: application/json; charset=utf-8' \
+          --data-binary "@$alert_file"
+      )
     fi
 
     sleep 300 # Check every 5 minutes

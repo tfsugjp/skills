@@ -49,25 +49,35 @@ Base: `https://dev.azure.com/{organization}/{project}/_apis/git/repositories/{re
 
 ```bash
 # Create a pull request
-curl -s -X POST -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json" \
+request_file=$(mktemp)
+trap 'rm -f "$request_file"' EXIT
+cat > "$request_file" <<'JSON'
+{
+  "sourceRefName": "refs/heads/feature/login-fix",
+  "targetRefName": "refs/heads/main",
+  "title": "Fix Safari login failure",
+  "description": "Fixes AB#1234.",
+  "isDraft": false
+}
+JSON
+curl --fail-with-body -sS -X POST -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json; charset=utf-8" \
   "https://dev.azure.com/{org}/{project}/_apis/git/repositories/{repo}/pullrequests?api-version=7.1" \
-  -d '{
-    "sourceRefName": "refs/heads/feature/login-fix",
-    "targetRefName": "refs/heads/main",
-    "title": "Fix Safari login failure",
-    "description": "Fixes AB#1234.",
-    "isDraft": false
-  }'
+  --data-binary "@$request_file"
 
 # Complete a PR with squash merge and source-branch deletion
-curl -s -X PATCH -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json" \
+cat > "$request_file" <<'JSON'
+{
+  "status": "completed",
+  "lastMergeSourceCommit": {"commitId": "<latest source commit SHA>"},
+  "completionOptions": {"mergeStrategy": "squash", "deleteSourceBranch": true}
+}
+JSON
+curl --fail-with-body -sS -X PATCH -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json; charset=utf-8" \
   "https://dev.azure.com/{org}/{project}/_apis/git/repositories/{repo}/pullrequests/{prId}?api-version=7.1" \
-  -d '{
-    "status": "completed",
-    "lastMergeSourceCommit": {"commitId": "<latest source commit SHA>"},
-    "completionOptions": {"mergeStrategy": "squash", "deleteSourceBranch": true}
-  }'
+  --data-binary "@$request_file"
 ```
+
+On Windows, use the PowerShell 7 file-based REST pattern in [azure-devops-foundation](../azure-devops-foundation/SKILL.md) instead of these Bash commands.
 
 ## Common workflows
 

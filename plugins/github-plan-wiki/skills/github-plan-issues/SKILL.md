@@ -42,6 +42,41 @@ Present the planned breakdown (parent title, each sub-issue title, labels, issue
 
 Check what labels and issue types actually exist before using them — passing a nonexistent `--type` fails the call:
 
+Before every parent or child issue write, save the intended Markdown as a real UTF-8 body file. Do not pass a shell-escaped string such as `### Heading\\n\\nBody` or paste an outer `shell` code fence around the issue body. Run [scripts/validate_body.py](scripts/validate_body.py) on that file. It rejects literal `\\n` / `\\r\\n` in prose (while allowing fenced and inline code), an unclosed fence, an all-code-fence body, invalid UTF-8, and a UTF-8 BOM. Backslash sequences inside Windows paths such as `C:\Users\name` are not treated as escaped newlines. Fix the source file and rerun validation; do not replace failed content with a shorter summary. The same preflight applies to connector or browser issue creation: validate the body file first, then submit its exact text. Read the created issue back and compare its body to the source after normalizing CRLF to LF. Treat a mismatch as an incomplete write and correct the issue before reporting success.
+
+```bash
+python3 "<skill-dir>/scripts/validate_body.py" "$body_file" || exit 1
+readback_file=$(mktemp)
+trap 'rm -f "$readback_file"' EXIT
+created_url=$(gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file")
+issue_number=${created_url##*/}
+gh issue view "$issue_number" --repo <owner>/<repo> --json body >"$readback_file"
+python3 - "$body_file" "$readback_file" <<'PY'
+import json, pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+stored = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))["body"]
+if source.replace("\r\n", "\n") != stored.replace("\r\n", "\n"):
+    raise SystemExit("Issue body readback differs from the submitted file")
+PY
+```
+
+```powershell
+python '<skill-dir>/scripts/validate_body.py' $bodyFile
+if ($LASTEXITCODE -ne 0) { throw 'Issue body validation failed.' }
+$createdUrl = gh issue create --repo '<owner>/<repo>' --title '<title>' --body-file $bodyFile
+if ($LASTEXITCODE -ne 0) { throw 'Issue creation failed.' }
+$issueNumber = ($createdUrl.TrimEnd('/') -split '/')[-1]
+$readBack = gh issue view $issueNumber --repo '<owner>/<repo>' --json body | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Issue readback failed.' }
+$source = [IO.File]::ReadAllText($bodyFile, [Text.Encoding]::UTF8)
+$normalize = { param($value) $value.Replace("`r`n", "`n") }
+if ((& $normalize $source) -cne (& $normalize $readBack.body)) {
+    throw 'Issue body readback differs from the submitted file.'
+}
+```
+
+When creating a body file in PowerShell, use `[IO.File]::WriteAllText($bodyFile, $body, [Text.UTF8Encoding]::new($false))`. Keep actual line breaks in `$body`; PowerShell single-quoted strings and Bash double-quoted strings do not expand `\\n` into a newline. In Bash, a quoted here-document or `printf '%s\n'` writes actual lines.
+
 ```bash
 gh label list --repo <owner>/<repo>
 gh api orgs/<org>/issue-types --jq '.[].name'   # empty/404 on personal repos and some orgs — fall back to labels only

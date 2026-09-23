@@ -13,12 +13,20 @@ Create, update, comment on, link, and close Azure Boards work items. Read [azure
 Follow this order for every operation:
 
 1. Use Azure DevOps MCP tools when they are available.
-2. When MCP is unavailable on Windows, use PowerShell 7 with Invoke-RestMethod first. Use native az boards from PowerShell only as the next fallback.
+2. When MCP is unavailable on Windows, use PowerShell 7 with Invoke-RestMethod and a UTF-8 request file. Use native az boards from PowerShell only as an ASCII-only fallback; it has no file input for titles or descriptions.
 3. On Linux and macOS, use the REST/CLI fallback described below.
 
 On Windows, never invoke Azure DevOps operations through MSYS2, Git Bash, WSL, bash, or sh. If only one of those shells is available, stop and report that a native PowerShell path is required. Read [Windows-native execution reference](references/windows-native-execution.md) for the encoding-safe command patterns.
 
 Do not rewrite Japanese or other non-English content because captured az output looks corrupted. Redirected output can be encoded with the Windows ANSI code page even when the server data is intact. Read the stored value back with Invoke-RestMethod before diagnosing data loss.
+
+## Description format preflight
+
+Treat the standard System.Description field as HTML rich text. Prepare multiline content in a UTF-8 Markdown source file, reject literal escaped line breaks (backslash-n or backslash-r-backslash-n) in prose and an accidental outer code fence, then convert Markdown to HTML before passing the value to MCP or REST. On PowerShell 7, use ConvertFrom-Markdown -InputObject with the source string and submit its Html property. On Linux/macOS, prepare an HTML file with a Markdown renderer or author valid HTML directly; do not submit raw Markdown as System.Description. The Windows reference below contains a complete preflight example.
+
+For custom fields, inspect the field metadata first: use HTML only for an HTML/rich-text field and preserve the declared format for other field types. Do not silently turn a plain-text or Markdown-enabled custom field into HTML.
+
+After creation or update, read the item back and check both the Unicode title and description text. Require rich-text structure in System.Description and reject a stored literal escaped newline, raw Markdown heading, or accidental outer code fence. Azure Boards may normalize HTML, so compare decoded text and structure rather than exact HTML bytes. Apply these checks even when the MCP write tool was used. If the stored representation differs, report the created item ID and repair the field before reporting success.
 
 ## When to use
 
@@ -45,8 +53,8 @@ For a Feature-equivalent item, follow this sequence:
 1. Read [azure-devops-wiki](../azure-devops-wiki/SKILL.md) and discover the existing Wiki, parent page, and page path using read operations. Do not create, rename, reorder, or re-index Wiki structure.
 2. Confirm that the existing placement can be used and that the approved plan has a concrete page destination. If the Wiki or destination cannot be determined, do not create the Work Item.
 3. Create the Work Item hierarchy only after the Wiki preflight succeeds.
-4. Explicitly load and run azure-devops-wiki, handing it the Work Item ID, title, approved plan, and existing page path. Do not duplicate Wiki page-writing logic in this skill or agent.
-5. Read the page back and verify that the registration contains the Work Item ID and approved plan. Report the Feature operation as successful only after this verification.
+4. Explicitly load and run azure-devops-wiki, handing it the Work Item ID, title, approved plan, and existing page path. Require a Wiki reference in `#<id>` form; `AB#<id>` does not create a Wiki work item link. Do not duplicate Wiki page-writing logic in this skill or agent.
+5. Read the page back and verify that the registration contains the `#<id>` reference and approved plan, with no `AB#<id>` work item reference in prose. Report the Feature operation as successful only after this verification.
 
 If an unexpected Wiki write fails after the Work Item exists, do not delete the Work Item. Report the created ID as a partial failure and identify Wiki registration as the required retry.
 
@@ -81,25 +89,29 @@ Base: `https://dev.azure.com/{organization}/{project}/_apis/wit` — verify exac
 Work item create/update uses **JSON Patch** (`Content-Type: application/json-patch+json`):
 
 ```bash
+patch_file="$(mktemp)"
+trap 'rm -f "$patch_file"' EXIT
+
 # Create a bug
+jq -n --arg title "Login fails on Safari" --arg repro "1. Open login page..." --arg tags "regression; auth" \
+  '[{"op":"add","path":"/fields/System.Title","value":$title},{"op":"add","path":"/fields/Microsoft.VSTS.TCM.ReproSteps","value":$repro},{"op":"add","path":"/fields/System.Tags","value":$tags}]' \
+  >"$patch_file"
 curl -s -X POST -H "Authorization: Bearer ${ADO_TOKEN}" \
-  -H "Content-Type: application/json-patch+json" \
+  -H "Content-Type: application/json-patch+json; charset=utf-8" \
   "https://dev.azure.com/{org}/{project}/_apis/wit/workitems/\$Bug?api-version=7.1" \
-  -d '[
-    {"op": "add", "path": "/fields/System.Title", "value": "Login fails on Safari"},
-    {"op": "add", "path": "/fields/Microsoft.VSTS.TCM.ReproSteps", "value": "1. Open login page..."},
-    {"op": "add", "path": "/fields/System.Tags", "value": "regression; auth"}
-  ]'
+  --data-binary "@$patch_file"
 
 # Close a work item (state transition + resolution comment)
+jq -n \
+  '[{"op":"add","path":"/fields/System.State","value":"Closed"},{"op":"add","path":"/fields/System.History","value":"Fixed by PR !123, verified in build 456."}]' \
+  >"$patch_file"
 curl -s -X PATCH -H "Authorization: Bearer ${ADO_TOKEN}" \
-  -H "Content-Type: application/json-patch+json" \
+  -H "Content-Type: application/json-patch+json; charset=utf-8" \
   "https://dev.azure.com/{org}/{project}/_apis/wit/workitems/{id}?api-version=7.1" \
-  -d '[
-    {"op": "add", "path": "/fields/System.State", "value": "Closed"},
-    {"op": "add", "path": "/fields/System.History", "value": "Fixed by PR !123, verified in build 456."}
-  ]'
+  --data-binary "@$patch_file"
 ```
+
+On Windows, use the PowerShell 7 temporary-file pattern in [Windows-native execution reference](references/windows-native-execution.md). It uses `ConvertTo-Json -InputObject` for the top-level patch array, writes UTF-8 without a BOM, sends with `Invoke-RestMethod -InFile` and `charset=utf-8`, and removes the file in `finally`. Read the work item back with REST and verify non-ASCII fields after every write.
 
 Linking via REST is also a PATCH on `/relations/-`, e.g. relation type `System.LinkTypes.Hierarchy-Reverse` (parent), `ArtifactLink` with a `vstfs:///Git/PullRequestId/...` URL for PRs.
 

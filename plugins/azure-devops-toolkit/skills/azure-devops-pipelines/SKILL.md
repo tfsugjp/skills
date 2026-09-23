@@ -44,18 +44,25 @@ Base: `https://dev.azure.com/{organization}/{project}/_apis` — verify with `mi
 
 ```bash
 # Queue a run on a specific branch with a template parameter
-curl -s -X POST -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json" \
+request_file=$(mktemp)
+trap 'rm -f "$request_file"' EXIT
+cat > "$request_file" <<'JSON'
+{
+  "resources": {"repositories": {"self": {"refName": "refs/heads/main"}}},
+  "templateParameters": {"configuration": "Release"}
+}
+JSON
+curl --fail-with-body -sS -X POST -H "Authorization: Bearer ${ADO_TOKEN}" -H "Content-Type: application/json; charset=utf-8" \
   "https://dev.azure.com/{org}/{project}/_apis/pipelines/{pipelineId}/runs?api-version=7.1" \
-  -d '{
-    "resources": {"repositories": {"self": {"refName": "refs/heads/main"}}},
-    "templateParameters": {"configuration": "Release"}
-  }'
+  --data-binary "@$request_file"
 
 # Inspect failed stages/jobs
 curl -s -H "Authorization: Bearer ${ADO_TOKEN}" \
   "https://dev.azure.com/{org}/{project}/_apis/build/builds/{buildId}/timeline?api-version=7.1" \
   | jq '[.records[] | select(.result == "failed") | {name, type, log: .log.url}]'
 ```
+
+On Windows, use the PowerShell 7 file-based REST pattern in [azure-devops-foundation](../azure-devops-foundation/SKILL.md) instead of these Bash commands.
 
 ## Common workflows
 

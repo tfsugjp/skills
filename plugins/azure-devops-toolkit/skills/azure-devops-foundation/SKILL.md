@@ -100,6 +100,38 @@ Microsoft recommends Entra ID tokens over PATs. Never print tokens to the termin
 | Pagination | Follow `x-ms-continuationtoken` response header / `continuationToken` query parameter |
 | Rate limiting | On HTTP 429 or 503, honor the `Retry-After` header and retry with backoff; reduce parallelism |
 
+### File-based UTF-8 request bodies
+
+For REST writes on Windows, use PowerShell 7 and send JSON from a temporary UTF-8 file. Build the payload as a PowerShell object, serialize it with `ConvertTo-Json -InputObject` (so a JSON Patch array remains an array), write UTF-8 without a BOM, and pass the file with `Invoke-RestMethod -InFile`. Do not interpolate JSON into a command argument or rely on the console code page. Set the endpoint's actual content type with `charset=utf-8` (`application/json-patch+json` for work items, `application/json` for other JSON writes). Keep credentials in headers, never in the request file, and delete the file in `finally`. The examples assume `$uri` and `$headers` (or Bash `$uri` and `ADO_TOKEN`) have been prepared for the selected endpoint.
+
+```powershell
+$payload = @{ content = "# Example`n" } # Replace with the endpoint's request object or JSON Patch array.
+$requestFile = [IO.Path]::GetTempFileName()
+try {
+    $json = ConvertTo-Json -InputObject $payload -Depth 20
+    [IO.File]::WriteAllText($requestFile, $json, [Text.UTF8Encoding]::new($false))
+    $result = Invoke-RestMethod -Method Put -Uri $uri -Headers $headers `
+        -ContentType 'application/json; charset=utf-8' -InFile $requestFile
+} finally {
+    Remove-Item -LiteralPath $requestFile -ErrorAction SilentlyContinue
+}
+```
+
+For Bash on Linux/macOS, likewise send a UTF-8 file with `curl --data-binary @file`; keep variable content out of shell-quoted JSON and remove temporary files on exit:
+
+```bash
+request_file=$(mktemp)
+trap 'rm -f "$request_file"' EXIT
+cat > "$request_file" <<'JSON'
+{"content":"# Example\n"}
+JSON
+curl --fail-with-body -sS -X PUT -H "Authorization: Bearer ${ADO_TOKEN}" \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  --data-binary "@$request_file" "$uri"
+```
+
+Use the same file pattern for every JSON REST write in the related skills. Read a written resource back through REST or MCP and compare the stored non-ASCII fields with the original values before treating console output as evidence of corruption. Preserve the original text when a CLI's redirected output appears garbled.
+
 ### Verify before you call
 
 REST endpoints and `api-version` values change. Before constructing a REST call you have not used in this session, verify it with the Microsoft Learn MCP Server:
