@@ -1,0 +1,92 @@
+{
+  "name": "tfsugjp-agent-skills",
+  "owner": {
+    "name": "Team Foundation Users Japan"
+  },
+  "metadata": {
+    "description": "Skills and plugins for Azure DevOps, GitHub, .NET, NuGet, and Relaypublisher workflows.",
+    "version": "0.4.0"
+  },
+  "plugins": [
+    {
+      "name": "azure-devops-toolkit",
+      "description": "Azure DevOps skills and agents for Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, and Advanced Security.",
+      "version": "0.2.0",
+      "source": "./plugins/azure-devops-toolkit",
+      "license": "MIT",
+      "keywords": [
+        "azure",
+        "azure-devops",
+        "devops",
+        "security"
+      ],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "nuget-validate",
+      "description": "Validate NuGet package versions for vulnerabilities, deprecation, listing status, and freshness.",
+      "version": "0.1.0",
+      "source": "./plugins/nuget-validate",
+      "license": "MIT",
+      "keywords": [
+        "dotnet",
+        "nuget",
+        "security"
+      ],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "dependabot-safe-merge",
+      "description": "Safely refresh, review, and merge eligible Dependabot pull requests.",
+      "version": "0.1.0",
+      "source": "./plugins/dependabot-safe-merge",
+      "license": "MIT",
+      "keywords": [
+        "dependabot",
+        "dependencies",
+        "github",
+        "security"
+      ],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "github-plan-wiki",
+      "description": "Break an approved plan into a parent GitHub issue plus sub-issues, and publish feature/refactor/perf plans to the repository's GitHub wiki in English and Japanese.",
+      "version": "0.1.1",
+      "source": "./plugins/github-plan-wiki",
+      "license": "MIT",
+      "keywords": [
+        "github",
+        "issues",
+        "sub-issues",
+        "wiki",
+        "planning"
+      ],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "relaypublisher-manifest",
+      "description": "Create, update, and statically validate Relaypublisher manifests for v1.1.0, including Windows Win32 script/file-system detection and multi-bundle macOS PKG/LOB detection.",
+      "version": "0.2.0",
+      "source": "./plugins/relaypublisher-manifest",
+      "license": "MIT",
+      "keywords": [
+        "relaypublisher",
+        "intune",
+        "windows",
+        "macos",
+        "manifest"
+      ],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "repository-init",
+      "description": "Explicitly initialize repository policy files once and preserve existing project rules.",
+      "version": "0.1.0",
+      "source": "./plugins/repository-init",
+      "license": "MIT",
+      "keywords": ["repository", "initialization", "agents", "policy"],
+      "category": "Developer Tools"
+    }
+  ]
+}

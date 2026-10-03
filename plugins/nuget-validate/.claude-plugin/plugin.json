@@ -1,0 +1,11 @@
+{
+  "name": "nuget-validate",
+  "version": "0.1.0",
+  "description": "Validate NuGet package versions for vulnerabilities, deprecation, listing status, and freshness.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["dotnet", "nuget", "security"],
+  "skills": "./skills/"
+}

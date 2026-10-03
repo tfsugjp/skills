@@ -1,0 +1,28 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.DmgUnsupported
+PackageName: Contoso Dmg Unsupported
+Publisher: Contoso Ltd.
+Description: DMG installers are unsupported and must be rejected.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: macos
+    Architecture: arm64
+    InstallerType: dmg
+    AppType: pkg
+    DisplayName: Contoso Dmg Unsupported [macOS Arm64]
+    Source:
+      Type: azureBlob
+      AccountName: examplepackages
+      Container: intune-packages
+      BlobName: macos/contoso-dmg/1.0.0/Contoso.dmg
+      Destination: Contoso.dmg
+      Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      Auth:
+        Type: workloadIdentity
+    Requirements:
+      MinimumOSVersion: "13.0"
+    Detection:
+      IncludedApps:
+        - BundleId: com.example.contoso.client
+          BundleVersion: "1.0.0"

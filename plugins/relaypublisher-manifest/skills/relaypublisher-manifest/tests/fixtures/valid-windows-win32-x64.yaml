@@ -1,0 +1,51 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.Tool
+PackageName: Contoso Tool
+Publisher: Contoso Ltd.
+Description: Internal tool for Contoso employees.
+PackageVersion: "1.2.3"
+
+Apps:
+  - Platform: windows
+    Architecture: x64
+    InstallerType: win32
+    DisplayName: Contoso Tool [Windows x64]
+
+    Package:
+      IntuneWin:
+        SetupFile: install.ps1
+
+      RepositoryFiles:
+        - Source: scripts/windows/x64/install.ps1
+          Destination: install.ps1
+        - Source: scripts/windows/common/uninstall.ps1
+          Destination: uninstall.ps1
+        - Source: scripts/windows/common/detect.ps1
+          Destination: detect.ps1
+
+      ExternalFiles:
+        - Type: publicHttp
+          Url: https://example.com/downloads/contoso-tool-1.2.3-x64.exe
+          Destination: bin/contoso-tool.exe
+          Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+    Install:
+      CommandLine: powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+      UninstallCommandLine: powershell.exe -ExecutionPolicy Bypass -File .\uninstall.ps1
+      InstallExperience: system
+      RestartBehavior: suppress
+      ReturnCodes:
+        - Code: 0
+          Type: success
+        - Code: 3010
+          Type: softReboot
+
+    Detection:
+      Type: script
+      ScriptFile: scripts/windows/common/detect.ps1
+      RunAs32Bit: false
+      EnforceSignatureCheck: false
+
+    Requirements:
+      MinimumOSVersion: "10.0.19045"
+      Architecture: x64

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Relaypublisher Manifest"
+  short_description: "Author and validate Relaypublisher manifests"
+  default_prompt: "Use $relaypublisher-manifest to create or update and statically validate this Relaypublisher manifest."
+
+policy:
+  allow_implicit_invocation: true

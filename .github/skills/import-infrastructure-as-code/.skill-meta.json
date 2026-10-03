@@ -1,8 +1,0 @@
-{
-  "name": "import-infrastructure-as-code",
-  "source": "github/awesome-copilot",
-  "description": "Import existing Azure resources into Terraform using Azure CLI discovery and Azure Verified Modules (AVM).",
-  "whenToUse": "Use when asked to reverse-engineer live Azure infrastructure or generate IaC from existing Azure resources.",
-  "categories": [],
-  "installedAt": "2026-05-06T09:33:21.595Z"
-}

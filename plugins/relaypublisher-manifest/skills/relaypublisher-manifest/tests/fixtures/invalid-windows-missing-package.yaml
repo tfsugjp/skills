@@ -1,0 +1,26 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.WindowsMissingPackage
+PackageName: Contoso Windows Missing Package
+Publisher: Contoso Ltd.
+Description: Package is required for Platform windows.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: windows
+    Architecture: x64
+    InstallerType: win32
+    DisplayName: Contoso Windows Missing Package [Windows x64]
+
+    Install:
+      CommandLine: powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+      UninstallCommandLine: powershell.exe -ExecutionPolicy Bypass -File .\uninstall.ps1
+      InstallExperience: system
+      RestartBehavior: suppress
+
+    Detection:
+      Type: script
+      ScriptFile: scripts/windows/common/detect.ps1
+
+    Requirements:
+      MinimumOSVersion: "10.0.19045"
+      Architecture: x64

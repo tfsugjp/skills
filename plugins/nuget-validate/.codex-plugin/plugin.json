@@ -1,0 +1,24 @@
+{
+  "name": "nuget-validate",
+  "version": "0.1.0",
+  "description": "Validate NuGet package versions for vulnerabilities, deprecation, listing status, and freshness.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["dotnet", "nuget", "security"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "NuGet Validate",
+    "shortDescription": "Safe NuGet package validation",
+    "longDescription": "A skills-only plugin that checks NuGet package versions for vulnerabilities, deprecation, listing status, and stale releases before package changes.",
+    "developerName": "Team Foundation Users Japan",
+    "category": "Developer Tools",
+    "capabilities": ["Read"],
+    "defaultPrompt": [
+      "Validate this NuGet package version before I add it.",
+      "Find the latest safe version of this NuGet package.",
+      "Audit this .NET project for vulnerable packages."
+    ]
+  }
+}

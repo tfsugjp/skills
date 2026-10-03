@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dependabot Safe Merge"
+  short_description: "Safely refresh and merge Dependabot PRs"
+  default_prompt: "Use $dependabot-safe-merge to review and safely merge this Dependabot pull request."

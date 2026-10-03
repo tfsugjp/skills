@@ -1,0 +1,48 @@
+name: my-marketplace
+version: 0.1.0
+description: A short description of what this repo offers
+marketplace:
+  owner:
+    name: tfsugjp
+    url: https://github.com/tfsugjp
+
+  # Default tag pattern used to resolve version ranges for each package.
+  build:
+    tagPattern: "v{version}"
+
+  # Output targets (map form). 'claude' is enabled by default;
+  # uncomment 'codex' below to publish the Codex artifact too.
+  # Each output writes to its profile default path; add 'path:'
+  # under a key to override.
+  outputs:
+    claude: {}
+    # codex: {}
+    #
+    # Note: enabling codex requires every package below to declare
+    # 'category:' (e.g. category: Productivity).
+
+  # CI tip: build one or all formats with a machine-readable manifest:
+  #   apm pack --marketplace=claude,codex --json | jq -r '.marketplace.outputs[].path'
+
+  packages:
+    - name: example-package
+      description: Human-readable description of the package
+      source: acme-org/example-package
+      version: "^1.0.0"
+      # Required when outputs includes codex:
+      # category: Productivity
+      # Optional overrides:
+      # subdir: path/inside/repo
+      # Per-package version tag (recommended for monorepos so each
+      # package can be released independently). Leave commented for
+      # repo-wide lockstep tagging.
+      # tag_pattern: "{name}-v{version}"
+      # include_prerelease: false
+      # ref: main  # pin to an explicit ref instead of a version range
+
+    # Local-path entry: ship a package shipped alongside this repo.
+    # - name: local-tool
+    #   source: ./packages/local-tool
+    #   description: A locally vendored tool
+    #   version: 0.1.0
+    #   # tag_pattern: "{name}-v{version}"

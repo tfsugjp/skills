@@ -1,8 +1,0 @@
-{
-  "name": "dotnet-timezone",
-  "source": "github/awesome-copilot",
-  "description": ".NET timezone handling guidance for C# applications. Use when working with TimeZoneInfo, DateTimeOffset, NodaTime, UTC conversion, daylight saving time, scheduling across timezones, cross-platform Windows/IANA timezone IDs.",
-  "whenToUse": "Resolve timezone questions for .NET and C# code with production-safe guidance and copy-paste-ready snippets.",
-  "categories": [],
-  "installedAt": "2026-05-06T09:33:21.595Z"
-}

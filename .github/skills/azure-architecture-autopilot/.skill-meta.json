@@ -1,8 +1,0 @@
-{
-  "name": "azure-architecture-autopilot",
-  "source": "github/awesome-copilot",
-  "description": "Design Azure infrastructure using natural language, or analyze existing Azure resources to auto-generate architecture diagrams, refine them through conversation, and deploy with Bicep.",
-  "whenToUse": "Use when creating Azure infrastructure designs, generating architecture diagrams, or deploying with Bicep.",
-  "categories": [],
-  "installedAt": "2026-05-06T09:33:21.595Z"
-}

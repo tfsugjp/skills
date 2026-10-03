@@ -1,0 +1,29 @@
+SchemaVersion: "1.0"
+PackageIdentifier: Contoso.IgnoreAppVersion
+PackageName: Contoso Ignore App Version
+Publisher: Contoso Ltd.
+Description: IgnoreAppVersion excludes the bundle version from Intune detection.
+PackageVersion: "1.0.0"
+
+Apps:
+  - Platform: macos
+    Architecture: arm64
+    InstallerType: pkg
+    AppType: pkg
+    DisplayName: Contoso Ignore App Version [macOS Arm64]
+    Source:
+      Type: azureBlob
+      AccountName: examplepackages
+      Container: intune-packages
+      BlobName: macos/contoso-ignore-version/1.0.0/Contoso.pkg
+      Destination: Contoso.pkg
+      Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      Auth:
+        Type: workloadIdentity
+    Requirements:
+      MinimumOSVersion: "13.0"
+    Detection:
+      IgnoreAppVersion: true
+      IncludedApps:
+        - BundleId: com.example.contoso.client
+          BundleVersion: "1.0.0"

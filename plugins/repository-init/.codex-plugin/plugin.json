@@ -1,0 +1,20 @@
+{
+  "name": "repository-init",
+  "version": "0.1.0",
+  "description": "Explicitly initialize repository policy files once and preserve existing project rules.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["repository", "initialization", "agents", "policy"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Repository Init",
+    "shortDescription": "Initialize repository policy files once.",
+    "longDescription": "Explicitly initialize LICENSE, SECURITY.md, and AGENTS.md for new or existing repositories, save decisions for resumption, and leave completed repositories unchanged on repeat invocation.",
+    "developerName": "Team Foundation Users Japan",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": "Use $repository-init to initialize policy files in this repository."
+  }
+}
