@@ -1,8 +1,16 @@
 param(
     [Parameter(Mandatory)]
     [string]$MarkdownPath,
-    [string[]]$RequireId = @()
+    [string[]]$RequireId = @(),
+    [string[]]$RequirePr = @(),
+    [string[]]$RequirePageLink = @()
 )
+
+function ConvertTo-WikiPagePath([string]$Value) {
+    $path = [Uri]::UnescapeDataString(($Value -split '#', 2)[0].Split('?', 2)[0]).Replace(' ', '-')
+    if ($path.EndsWith('.md')) { $path = $path.Substring(0, $path.Length - 3) }
+    return '/' + $path.Trim('/')
+}
 
 $bytes = [IO.File]::ReadAllBytes($MarkdownPath)
 if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and
@@ -46,5 +54,23 @@ foreach ($id in $RequireId) {
     $reference = '(?<![A-Za-z0-9#])#' + [regex]::Escape($id) + '(?![0-9])'
     if ($referenceText -notmatch $reference) {
         throw "Wiki Markdown is missing the #$id work item reference."
+    }
+}
+
+$targets = @([regex]::Matches($proseText, '(?<!!)\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))(?:\s+"[^"]*")?\s*\)') |
+    ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } })
+foreach ($id in $RequirePr) {
+    if ($id -notmatch '^[1-9][0-9]*$') { throw 'RequirePr must be a positive decimal pull request ID.' }
+    $pattern = '/(?:pullrequest|pull)/' + [regex]::Escape($id) + '(?![0-9])'
+    if (-not ($targets | Where-Object { $_ -match $pattern })) {
+        throw "Wiki Markdown is missing a link to pull request $id."
+    }
+}
+$linkedPages = @($targets | Where-Object { $_.StartsWith('/') } | ForEach-Object { ConvertTo-WikiPagePath $_ })
+foreach ($page in $RequirePageLink) {
+    if (-not $page.StartsWith('/')) { throw 'RequirePageLink must be an absolute wiki page path such as /repo/plan/1234-slug.' }
+    $expected = ConvertTo-WikiPagePath $page
+    if ($linkedPages -cnotcontains $expected) {
+        throw "Wiki Markdown is missing a link to the $expected page."
     }
 }
