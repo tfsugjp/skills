@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Updated `azure-devops-toolkit` to 0.3.0: the `azure-devops-wiki` skill now publishes into a repository-rooted hierarchy (`/<repo>` overview and overall design, `/<repo>/plan` and `/<repo>/bug` indexes), with root, index, plan, and bug fix plan templates, required Work Item and pull request references, and an approval-gated migration procedure for non-conforming pages.
+- Added `--require-pr` / `-RequirePr` and `--require-page-link` / `-RequirePageLink` checks to the Wiki validators, with unit tests that also verify PowerShell parity.
+- The Boards skill and Work Item agent now hand approved Bug fix plans to the Wiki skill and delegate Wiki structure creation to its publish sequence.
 - Added the explicitly invoked `repository-init` plugin for one-time repository governance setup with resumable, idempotent state tracking.
 
 ## 0.4.0

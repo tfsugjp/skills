@@ -1,6 +1,6 @@
 ---
 name: 'Azure DevOps Work Item Agent'
-description: 'Creates Azure DevOps work items with process-aware hierarchy, iteration, assignee, bug-linking, Windows-native execution, and mandatory Wiki handoff for Feature-equivalent items.'
+description: 'Creates Azure DevOps work items with process-aware hierarchy, iteration, assignee, bug-linking, Windows-native execution, and mandatory Wiki handoff for Feature-equivalent items and approved Bug fix plans.'
 tools: ['codebase', 'search', 'terminalCommand', 'runCommands', 'githubRepo', 'edit/editFiles']
 ---
 
@@ -34,12 +34,15 @@ Treat User Story, Product Backlog Item, Requirement, Task, and Bug as non-gated 
 
 For a gated item:
 
-1. Read the azure-devops-wiki skill and discover the existing Wiki, parent page, and target path using read operations.
-2. Do not create, rename, reorder, or re-index Wiki structure. Stop before Work Item creation if the existing destination cannot be determined.
-3. Obtain confirmation for the page draft when the Wiki skill requires it.
+1. Read the azure-devops-wiki skill and resolve the Wiki and the repository's page hierarchy (`/<repo>`, `/<repo>/plan`, `/<repo>/bug`) using read operations.
+2. Run the Wiki skill's conformance check. Stop before Work Item creation if the Wiki or repository cannot be determined, or if the user declines the migration of non-conforming pages. Leave creating missing root or index pages and carrying out the approved migration to the Wiki skill's publish sequence.
+3. Obtain confirmation for the page drafts when the Wiki skill requires it.
 4. Create the Work Item hierarchy only after Wiki preflight succeeds.
-5. Load and run azure-devops-wiki as an explicit handoff, passing the Work Item ID, title, approved plan, and existing page path.
-6. Read the page back and verify the Work Item ID and plan before reporting success.
+5. Load and run azure-devops-wiki as an explicit handoff, passing the Work Item ID, title, approved plan, repository name, and child Task IDs.
+6. Read the page back and verify the Work Item ID, the plan, and the `/<repo>/plan` index row before reporting success.
+7. After the pull request is created, hand its number and any design changes to azure-devops-wiki to update the plan page, the index row, and the root page's overall design when the specification changed.
+
+When the fix approach for a Bug is approved, hand the Bug ID, title, related Feature ID (when one exists; otherwise the page records None), repository name, and fix approach to azure-devops-wiki for the `/<repo>/bug/<id>-<slug>` page, and verify it the same way, including the root page update when the fix changes the specification. Creating the Bug itself is not gated.
 
 If the Wiki write unexpectedly fails after creation, keep the Work Item, report a partial failure, and identify Wiki registration as the required retry. Never delete the Work Item to simulate rollback.
 

@@ -1,6 +1,6 @@
 ---
 name: azure-devops-boards
-description: 'Manage Azure Boards work items: create, update fields, add comments, link items, and close them. Use when the user asks to create/update/comment on/close bugs, tasks, user stories, features, or other work items in Azure DevOps. Prefer Azure DevOps MCP Server tools, then use Windows-native PowerShell Invoke-RestMethod or az boards on Windows, and fall back to REST/CLI on non-Windows systems. Feature-equivalent work items require a delegated Azure DevOps Wiki registration before completion.'
+description: 'Manage Azure Boards work items: create, update fields, add comments, link items, and close them. Use when the user asks to create/update/comment on/close bugs, tasks, user stories, features, or other work items in Azure DevOps. Prefer Azure DevOps MCP Server tools, then use Windows-native PowerShell Invoke-RestMethod or az boards on Windows, and fall back to REST/CLI on non-Windows systems. Feature-equivalent work items and Bugs with an approved fix approach require a delegated Azure DevOps Wiki registration before completion.'
 ---
 
 # Azure Boards Work Items
@@ -50,13 +50,18 @@ Do not trigger this gate for a User Story, Product Backlog Item, Requirement, Ta
 
 For a Feature-equivalent item, follow this sequence:
 
-1. Read [azure-devops-wiki](../azure-devops-wiki/SKILL.md) and discover the existing Wiki, parent page, and page path using read operations. Do not create, rename, reorder, or re-index Wiki structure.
-2. Confirm that the existing placement can be used and that the approved plan has a concrete page destination. If the Wiki or destination cannot be determined, do not create the Work Item.
+1. Read [azure-devops-wiki](../azure-devops-wiki/SKILL.md) and resolve the Wiki and the repository's page hierarchy (`/<repo>`, `/<repo>/plan`, `/<repo>/bug`) using read operations. The plan page destination is `/<repo>/plan/<id>-<slug>`.
+2. Confirm that the Wiki and repository can be determined, and run the Wiki skill's conformance check. If the repository's pages are non-conforming, obtain the user's approval of the migration mapping before creating the Work Item; if the Wiki or repository cannot be determined or the migration is declined, do not create the Work Item. Missing root or index pages and the approved migration are carried out by the Wiki skill's publish sequence; do not create or move Wiki structure from this skill.
 3. Create the Work Item hierarchy only after the Wiki preflight succeeds.
-4. Explicitly load and run azure-devops-wiki, handing it the Work Item ID, title, approved plan, and existing page path. Require a Wiki reference in `#<id>` form; `AB#<id>` does not create a Wiki work item link. Do not duplicate Wiki page-writing logic in this skill or agent.
-5. Read the page back and verify that the registration contains the `#<id>` reference and approved plan, with no `AB#<id>` work item reference in prose. Report the Feature operation as successful only after this verification.
+4. Explicitly load and run azure-devops-wiki, handing it the Work Item ID, title, approved plan, repository name, and child Task IDs. Require a Wiki reference in `#<id>` form; `AB#<id>` does not create a Wiki work item link. Do not duplicate Wiki page-writing logic in this skill or agent.
+5. Read the page back and verify that the registration contains the `#<id>` reference and approved plan, with no `AB#<id>` work item reference in prose, and that the `/<repo>/plan` index lists the page. Report the Feature operation as successful only after this verification.
+6. When the pull request is created, hand the PR number and any design changes found during implementation back to azure-devops-wiki so it updates the plan page, its index row, and the root page's overall design when the specification changed.
 
 If an unexpected Wiki write fails after the Work Item exists, do not delete the Work Item. Report the created ID as a partial failure and identify Wiki registration as the required retry.
+
+### Bug fix plan Wiki registration
+
+When the fix approach for a Bug is approved, hand the Bug ID, title, related Feature ID (when one exists; otherwise the page records None), repository name, and approved fix approach to azure-devops-wiki, which writes `/<repo>/bug/<id>-<slug>` and its index row. Creating the Bug Work Item itself is not gated; do not report the fix plan as registered until the read-back verification succeeds. Hand the PR number back after the PR is created, together with any specification change the fix introduces so the root page's overall design is updated.
 
 ## MCP tools (preferred)
 
