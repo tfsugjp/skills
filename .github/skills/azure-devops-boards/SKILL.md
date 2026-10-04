@@ -61,7 +61,7 @@ If an unexpected Wiki write fails after the Work Item exists, do not delete the 
 
 ### Bug fix plan Wiki registration
 
-When the fix approach for a Bug is approved, hand the Bug ID, title, related Feature ID, repository name, and approved fix approach to azure-devops-wiki, which writes `/<repo>/bug/<id>-<slug>` and its index row. Creating the Bug Work Item itself is not gated; do not report the fix plan as registered until the read-back verification succeeds. Hand the PR number back after the PR is created, together with any specification change the fix introduces so the root page's overall design is updated.
+When the fix approach for a Bug is approved, hand the Bug ID, title, related Feature ID (when one exists; otherwise the page records None), repository name, and approved fix approach to azure-devops-wiki, which writes `/<repo>/bug/<id>-<slug>` and its index row. Creating the Bug Work Item itself is not gated; do not report the fix plan as registered until the read-back verification succeeds. Hand the PR number back after the PR is created, together with any specification change the fix introduces so the root page's overall design is updated.
 
 ## MCP tools (preferred)
 

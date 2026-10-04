@@ -42,7 +42,7 @@ For a gated item:
 6. Read the page back and verify the Work Item ID, the plan, and the `/<repo>/plan` index row before reporting success.
 7. After the pull request is created, hand its number and any design changes to azure-devops-wiki to update the plan page, the index row, and the root page's overall design when the specification changed.
 
-When the fix approach for a Bug is approved, hand the Bug ID, title, related Feature ID, repository name, and fix approach to azure-devops-wiki for the `/<repo>/bug/<id>-<slug>` page, and verify it the same way, including the root page update when the fix changes the specification. Creating the Bug itself is not gated.
+When the fix approach for a Bug is approved, hand the Bug ID, title, related Feature ID (when one exists; otherwise the page records None), repository name, and fix approach to azure-devops-wiki for the `/<repo>/bug/<id>-<slug>` page, and verify it the same way, including the root page update when the fix changes the specification. Creating the Bug itself is not gated.
 
 If the Wiki write unexpectedly fails after creation, keep the Work Item, report a partial failure, and identify Wiki registration as the required retry. Never delete the Work Item to simulate rollback.
 

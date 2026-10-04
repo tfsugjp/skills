@@ -57,18 +57,19 @@ foreach ($id in $RequireId) {
     }
 }
 
-$targets = @([regex]::Matches($proseText, '(?<!!)\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))(?:\s+"[^"]*")?\s*\)') |
+$renderedText = [regex]::Replace($proseText, '(?s)<!--.*?-->', '')
+$targets = @([regex]::Matches($renderedText, '(?<!!)\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))(?:\s+"[^"]*")?\s*\)') |
     ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } })
 foreach ($id in $RequirePr) {
     if ($id -notmatch '^[1-9][0-9]*$') { throw 'RequirePr must be a positive decimal pull request ID.' }
     $pattern = '/(?:pullrequest|pull)/' + [regex]::Escape($id) + '(?![0-9])'
-    if (-not ($targets | Where-Object { $_ -match $pattern })) {
+    if (-not ($targets | Where-Object { $_ -match '^https?://' -and $_ -match $pattern })) {
         throw "Wiki Markdown is missing a link to pull request $id."
     }
 }
-$linkedPages = @($targets | Where-Object { $_.StartsWith('/') } | ForEach-Object { ConvertTo-WikiPagePath $_ })
+$linkedPages = @($targets | Where-Object { $_.StartsWith('/') -and -not $_.StartsWith('//') } | ForEach-Object { ConvertTo-WikiPagePath $_ })
 foreach ($page in $RequirePageLink) {
-    if (-not $page.StartsWith('/')) { throw 'RequirePageLink must be an absolute wiki page path such as /repo/plan/1234-slug.' }
+    if (-not $page.StartsWith('/') -or $page.StartsWith('//')) { throw 'RequirePageLink must be an absolute wiki page path such as /repo/plan/1234-slug.' }
     $expected = ConvertTo-WikiPagePath $page
     if ($linkedPages -cnotcontains $expected) {
         throw "Wiki Markdown is missing a link to the $expected page."

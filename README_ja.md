@@ -6,7 +6,7 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 
 | Plugin | 含まれるスキルとエージェント |
 |---|---|
-| `azure-devops-toolkit` | スキル: Azure DevOps Foundation、Boards、Repos、Pipelines、Artifacts、Test Plans、Wikis、Advanced Security、CLI、security triage。エージェント: Azure DevOps Agent、Azure DevOps Work Item Agent |
+| `azure-devops-toolkit` | スキル: Azure DevOps Foundation、Boards、Repos、Pipelines、Artifacts、Test Plans、Wikis、Advanced Security、CLI、security triage。Boards は Windows でネイティブ PowerShell を使い、Feature 相当の Work Item と承認済みのバグ修正方針は Wiki への登録を必須とします。Wikis は計画とバグ修正方針を、リポジトリをルートとする階層（`/<repo>` の全体設計、`/<repo>/plan` と `/<repo>/bug` の一覧）に、同梱のページテンプレートと検証スクリプトを使って登録します。エージェント: Azure DevOps Agent、Azure DevOps Work Item Agent |
 | `nuget-validate` | NuGet の脆弱性、非推奨、掲載状態、公開からの経過日数、プロジェクト監査 |
 | `dependabot-safe-merge` | Dependabot pull request の安全な更新、公開経過時間ポリシー、マージゲート、メジャーアップグレード計画 |
 | `github-plan-wiki` | スキル: GitHub Plan Issues（親 issue と sub-issue の階層）、GitHub Wiki Plan（英日 Wiki plan と Home index の管理） |

@@ -14,6 +14,8 @@ INLINE_CODE = re.compile(r"(?<!\x60)(\x60+).*?\1")
 GITHUB_STYLE = re.compile(r"\bAB#(?:[0-9]+|<[^>]+>|\{[^}]+\})", re.IGNORECASE)
 LINK_TARGET = re.compile(r"(?<!!)\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))(?:\s+\"[^\"]*\")?\s*\)")
 POSITIVE_ID = re.compile(r"[1-9][0-9]*")
+HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+HTTP_URL = re.compile(r"https?://", re.IGNORECASE)
 
 
 def prose_lines(markdown: str) -> Tuple[List[Tuple[int, str]], bool]:
@@ -67,12 +69,13 @@ def validate(
         reference = re.compile(r"(?<![A-Za-z0-9#])#{}(?![0-9])".format(re.escape(work_item_id)))
         if not reference.search(reference_text):
             errors.append("Wiki Markdown is missing the #{} work item reference.".format(work_item_id))
-    targets = [angle or bare for angle, bare in LINK_TARGET.findall(prose)]
+    rendered = HTML_COMMENT.sub("", prose)
+    targets = [angle or bare for angle, bare in LINK_TARGET.findall(rendered)]
     for pull_request_id in required_prs:
         pattern = pull_request_pattern(pull_request_id)
-        if not any(pattern.search(target) for target in targets):
+        if not any(HTTP_URL.match(target) and pattern.search(target) for target in targets):
             errors.append("Wiki Markdown is missing a link to pull request {}.".format(pull_request_id))
-    linked_pages = {normalize_page_path(target) for target in targets if target.startswith("/")}
+    linked_pages = {normalize_page_path(target) for target in targets if target.startswith("/") and not target.startswith("//")}
     for page in required_page_links:
         if normalize_page_path(page) not in linked_pages:
             errors.append("Wiki Markdown is missing a link to the {} page.".format(normalize_page_path(page)))
@@ -90,7 +93,7 @@ def main() -> int:
         parser.error("--require-id must be a positive decimal work item ID")
     if any(not POSITIVE_ID.fullmatch(value) for value in args.require_pr):
         parser.error("--require-pr must be a positive decimal pull request ID")
-    if any(not value.startswith("/") for value in args.require_page_link):
+    if any(not value.startswith("/") or value.startswith("//") for value in args.require_page_link):
         parser.error("--require-page-link must be an absolute wiki page path such as /repo/plan/1234-slug")
     try:
         raw = args.markdown_file.read_bytes()

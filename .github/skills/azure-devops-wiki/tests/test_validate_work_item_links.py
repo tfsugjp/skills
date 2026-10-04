@@ -95,6 +95,16 @@ class ValidateTests(unittest.TestCase):
     def test_image_is_not_a_page_link(self) -> None:
         self.assertEqual(len(validate("![diagram](/repo/plan)\n", [], [], ["/repo/plan"])), 1)
 
+    def test_links_in_html_comments_do_not_count(self) -> None:
+        markdown = f"<!--\n[Plans](/repo/plan)\n[!322]({ORG_PROJECT}/_git/r/pullrequest/322)\n-->\n"
+        self.assertEqual(len(validate(markdown, [], ["322"], ["/repo/plan"])), 2)
+
+    def test_pull_request_link_must_be_absolute_http_url(self) -> None:
+        self.assertEqual(len(validate("[!322](/repo/pullrequest/322)\n", [], ["322"])), 1)
+
+    def test_protocol_relative_link_is_not_a_page_link(self) -> None:
+        self.assertEqual(len(validate("[P](//repo/plan)\n", [], [], ["/repo/plan"])), 1)
+
     def test_normalize_page_path(self) -> None:
         self.assertEqual(normalize_page_path("/repo/plan/My%20Page.md#top"), "/repo/plan/My-Page")
         self.assertEqual(normalize_page_path("/repo/plan/"), "/repo/plan")
@@ -151,6 +161,14 @@ class PowerShellParityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         image = self.run_script("![diagram](/repo/plan)\n", RequirePageLink=["/repo/plan"])
         self.assertNotEqual(image.returncode, 0)
+
+    def test_rejects_hidden_relative_and_protocol_relative_links(self) -> None:
+        hidden = self.run_script("<!--\n[Plans](/repo/plan)\n-->\n", RequirePageLink=["/repo/plan"])
+        self.assertNotEqual(hidden.returncode, 0)
+        relative_pr = self.run_script("[!322](/repo/pullrequest/322)\n", RequirePr=["322"])
+        self.assertNotEqual(relative_pr.returncode, 0)
+        protocol_relative = self.run_script("[P](//repo/plan)\n", RequirePageLink=["/repo/plan"])
+        self.assertNotEqual(protocol_relative.returncode, 0)
 
     def test_missing_child_page_fails(self) -> None:
         result = self.run_script(INDEX, RequirePageLink=["/example-repo/plan/1400-missing"])
