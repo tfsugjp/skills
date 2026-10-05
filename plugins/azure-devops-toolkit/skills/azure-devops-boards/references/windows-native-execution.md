@@ -84,19 +84,33 @@ The helper functions below implement the Markdown-first write with the HTML fall
         }
     }
 
-    function ConvertTo-MarkdownFieldValue([string]$Markdown) {
-        # Same encoding as the Azure DevOps MCP Server applies to Markdown fields.
-        $Markdown.Replace('<', '&lt;').Replace('>', '&gt;')
+    # Applies $Prose to text outside code and $Code to code spans and fenced code lines.
+    function Convert-MarkdownText([string]$Markdown, [scriptblock]$Prose, [scriptblock]$Code) {
+        $fence = $null
+        $lines = foreach ($line in $Markdown.Split("`n")) {
+            $fenceMatch = [regex]::Match($line, '^ {0,3}(`{3,}|~{3,})')
+            $marker = $fenceMatch.Groups[1].Value
+            if ($fenceMatch.Success -and ($null -eq $fence -or
+                    ($marker[0] -eq $fence[0] -and $marker.Length -ge $fence.Length))) {
+                $fence = if ($null -eq $fence) { $marker } else { $null }
+                $line
+            }
+            elseif ($null -ne $fence) { & $Code $line }
+            else {
+                [regex]::Replace($line, '(`+)(.+?)(?<!`)\1(?!`)|[^`]+|`+', {
+                        param($match)
+                        if ($match.Groups[2].Success) { & $Code $match.Value } else { & $Prose $match.Value }
+                    })
+            }
+        }
+        $lines -join "`n"
     }
 
-    function ConvertFrom-NumericCharacterReference([string]$Value) {
-        # Azure Boards stores characters outside the BMP, such as emoji, as &#NNNNNN;.
-        [regex]::Replace($Value, '&#(?:([0-9]+)|[xX]([0-9a-fA-F]+));', {
-                param($match)
-                $codePoint = if ($match.Groups[1].Success) { [int]$match.Groups[1].Value }
-                else { [Convert]::ToInt32($match.Groups[2].Value, 16) }
-                [char]::ConvertFromUtf32($codePoint)
-            })
+    function ConvertTo-MarkdownFieldValue([string]$Markdown) {
+        # The server strips anything shaped like an HTML tag, and the Markdown preview decodes
+        # the stored value once before rendering. Encode < twice in prose so it renders as a
+        # literal <, and once inside code, which shows entities as text. Leave > and & as they are.
+        Convert-MarkdownText $Markdown { param($text) $text.Replace('<', '&amp;lt;') } { param($text) $text.Replace('<', '&lt;') }
     }
 
     function ConvertTo-UpperPercentEncoding([string]$Value) {
@@ -105,7 +119,8 @@ The helper functions below implement the Markdown-first write with the HTML fall
     }
 
     function ConvertFrom-MarkdownFieldValue([string]$Value) {
-        (ConvertFrom-NumericCharacterReference $Value).Replace('&lt;', '<').Replace('&gt;', '>')
+        # Undo the server escaping (&amp;, &gt;, and &#NNNN; for emoji), then the prose encoding.
+        Convert-MarkdownText ([Net.WebUtility]::HtmlDecode($Value)) { param($text) $text.Replace('&lt;', '<') } { param($text) $text }
     }
 
     function ConvertTo-HtmlFieldValue([string]$Markdown) {
@@ -203,7 +218,8 @@ The helper functions below implement the Markdown-first write with the HTML fall
         if ([string]$item.multilineFieldsFormat.$field -eq 'Markdown') {
             $normalize = {
                 param([string]$value)
-                (ConvertTo-UpperPercentEncoding (ConvertFrom-NumericCharacterReference $value)).Replace("`r`n", "`n").Trim()
+                # The server escapes & and >, and stores emoji as &#NNNN;: compare decoded text.
+                (ConvertTo-UpperPercentEncoding ([Net.WebUtility]::HtmlDecode($value))).Replace("`r`n", "`n").Trim()
             }
             if ((& $normalize $stored) -cne (& $normalize (ConvertTo-MarkdownFieldValue $Markdown))) {
                 throw "Work item $($written.id) readback did not preserve the Markdown body."
@@ -398,6 +414,35 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
     PY
     }
 
+    # $1: encode | decode, $2: input file, $3: output file. encode turns a Markdown source into
+    # the field value: the server strips anything shaped like an HTML tag and the Markdown
+    # preview decodes the stored value once, so < is encoded twice in prose and once in code.
+    # decode turns a stored Markdown value back into the source.
+    markdown_codec() {
+      python3 - "$@" <<'PY'
+    import html, re, sys
+    mode, source, target = sys.argv[1:4]
+    text = open(source, encoding="utf-8", newline="").read()
+    if mode == "decode":
+        text = html.unescape(text)
+        prose, code = (lambda s: s.replace("&lt;", "<")), (lambda s: s)
+    else:
+        prose, code = (lambda s: s.replace("<", "&amp;lt;")), (lambda s: s.replace("<", "&lt;"))
+    spans = re.compile(r"(`+)(.+?)(?<!`)\1(?!`)|[^`]+|`+")
+    fence, lines = None, []
+    for line in text.split("\n"):
+        marker = re.match(r" {0,3}(`{3,}|~{3,})", line)
+        if marker and (fence is None or (marker.group(1)[0] == fence[0] and len(marker.group(1)) >= len(fence))):
+            fence = marker.group(1) if fence is None else None
+            lines.append(line)
+        elif fence is not None:
+            lines.append(code(line))
+        else:
+            lines.append(spans.sub(lambda m: code(m.group(0)) if m.group(2) else prose(m.group(0)), line))
+    open(target, "w", encoding="utf-8", newline="").write("\n".join(lines))
+    PY
+    }
+
     send_patch() { # $1: method, $2: URI, $3: patch file; prints the HTTP status
       curl -sS -o "$tmp_dir/response.json" -w '%{http_code}' -X "$1" \
         -H "Authorization: Bearer $ADO_TOKEN" \
@@ -421,8 +466,9 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
         method=POST; uri="$base_uri/workitems/\$$type_enc?api-version=7.1"
         title_ops=$(jq -n --arg t "$ADO_WORK_ITEM_TITLE" '[{"op":"add","path":"/fields/System.Title","value":$t}]')
       fi
-      jq -n --argjson title "$title_ops" --argjson extra "$extra" --arg field "$field" --rawfile body "$body_file" \
-        '$title + [{"op":"add","path":("/fields/" + $field),"value":($body | gsub("<";"&lt;") | gsub(">";"&gt;"))},
+      markdown_codec encode "$body_file" "$tmp_dir/body.value" || return 1
+      jq -n --argjson title "$title_ops" --argjson extra "$extra" --arg field "$field" --rawfile body "$tmp_dir/body.value" \
+        '$title + [{"op":"add","path":("/fields/" + $field),"value":$body},
                    {"op":"add","path":("/multilineFieldsFormat/" + $field),"value":"Markdown"}] + $extra' \
         >"$tmp_dir/patch.json"
       status=$(send_patch "$method" "$uri" "$tmp_dir/patch.json")
@@ -439,19 +485,16 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
       read_back "$id" || return 1
       if jq -e --arg field "$field" '((.multilineFieldsFormat[$field] // "") | ascii_downcase) == "markdown"' \
           "$tmp_dir/item.json" >/dev/null; then
-        python3 - "$tmp_dir/item.json" "$field" "$body_file" <<'PY' || return 1
-    import json, re, sys
+        python3 - "$tmp_dir/item.json" "$field" "$tmp_dir/body.value" <<'PY' || return 1
+    import html, json, re, sys
     from pathlib import Path
     item = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    def ncr(match):
-        return chr(int(match.group(1)) if match.group(1) else int(match.group(2), 16))
     def norm(value):
-        # Azure Boards stores characters outside the BMP, such as emoji, as &#NNNNNN;.
-        value = re.sub(r"&#(?:([0-9]+)|[xX]([0-9a-fA-F]+));", ncr, value)
-        # Azure Boards lowercases percent-encodings (%2F -> %2f) in Markdown links.
-        value = re.sub(r"%[0-9a-fA-F]{2}", lambda match: match.group(0).upper(), value)
+        # The server escapes & and >, stores emoji as &#NNNN;, and lowercases
+        # percent-encodings in links (%2F -> %2f): compare decoded text.
+        value = re.sub(r"%[0-9a-fA-F]{2}", lambda match: match.group(0).upper(), html.unescape(value))
         return value.replace("\r\n", "\n").strip()
-    sent = Path(sys.argv[3]).read_text(encoding="utf-8").replace("<", "&lt;").replace(">", "&gt;")
+    sent = Path(sys.argv[3]).read_text(encoding="utf-8")
     if norm(item["fields"][sys.argv[2]]) != norm(sent):
         raise SystemExit("The stored Markdown body differs from the submitted body.")
     PY
@@ -482,19 +525,19 @@ Wiki back-link. The function rewrites the `## Wiki` section in the Markdown sour
 
     add_wiki_back_link() { # $1: work item ID, $2: page path, $3: page remoteUrl
       read_back "$1" || return 1
-      python3 - "$body_file" "$2" "$3" "$tmp_dir/item.json" "$field" <<'PY' || return 1
-    import json, re, sys
+      if jq -e --arg field "$field" '((.multilineFieldsFormat[$field] // "") | ascii_downcase) == "markdown"' \
+          "$tmp_dir/item.json" >/dev/null; then
+        # Start from the stored body; an HTML body is edited through the Markdown source file.
+        jq -j --arg field "$field" '.fields[$field]' "$tmp_dir/item.json" >"$tmp_dir/stored.value"
+        markdown_codec decode "$tmp_dir/stored.value" "$body_file" || return 1
+      fi
+      python3 - "$body_file" "$2" "$3" <<'PY' || return 1
+    import re, sys
     from pathlib import Path
-    body_path, page_path, page_url, item_path, field = sys.argv[1:6]
+    body_path, page_path, page_url = sys.argv[1:4]
     upper_pct = lambda value: re.sub(r"%[0-9a-fA-F]{2}", lambda match: match.group(0).upper(), value)
     page_url = upper_pct(page_url)
-    item = json.loads(Path(item_path).read_text(encoding="utf-8"))
-    if (item.get("multilineFieldsFormat") or {}).get(field, "").lower() == "markdown":
-        text = re.sub(r"&#(?:([0-9]+)|[xX]([0-9a-fA-F]+));",
-                      lambda m: chr(int(m.group(1)) if m.group(1) else int(m.group(2), 16)),
-                      item["fields"][field]).replace("&lt;", "<").replace("&gt;", ">")
-    else:
-        text = Path(body_path).read_text(encoding="utf-8")
+    text = Path(body_path).read_text(encoding="utf-8")
     pattern = re.compile(r"(?ms)^##[ \t]+Wiki[ \t]*\r?\n(.*?)(?=^##[ \t]|\Z)")
     match = pattern.search(text)
     lines = [line for line in (match.group(1).splitlines() if match else [])
