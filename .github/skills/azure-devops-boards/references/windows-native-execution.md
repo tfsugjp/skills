@@ -70,12 +70,17 @@ The helper functions below implement the Markdown-first write with the HTML fall
     }
 
     function Assert-BugSections([string]$Markdown) {
+        $previousIndex = -1
         foreach ($heading in $bugSections) {
             $pattern = "(?ms)^##[ \t]+$([regex]::Escape($heading))[ \t]*\r?\n(.*?)(?=^##[ \t]|\z)"
             $section = [regex]::Match($Markdown, $pattern)
             if (-not $section.Success -or -not $section.Groups[1].Value.Trim()) {
                 throw "The Bug body has no '$heading' section with content."
             }
+            if ($section.Index -le $previousIndex) {
+                throw "The Bug body sections must be in this order: $($bugSections -join ', ')."
+            }
+            $previousIndex = $section.Index
         }
     }
 
@@ -301,15 +306,23 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
     import re, sys
     from pathlib import Path
     text = Path(sys.argv[1]).read_text(encoding="utf-8")
-    for heading in ("Repro steps", "Expected vs actual", "Root cause", "Fix approach"):
+    headings = ("Repro steps", "Expected vs actual", "Root cause", "Fix approach")
+    previous = -1
+    for heading in headings:
         match = re.search(r"(?ms)^##[ \t]+" + re.escape(heading) + r"[ \t]*\r?\n(.*?)(?=^##[ \t]|\Z)", text)
         if not match or not match.group(1).strip():
             raise SystemExit(f"The Bug body has no '{heading}' section with content.")
+        if match.start() <= previous:
+            raise SystemExit("The Bug body sections must be in this order: " + ", ".join(headings) + ".")
+        previous = match.start()
     PY
     }
 
-    check_html() { # $1: file with the stored HTML value
-      python3 - "$1" <<'PY'
+    # $1: HTML file to check; $2 (optional): HTML whose text $1 must match;
+    # $3 (optional): Markdown source whose headings must appear in $1.
+    check_html() {
+      python3 - "$@" <<'PY'
+    from html import unescape
     from html.parser import HTMLParser
     from pathlib import Path
     import re
@@ -345,6 +358,21 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
             re.search(r"(?<!\\)\\r\\n|(?<!\\)\\n(?=$|[\s\\#>*+|<-]|\d+[.)]\s)|(?<=[.!?。！？])\\n", prose) or
             re.search(r"(?m)^\s*#{1,6}\s", prose)):
         raise SystemExit("The body must contain HTML rich text and no escaped newlines or Markdown headings in prose.")
+
+    def plain_text(html):
+        return re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", html))).strip()
+
+    stored = plain_text(Path(sys.argv[1]).read_text(encoding="utf-8"))
+    if len(sys.argv) > 2 and stored != plain_text(Path(sys.argv[2]).read_text(encoding="utf-8")):
+        raise SystemExit("The stored body text differs from the submitted HTML.")
+    if len(sys.argv) > 3:
+        markdown = Path(sys.argv[3]).read_text(encoding="utf-8")
+        markdown = re.sub(r"(?ms)^ {0,3}(`{3,}|~{3,}).*?^ {0,3}\1[ \t]*$", "", markdown)
+        for heading in re.findall(r"(?m)^ {0,3}#{1,6}[ \t]+(.+?)[ \t#]*$", markdown):
+            heading = re.sub(r"\[([^]]*)\]\([^)]*\)", r"\1", heading)
+            heading = re.sub(r"\s+", " ", re.sub(r"[`*_]", "", heading)).strip()
+            if heading not in re.sub(r"[`*_]", "", stored):
+                raise SystemExit(f"The HTML file is stale: heading '{heading}' from the Markdown source is missing.")
     PY
     }
 
@@ -379,7 +407,7 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
       if [ "$status" = 400 ]; then
         # The server rejected the format operation and wrote nothing; resend with HTML.
         sent_markdown=0
-        check_html "$html_file" || return 1
+        check_html "$html_file" "$html_file" "$body_file" || return 1
         jq -n --argjson title "$title_ops" --argjson extra "$extra" --arg field "$field" --rawfile html "$html_file" \
           '$title + [{"op":"add","path":("/fields/" + $field),"value":$html}] + $extra' >"$tmp_dir/patch.json"
         status=$(send_patch "$method" "$uri" "$tmp_dir/patch.json")
@@ -397,7 +425,7 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
       else
         if [ "$sent_markdown" = 1 ]; then
           # The field stayed HTML: never leave raw Markdown in it.
-          check_html "$html_file" || return 1
+          check_html "$html_file" "$html_file" "$body_file" || return 1
           jq -n --arg field "$field" --rawfile html "$html_file" \
             '[{"op":"add","path":("/fields/" + $field),"value":$html}]' >"$tmp_dir/patch.json"
           [ "$(send_patch PATCH "$base_uri/workitems/$id?api-version=7.1" "$tmp_dir/patch.json")" = 200 ] ||
@@ -405,7 +433,7 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
           read_back "$id" || return 1
         fi
         jq -r --arg field "$field" '.fields[$field]' "$tmp_dir/item.json" >"$tmp_dir/stored.html"
-        check_html "$tmp_dir/stored.html" || return 1
+        check_html "$tmp_dir/stored.html" "$html_file" || return 1
       fi
       jq -e --arg t "$ADO_WORK_ITEM_TITLE" '$t == "" or .fields["System.Title"] == $t' "$tmp_dir/item.json" >/dev/null ||
         { echo "Work item $id did not preserve the title." >&2; return 1; }
