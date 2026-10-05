@@ -81,6 +81,7 @@ Repository, pipeline-definition, design-document, and pull request links point i
 4. **Write the child page** from the plan or bug template.
 5. **Update the index row** and, when the specification changed, **the root page's overall design**.
 6. **Validate every page you write** with the scripts below, write it with the ETag flow, and read it back.
+7. **Return the page path and `remoteUrl`** of each plan or bug page from the read-back to the caller, so azure-devops-boards can link the Work Item back to the page.
 
 | Page | Validation arguments |
 |---|---|

@@ -6,7 +6,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, and Relaypu
 
 | Plugin | Included skills and agents |
 |---|---|
-| `azure-devops-toolkit` | Skills: Azure DevOps Foundation, Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, Advanced Security, CLI, security triage. Boards uses native PowerShell on Windows, and Feature-equivalent Work Items and approved Bug fix plans require Wiki traceability. Wikis publishes plans and bug fix plans under a repository-rooted hierarchy (`/<repo>` overall design, `/<repo>/plan` and `/<repo>/bug` indexes) with bundled page templates and validators. Agents: Azure DevOps Agent, Azure DevOps Work Item Agent |
+| `azure-devops-toolkit` | Skills: Azure DevOps Foundation, Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, Advanced Security, CLI, security triage. Boards uses native PowerShell on Windows, writes body fields as Markdown, records the root cause and fix approach in a Bug's Repro Steps, links work items back to their Wiki pages, and Feature-equivalent Work Items and approved Bug fix plans require Wiki traceability. Wikis publishes plans and bug fix plans under a repository-rooted hierarchy (`/<repo>` overall design, `/<repo>/plan` and `/<repo>/bug` indexes) with bundled page templates and validators. Agents: Azure DevOps Agent, Azure DevOps Work Item Agent |
 | `nuget-validate` | NuGet vulnerability, deprecation, listing, freshness, and project-audit validation |
 | `dependabot-safe-merge` | Safe Dependabot refresh, release-age policy, merge gates, and major-upgrade planning |
 | `github-plan-wiki` | Skills: GitHub Plan Issues (parent + sub-issue hierarchy via `gh`), GitHub Wiki Plan (bilingual GitHub wiki publishing and Home index maintenance) |

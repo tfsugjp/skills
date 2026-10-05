@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Updated `azure-devops-toolkit` to 0.3.1: the `azure-devops-boards` skill writes body fields as Markdown by switching the field with `/multilineFieldsFormat/<field>` (MCP `format: "Markdown"`) and falls back to HTML only when the server does not support Markdown fields, with format-aware read-back checks.
+- Bugs now record the AI's Root cause and Fix approach, together with Repro steps and Expected vs actual, in Repro Steps, which is the body field the Bug form shows. The Work Item agent follows the same rule.
+- Work items of any type whose content is registered in the Azure DevOps Wiki are linked back to the page with a `## Wiki` body section and a `Hyperlink` relation; the `azure-devops-wiki` skill returns the page `remoteUrl` for this. The Windows-native reference adds tested `Write-WorkItemBody` and `Add-WikiBackLink` PowerShell helpers and Linux/macOS equivalents. The `azure-devops-cli` and `azure-devops-security-triage` skills now defer work item bodies to the same rules.
 - Updated `azure-devops-toolkit` to 0.3.0: the `azure-devops-wiki` skill now publishes into a repository-rooted hierarchy (`/<repo>` overview and overall design, `/<repo>/plan` and `/<repo>/bug` indexes), with root, index, plan, and bug fix plan templates, required Work Item and pull request references, and an approval-gated migration procedure for non-conforming pages.
 - Added `--require-pr` / `-RequirePr` and `--require-page-link` / `-RequirePageLink` checks to the Wiki validators, with unit tests that also verify PowerShell parity.
 - The Boards skill and Work Item agent now hand approved Bug fix plans to the Wiki skill and delegate Wiki structure creation to its publish sequence.

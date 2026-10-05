@@ -42,7 +42,7 @@ One work item per actionable alert (or one per dependency-upgrade batch):
 
 - Type: Bug (or the team's security work item type); tag `ghazdo`; severity mapped from the alert
 - Title: `[GHAS] {ruleId or CVE}: {short description} in {file}`
-- Description: alert summary, link `https://dev.azure.com/{org}/{project}/_git/{repo}/alerts/{alertId}`, recommendation text
+- Body: write the body field defined by [azure-devops-boards](../azure-devops-boards/SKILL.md) (Repro Steps for a Bug) as Markdown. For a Bug, map the alert summary and the link `https://dev.azure.com/{org}/{project}/_git/{repo}/alerts/{alertId}` to Repro steps, the rule's expected secure behavior to Expected vs actual, the vulnerable code path to Root cause, and the recommendation text to Fix approach; write `Not yet analyzed` for a section you have not analyzed yet
 - Add a Hyperlink relation to the alert URL
 - For active secrets: the work item is "rotate + revoke + purge", not just "remove from code"
 

@@ -2,6 +2,9 @@
 
 ## 未リリース
 
+- `azure-devops-toolkit` を 0.3.1 に更新しました。`azure-devops-boards` スキルは、`/multilineFieldsFormat/<field>`（MCP では `format: "Markdown"`）でフィールドを Markdown に切り替えてから本文を Markdown で書き込みます。サーバーが Markdown フィールドに対応していない場合に限り HTML に切り替え、読み戻し検査も形式に応じて行います。
+- Bug では、AI が分析した根本原因（Root cause）と修正方針（Fix approach）を、再現手順・期待結果と実際の結果とあわせて、Bug フォームの本文欄である Repro Steps に記録するようにしました。Work Item エージェントも同じ規則に従います。
+- 内容を Azure DevOps Wiki に登録した Work Item は、種類を問わず、本文の `## Wiki` セクションと `Hyperlink` リンクでページへ逆リンクします。そのために `azure-devops-wiki` スキルはページの `remoteUrl` を返します。Windows ネイティブ実行リファレンスには、検証済みの PowerShell ヘルパー `Write-WorkItemBody` と `Add-WikiBackLink`、および Linux/macOS 版の手順を追加しました。`azure-devops-cli` と `azure-devops-security-triage` スキルも、Work Item の本文については同じ規則に従うようにしました。
 - `azure-devops-toolkit` を 0.3.0 に更新しました。`azure-devops-wiki` スキルは、リポジトリ名をルートとする階層（`/<repo>` の概要と全体設計、`/<repo>/plan` と `/<repo>/bug` の一覧）に登録します。ルート・一覧・計画・バグ修正方針のテンプレート、Work Item と pull request の必須参照、非準拠ページを承認後に移行する手順を追加しました。
 - Wiki 検証スクリプトに `--require-pr` / `-RequirePr` と `--require-page-link` / `-RequirePageLink` を追加し、PowerShell 版との一致も確かめる単体テストを追加しました。
 - Boards スキルと Work Item エージェントは、承認済みのバグ修正方針を Wiki スキルへ引き渡し、Wiki 構造の作成を Wiki スキルの登録手順に委ねるようにしました。
