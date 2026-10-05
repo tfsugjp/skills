@@ -89,8 +89,23 @@ The helper functions below implement the Markdown-first write with the HTML fall
         $Markdown.Replace('<', '&lt;').Replace('>', '&gt;')
     }
 
+    function ConvertFrom-NumericCharacterReference([string]$Value) {
+        # Azure Boards stores characters outside the BMP, such as emoji, as &#NNNNNN;.
+        [regex]::Replace($Value, '&#(?:([0-9]+)|[xX]([0-9a-fA-F]+));', {
+                param($match)
+                $codePoint = if ($match.Groups[1].Success) { [int]$match.Groups[1].Value }
+                else { [Convert]::ToInt32($match.Groups[2].Value, 16) }
+                [char]::ConvertFromUtf32($codePoint)
+            })
+    }
+
+    function ConvertTo-UpperPercentEncoding([string]$Value) {
+        # Azure Boards lowercases percent-encodings (%2F -> %2f) in Markdown links.
+        [regex]::Replace($Value, '%[0-9a-fA-F]{2}', { param($match) $match.Value.ToUpperInvariant() })
+    }
+
     function ConvertFrom-MarkdownFieldValue([string]$Value) {
-        $Value.Replace('&lt;', '<').Replace('&gt;', '>')
+        (ConvertFrom-NumericCharacterReference $Value).Replace('&lt;', '<').Replace('&gt;', '>')
     }
 
     function ConvertTo-HtmlFieldValue([string]$Markdown) {
@@ -186,7 +201,10 @@ The helper functions below implement the Markdown-first write with the HTML fall
         }
         $stored = [string]$item.fields.$field
         if ([string]$item.multilineFieldsFormat.$field -eq 'Markdown') {
-            $normalize = { param([string]$value) $value.Replace("`r`n", "`n").Trim() }
+            $normalize = {
+                param([string]$value)
+                (ConvertTo-UpperPercentEncoding (ConvertFrom-NumericCharacterReference $value)).Replace("`r`n", "`n").Trim()
+            }
             if ((& $normalize $stored) -cne (& $normalize (ConvertTo-MarkdownFieldValue $Markdown))) {
                 throw "Work item $($written.id) readback did not preserve the Markdown body."
             }
@@ -232,6 +250,7 @@ After azure-devops-wiki has registered and read back the page, pass its `remoteU
     }
 
     function Add-WikiBackLink([int]$Id, [string]$PagePath, [string]$PageUrl, [string]$MarkdownPath) {
+        $PageUrl = ConvertTo-UpperPercentEncoding $PageUrl
         $item = Get-WorkItem $Id
         $type = $item.fields.'System.WorkItemType'
         $field = Get-BodyField $type
@@ -246,11 +265,14 @@ After azure-devops-wiki has registered and read back the page, pass its `remoteU
         $existing = [regex]::Match($markdown, '(?ms)^##[ \t]+Wiki[ \t]*\r?\n(.*?)(?=^##[ \t]|\z)')
         if ($existing.Success) {
             $lines = @($existing.Groups[1].Value -split "`r?`n" |
-                Where-Object { $_.Trim() -and -not $_.Contains("]($PageUrl)") }) + $lines
+                Where-Object { $_.Trim() -and -not (ConvertTo-UpperPercentEncoding $_).Contains("]($PageUrl)") }) + $lines
         }
         $markdown = Set-WikiSection $markdown $lines
 
-        $isLinked = { param($relation) $relation.rel -eq 'Hyperlink' -and $relation.url -eq $PageUrl }
+        $isLinked = {
+            param($relation)
+            $relation.rel -eq 'Hyperlink' -and (ConvertTo-UpperPercentEncoding $relation.url) -ceq $PageUrl
+        }
         $relationOperations = @()
         if (-not @($item.relations | Where-Object { & $isLinked $_ })) {
             $relationOperations += @{ op = 'add'; path = '/relations/-'; value = @{
@@ -417,11 +439,22 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
       read_back "$id" || return 1
       if jq -e --arg field "$field" '((.multilineFieldsFormat[$field] // "") | ascii_downcase) == "markdown"' \
           "$tmp_dir/item.json" >/dev/null; then
-        jq -e --arg field "$field" --rawfile body "$body_file" '
-          def norm: gsub("\r\n";"\n") | sub("^\\s+";"") | sub("\\s+$";"");
-          (.fields[$field] | norm) == ($body | gsub("<";"&lt;") | gsub(">";"&gt;") | norm)' \
-          "$tmp_dir/item.json" >/dev/null ||
-          { echo "Work item $id did not preserve the Markdown body." >&2; return 1; }
+        python3 - "$tmp_dir/item.json" "$field" "$body_file" <<'PY' || return 1
+    import json, re, sys
+    from pathlib import Path
+    item = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+    def ncr(match):
+        return chr(int(match.group(1)) if match.group(1) else int(match.group(2), 16))
+    def norm(value):
+        # Azure Boards stores characters outside the BMP, such as emoji, as &#NNNNNN;.
+        value = re.sub(r"&#(?:([0-9]+)|[xX]([0-9a-fA-F]+));", ncr, value)
+        # Azure Boards lowercases percent-encodings (%2F -> %2f) in Markdown links.
+        value = re.sub(r"%[0-9a-fA-F]{2}", lambda match: match.group(0).upper(), value)
+        return value.replace("\r\n", "\n").strip()
+    sent = Path(sys.argv[3]).read_text(encoding="utf-8").replace("<", "&lt;").replace(">", "&gt;")
+    if norm(item["fields"][sys.argv[2]]) != norm(sent):
+        raise SystemExit("The stored Markdown body differs from the submitted body.")
+    PY
       else
         if [ "$sent_markdown" = 1 ]; then
           # The field stayed HTML: never leave raw Markdown in it.
@@ -453,15 +486,19 @@ Wiki back-link. The function rewrites the `## Wiki` section in the Markdown sour
     import json, re, sys
     from pathlib import Path
     body_path, page_path, page_url, item_path, field = sys.argv[1:6]
+    upper_pct = lambda value: re.sub(r"%[0-9a-fA-F]{2}", lambda match: match.group(0).upper(), value)
+    page_url = upper_pct(page_url)
     item = json.loads(Path(item_path).read_text(encoding="utf-8"))
     if (item.get("multilineFieldsFormat") or {}).get(field, "").lower() == "markdown":
-        text = item["fields"][field].replace("&lt;", "<").replace("&gt;", ">")
+        text = re.sub(r"&#(?:([0-9]+)|[xX]([0-9a-fA-F]+));",
+                      lambda m: chr(int(m.group(1)) if m.group(1) else int(m.group(2), 16)),
+                      item["fields"][field]).replace("&lt;", "<").replace("&gt;", ">")
     else:
         text = Path(body_path).read_text(encoding="utf-8")
     pattern = re.compile(r"(?ms)^##[ \t]+Wiki[ \t]*\r?\n(.*?)(?=^##[ \t]|\Z)")
     match = pattern.search(text)
     lines = [line for line in (match.group(1).splitlines() if match else [])
-             if line.strip() and f"]({page_url})" not in line]
+             if line.strip() and f"]({page_url})" not in upper_pct(line)]
     lines.append(f"- [{page_path}]({page_url})")
     section = "## Wiki\n\n" + "\n".join(lines) + "\n"
     if match:
@@ -471,13 +508,13 @@ Wiki back-link. The function rewrites the `## Wiki` section in the Markdown sour
     Path(body_path).write_text(text, encoding="utf-8")
     PY
       local count relation='[]'
-      count=$(jq --arg url "$3" '[.relations[]? | select(.rel == "Hyperlink" and .url == $url)] | length' "$tmp_dir/item.json")
+      count=$(jq --arg url "$3" '[.relations[]? | select(.rel == "Hyperlink" and (.url | ascii_downcase) == ($url | ascii_downcase))] | length' "$tmp_dir/item.json")
       if [ "$count" = 0 ]; then
         relation=$(jq -n --arg url "$3" --arg path "$2" \
           '[{"op":"add","path":"/relations/-","value":{"rel":"Hyperlink","url":$url,"attributes":{"comment":("Wiki: " + $path)}}}]')
       fi
       write_body "$1" "$relation" >/dev/null || return 1
-      count=$(jq --arg url "$3" '[.relations[]? | select(.rel == "Hyperlink" and .url == $url)] | length' "$tmp_dir/item.json")
+      count=$(jq --arg url "$3" '[.relations[]? | select(.rel == "Hyperlink" and (.url | ascii_downcase) == ($url | ascii_downcase))] | length' "$tmp_dir/item.json")
       [ "$count" = 1 ] || { echo "Work item $1 does not have exactly one Hyperlink to the Wiki page." >&2; return 1; }
     }
 
