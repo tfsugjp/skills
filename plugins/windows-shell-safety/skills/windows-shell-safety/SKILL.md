@@ -30,7 +30,7 @@ Exit code 0 means clean, 1 means findings (each with `why` and `fix`), 2 means t
 
 | Rule | Detects | Safe rewrite |
 | --- | --- | --- |
-| WSS001 | `cmd /c`, `cmd.exe`, `%COMSPEC%` | Call the tool from pwsh directly |
+| WSS001 | Any `cmd`/`cmd.exe` invocation (`cmd /c`, `& cmd.exe`, `Start-Process cmd`), `%COMSPEC%` | Call the tool from pwsh directly |
 | WSS002 | `pwsh`/`powershell -Command` string with `\|`, `"`, or braces | `.ps1` file + `-File` |
 | WSS003 | `\| & < > ^ %VAR%` in an argument to `az` or another `.cmd`/`.bat` | `'@<file>'` or `ConvertFrom-Json` filtering |
 | WSS004 | Inline JSON (literal, `ConvertTo-Json` result, or variable) to a `.cmd`/`.bat` | UTF-8 file + `'@<file>'` |
@@ -58,7 +58,12 @@ Invoke-AzJson -Arguments 'rest', '--method', 'post', '--uri', $uri -Body @{ name
 Invoke-NativeJson -FilePath gh -Arguments 'api', 'repos/{owner}/{repo}/issues', '--method', 'POST' `
     -Body @{ title = 'x' } -BodyParameter '--input' -BodyValueFormat '{0}'
 
-# See the argv a .cmd target actually receives (Windows reproduces az.cmd's %* forwarding).
+# Text output such as -o tsv needs -Raw; without it Invoke-AzJson refuses non-JSON output.
+Invoke-AzJson -Arguments 'group', 'show', '-n', $rg, '--query', 'id', '-o', 'tsv' -Raw
+
+# See the argv a target would receive, body file included, without running it.
+# On Windows, batch targets go through a .cmd shim that reproduces az.cmd's %* forwarding.
+Invoke-AzJson -Arguments 'rest', '--method', 'post', '--uri', $uri -Body @{ name = 'demo' } -EchoArgs
 Show-NativeArgs 'a|b' '{"name":"demo"}'
 ```
 

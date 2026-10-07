@@ -120,6 +120,29 @@ class HelperTests(unittest.TestCase):
         self.assertIn("exited with 3", result.stdout)
         self.assertIn("boom", result.stdout)
 
+    def test_echo_args_shows_full_argument_list_without_running(self) -> None:
+        result = self.run_helper(
+            "Invoke-NativeJson -FilePath pwsh -Arguments '-c', 'exit 9' -Body @{ a = 1 } -EchoArgs"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = result.stdout.split("\n")
+        self.assertEqual(lines[:3], ["[-c]", "[exit 9]", "[--body]"])
+        self.assertRegex(lines[3], r"^\[@.+wss-[0-9a-f]{32}\.json\]$")
+
+    def test_az_json_rejects_non_json_output_without_raw(self) -> None:
+        for option in ("'-o', 'tsv'", "'--output', 'table'", "'--output=tsv'"):
+            with self.subTest(option=option):
+                result = self.run_helper(
+                    f"try {{ Invoke-AzJson -Arguments 'version', {option}; 'ran' }} catch {{ $_.Exception.Message }}"
+                )
+                self.assertIn("Pass -Raw", result.stdout)
+
+    @unittest.skipUnless(shutil.which("az"), "az is required")
+    def test_az_json_raw_returns_text(self) -> None:
+        result = self.run_helper("Invoke-AzJson -Arguments 'version', '--query', '\"azure-cli\"', '-o', 'tsv' -Raw")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.stdout.strip(), r"^\d+\.\d+")
+
     def test_show_native_args_prints_received_argv(self) -> None:
         result = self.run_helper("Show-NativeArgs 'x y' 'plain'")
         self.assertEqual(result.returncode, 0, result.stderr)

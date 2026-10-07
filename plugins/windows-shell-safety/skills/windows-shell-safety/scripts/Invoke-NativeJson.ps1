@@ -10,7 +10,9 @@
                        UTF-8 (no BOM) temporary file referenced by '@<file>' (or a custom form),
                        parses stdout with ConvertFrom-Json, and throws with stderr on failure.
                        Refuses arguments that cmd.exe would rewrite when the target is a .cmd/.bat.
-    Invoke-AzJson      Invoke-NativeJson for az: adds '-o json' and PYTHONIOENCODING=utf-8.
+    Invoke-AzJson      Invoke-NativeJson for az: adds '-o json' and PYTHONIOENCODING=utf-8. Rejects a
+                       non-JSON -o/--output unless -Raw is given.
+    -EchoArgs          On either function: print the argv the target would receive instead of running it.
     Show-NativeArgs    Prints the argv a child process actually receives, through the same
                        .cmd shim path az.cmd uses on Windows, so argument loss is visible.
 
@@ -82,7 +84,9 @@ function Invoke-NativeJson {
         # Treat the target as a batch file even off Windows (used by tests).
         [switch]$AssumeBatch,
         # Return stdout as text instead of parsing it as JSON.
-        [switch]$Raw
+        [switch]$Raw,
+        # Do not run the target; print the argv it would receive (body file included) via Show-NativeArgs.
+        [switch]$EchoArgs
     )
 
     $target = Resolve-NativeTarget $FilePath
@@ -100,6 +104,10 @@ function Invoke-NativeJson {
             $bodyFile = Write-Utf8TempFile $json
             if ($BodyParameter) { $argumentList.Add($BodyParameter) }
             $argumentList.Add(($BodyValueFormat -f $bodyFile))
+        }
+        if ($EchoArgs) {
+            # Batch targets are echoed through a .cmd shim, so cmd.exe rewriting stays visible.
+            return Show-NativeArgs @argumentList
         }
         if ($isBatch) { Assert-BatchSafeArguments $argumentList $target.Name }
 
@@ -135,16 +143,33 @@ function Invoke-AzJson {
     param(
         [Parameter(Mandatory)][string[]]$Arguments,
         [object]$Body,
-        [string]$BodyParameter = '--body'
+        [string]$BodyParameter = '--body',
+        # Return stdout as text; required for non-JSON output such as -o tsv.
+        [switch]$Raw,
+        [switch]$EchoArgs
     )
 
     $arguments = @($Arguments)
-    if ($arguments -notcontains '-o' -and $arguments -notcontains '--output') { $arguments += '-o', 'json' }
+    $output = $null
+    for ($i = 0; $i -lt $arguments.Count; $i++) {
+        if ($arguments[$i] -in '-o', '--output') {
+            $output = if ($i + 1 -lt $arguments.Count) { $arguments[$i + 1] } else { '' }
+        }
+        elseif ($arguments[$i] -match '^(-o|--output)=(.*)$') {
+            $output = $Matches[2]
+        }
+    }
+    if ($null -eq $output) { $arguments += '-o', 'json' }
+    elseif ($output -notin 'json', 'jsonc' -and -not $Raw -and -not $EchoArgs) {
+        throw "Invoke-AzJson parses JSON, but the arguments request '-o $output'. Pass -Raw for text output, or drop the output option."
+    }
     $parameters = @{
         FilePath      = 'az'
         Arguments     = $arguments
         BodyParameter = $BodyParameter
         Environment   = @{ PYTHONIOENCODING = 'utf-8' }
+        Raw           = $Raw
+        EchoArgs      = $EchoArgs
     }
     if ($PSBoundParameters.ContainsKey('Body')) { $parameters.Body = $Body }
     Invoke-NativeJson @parameters

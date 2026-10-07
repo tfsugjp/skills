@@ -152,7 +152,8 @@ end {
     for ($i = 0; $i -lt $sourceLines.Count; $i++) {
         $line = $sourceLines[$i]
         $code = $maskedLines[$i]
-        if ($code -match "$shellWord(cmd(\.exe)?)[`"']?\s+[/-]{1,2}[ck]\b" -or $code -match '%COMSPEC%|\$env:COMSPEC') {
+        if ($code -match "$shellWord(cmd(\.exe)?)[`"']?\s+[/-]{1,2}[ck]\b" -or $code -match '%COMSPEC%|\$env:COMSPEC' -or
+            $code -match "(^|[;&|({]|\bexec|\bstart|Start-Process(\s+-FilePath)?)\s*[`"']?cmd(\.exe)?[`"']?(?=\s|$|[;&|)}])") {
             Add-Finding 'WSS001' ($i + 1) $line
         }
         if ($code -match "$shellWord(powershell(\.exe)?)(?=[\s`"']|$)") {
@@ -214,6 +215,10 @@ end {
     $commands = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)
     foreach ($node in $commands) {
         $target = Get-TargetName $node
+        if ($target -in 'cmd', 'cmd.exe') {
+            Add-Finding 'WSS001' $node.Extent.StartLineNumber $sourceLines[$node.Extent.StartLineNumber - 1]
+            continue
+        }
         if (-not (Test-BatchTarget $target)) { continue }
 
         $elements = $node.CommandElements

@@ -72,6 +72,10 @@ try { Invoke-AzJson -Arguments 'version', '--query', 'keys(@)|[0]' | Out-Null }
 catch { $refused = $_.Exception.Message -match 'cmd.exe rewrites' }
 Assert-That $refused 'Invoke-AzJson refuses cmd metacharacters before calling az.cmd'
 
+$echoed = Invoke-Captured { Invoke-NativeJson -FilePath az -Arguments 'version', '--query', 'keys(@)|[0]' -EchoArgs }
+Write-Host "      -EchoArgs for az: received $($echoed.Output -join ' ')"
+Assert-That ($echoed.Output -notcontains '[keys(@)|[0]]') 'Invoke-NativeJson -EchoArgs shows the loss az.cmd would see'
+
 # 4. The lint flags every broken form used above.
 foreach ($command in "az version --query 'keys(@)|[0]' -o tsv", "az version --query '`"azure-cli`"' -o tsv", 'cmd /c "az version | findstr azure"') {
     $result = Invoke-Captured { & $lint -Command $command -AsJson }
