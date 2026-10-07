@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher のワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
+Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行のワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
 
 ## Plugin
 
@@ -63,6 +63,23 @@ Codex の local marketplace は開発・チーム配布用です。公開 listin
 
 `repository-init` は `$repository-init` を明示的に呼び出したときだけ使用します。新規または既存リポジトリの不足するガバナンスファイルを整備し、確定したライセンスと言語プロファイルを `.repository-init.json` に保存します。完了後に再度呼び出してもファイルを変更しません。Git の初期化、リモート作成、Issue／Work Item 作成、Wiki 公開、コミット、プッシュは行いません。
 
+## Windows Shell Safety
+
+`windows-shell-safety` は、Windows で Azure CLI などのネイティブコマンドを実行するエージェント（と人）のためのプラグインです。`az` の実体はバッチファイル `az.cmd` のため、引数は PowerShell の後に `cmd.exe` でも解釈されます。その結果、引用符外の `|`、`&`、`<`、`>`、`^` が消費され、`%VAR%` が展開され、インライン JSON の二重引用符が失われます。エスケープを変えて再試行するのではなく、スキルが定める一つの安全な手順に従います。
+
+- 規則: `pwsh` だけを使う、スクリプトは `-Command` 文字列ではなく `pwsh -File` で実行する、JSON は UTF-8 ファイルを `'@<file>'` で渡す、`az` の出力は `ConvertFrom-Json` で絞り込む（または `--query` を `'@<file>'` から読み込む）、ネイティブ出力を解析する前にコンソールを UTF-8 にする。
+- 実行前の lint: `Test-NativeCommand.ps1` は規則 WSS001-WSS009（`cmd.exe`、入れ子の `-Command`、`az` に渡す `cmd` メタ文字やインライン JSON、引用符なしの `@file` など）を理由と安全な書き換えつきで報告し、指摘があれば終了コード 1 を返します。
+- ヘルパー: `Invoke-NativeJson.ps1` をドットソースすると、`Invoke-AzJson` / `Invoke-NativeJson`（UTF-8 の本文ファイル、JSON 出力の解析、テキスト出力用の `-Raw`、`cmd.exe` に書き換えられる引数の拒否）と、`.cmd` 対象が実際に受け取る argv を表示する `-EchoArgs` / `Show-NativeArgs` を使えます。
+
+```powershell
+$skill = 'plugins/windows-shell-safety/skills/windows-shell-safety'
+pwsh -NoProfile -File "$skill/scripts/Test-NativeCommand.ps1" -Command 'az version --query "keys(@)|[0]" -o tsv'
+. "$skill/scripts/Invoke-NativeJson.ps1"
+(Invoke-AzJson -Arguments 'version').'azure-cli'
+```
+
+このスキルは助言用です。フックを同梱しないため、lint の指摘だけでツール呼び出しが止まることはありません。
+
 ## プロジェクト文書管理
 
 [project-documentation](.github/skills/project-documentation/SKILL.md) は英語の文書を `docs/adr/`、`docs/architecture/`、`docs/infra/`、`docs/test/e2e/`、`docs/setup/` に整理します。既存記録の変更には明示承認が必要です。判断は同じ項目を更新し、旧判断の要約・更新理由・承認情報を履歴に残します。選定根拠URLと実際のE2E実行証跡も記録します。
@@ -99,7 +116,7 @@ python scripts/validate_marketplaces.py
 python -m unittest discover -s plugins/github-plan-wiki/skills/github-wiki-plan/tests -p 'test_*.py'
 ```
 
-JSON、plugin 名とバージョン、skill frontmatter、source path、相対リンク、plugin root 外参照、GitHub Wiki template の平坦化された公開 route を検証します。GitHub Actions でも `main` への push と pull request に対して同じ検証を実行します。
+JSON、plugin 名とバージョン、skill frontmatter、source path、相対リンク、plugin root 外参照、GitHub Wiki template の平坦化された公開 route を検証します。GitHub Actions でも `main` への push と pull request に対して同じ検証を実行します。`tests` ジョブは各 plugin の `tests/test_*.py` も実行し（`windows-shell-safety` のテストには `pwsh` が必要）、`windows-latest` の `windows-shell-safety` ジョブは `cmd.exe` による引数の欠落を再現して安全なパターンを検証します。
 
 ## ライセンス
 
