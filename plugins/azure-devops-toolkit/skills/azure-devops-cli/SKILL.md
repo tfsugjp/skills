@@ -777,15 +777,15 @@ az boards work-item show --id {work-item-id} --open
 
 ### Create Work Item
 
-For a multiline description, prepare the text with actual line breaks and use the [Boards description preflight](../azure-devops-boards/SKILL.md) before writing. The standard System.Description field is HTML rich text: submit rendered HTML, then read the item back and verify its text and structure. Do not pass a literal backslash-n sequence or raw Markdown heading as the description. On Windows, use the Boards PowerShell 7 REST file flow for non-ASCII text instead of CLI arguments.
+az boards cannot switch a multiline field to Markdown and writes `--description` to `System.Description` as HTML. For a work item body, create the item without a body and write the body through MCP or REST as described in the Boards skill's [Long-text field format](../azure-devops-boards/SKILL.md#long-text-field-format): Markdown with the field format switched, HTML only as a fallback, and Repro Steps (with the root cause and fix approach) as the body of a Bug. Use `--description` only for a short single-line ASCII text on a non-Bug type. On Windows, use the Boards PowerShell 7 REST file flow for non-ASCII text instead of CLI arguments.
 
 ```bash
 # Basic work item
 az boards work-item create \
-  --title "Fix login bug" \
-  --type Bug \
+  --title "Update SSO documentation" \
+  --type Task \
   --assigned-to user@example.com \
-  --description "Users cannot login with SSO"
+  --description "Document the SSO login flow"
 
 # With area and iteration
 az boards work-item create \
