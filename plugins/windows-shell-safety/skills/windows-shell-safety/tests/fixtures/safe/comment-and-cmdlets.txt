@@ -1,0 +1,2 @@
+# cmd /c is mentioned only in this comment
+Get-ChildItem | Where-Object Length -gt 0

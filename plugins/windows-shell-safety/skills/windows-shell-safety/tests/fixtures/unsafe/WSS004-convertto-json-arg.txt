@@ -1,0 +1,1 @@
+az rest --method patch --uri $uri --body ($payload | ConvertTo-Json -Depth 10)

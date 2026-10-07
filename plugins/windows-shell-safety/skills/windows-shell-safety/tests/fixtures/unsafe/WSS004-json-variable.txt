@@ -1,0 +1,2 @@
+$json = $payload | ConvertTo-Json
+az deployment group create -g rg -f main.bicep --parameters $json

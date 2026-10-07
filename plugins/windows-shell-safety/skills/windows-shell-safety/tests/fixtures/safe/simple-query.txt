@@ -1,0 +1,2 @@
+az group show -n rg --query name -o tsv
+az vm list --query "[].{n:name, rg:resourceGroup}" -o json

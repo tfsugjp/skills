@@ -10,6 +10,8 @@ Use this reference whenever Azure Boards work is executed from Windows, especial
 
 Never use MSYS2, Git Bash, WSL, bash, or sh for Azure DevOps work on Windows. Do not use MSYS_NO_PATHCONV as a workaround; that variable addresses path conversion in a prohibited shell and does not make the shell an approved execution path.
 
+Before running az or other native commands with JSON, `--query`, or pipes, apply the `windows-shell-safety` skill (plugin `windows-shell-safety`) and lint the command with its `Test-NativeCommand.ps1`.
+
 ## UTF-8 REST writes
 
 Keep the organization URL, project, and credential in environment variables. In the PowerShell example below, `ADO_TOKEN` must be an Entra ID access token because it is sent as a Bearer token. A PAT is not a Bearer token; use an `Authorization: Basic` header with the PAT instead, following the authentication guidance in the foundation skill. Never print credentials.

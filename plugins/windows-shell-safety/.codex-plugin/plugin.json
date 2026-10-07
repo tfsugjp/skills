@@ -1,0 +1,24 @@
+{
+  "name": "windows-shell-safety",
+  "version": "0.1.0",
+  "description": "Run Azure CLI and other native commands on Windows without losing pipes, quotes, JSON, or special characters to cmd.exe, with a pre-execution lint.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["windows", "powershell", "azure-cli", "json", "quoting"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Windows Shell Safety",
+    "shortDescription": "Windows-safe az, JSON, and pipe execution",
+    "longDescription": "Prescriptive rules, a pre-execution lint, and a PowerShell 7 helper that keep Azure CLI (az.cmd) and other native commands on Windows from losing pipes, quotes, inline JSON, and non-ASCII text to cmd.exe, nested -Command strings, and console encoding.",
+    "developerName": "Team Foundation Users Japan",
+    "category": "Developer Tools",
+    "capabilities": ["Read"],
+    "defaultPrompt": [
+      "Check this az command before I run it on Windows.",
+      "Rewrite this Azure CLI call so the JSON body survives PowerShell and cmd.exe.",
+      "Why does my --query with a pipe fail on Windows?"
+    ]
+  }
+}
