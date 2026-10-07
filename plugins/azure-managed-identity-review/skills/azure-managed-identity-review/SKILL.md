@@ -50,6 +50,7 @@ Exit code 0 means no warnings or errors (info and notes may remain), 1 means war
 | `--map <dir>=<resource>` | Attribute source code under `<dir>` to a resource. Without it, code is attributed only when there is exactly one app and one Functions project. |
 | `--tf-plan-json <file>` | Output of `terraform show -json <plan>`; resolves module and variable values that `*.tf` parsing cannot. |
 | `--no-code`, `--no-bicep-build` | Skip the code scan; read committed ARM JSON (resource group, subscription, management group, or tenant scope) instead of compiling Bicep. |
+| `--all` | Review every user-assigned identity that has a consumer (the default when neither `--identity` nor `--resource` is given). |
 | `--json` | Machine-readable model and findings. |
 | `live --replay <dir>` / `--record <dir>` | Replay or record (masked) `az` output, for tests and offline review. |
 
@@ -62,7 +63,7 @@ Exit code 0 means no warnings or errors (info and notes may remain), 1 means war
 | MIR002 | error / warning | A consumer reaches a target with the identity, but no grant for that identity covers it. Error for identity-based connections and platform slots; warning when inferred from a URL or code, or when the only grant is on a child (a container, queue, or secret) of the target. | Grant the least-privileged data role on the target to that identity, in IaC. |
 | MIR003 | warning / info | A shared identity holds a broad-scope (resource group, subscription) or privileged grant, or a grant only one consumer needs. Warning when an FIC also exists. | Narrow the scope, or split the identity. |
 | MIR004 | warning | A federated credential lets an external workload act as an identity that resources also use; non-standard audience; flexible (expression) subject matching. | Dedicated identity for the external workload. |
-| MIR005 | error / warning | An identity-based connection, Key Vault reference, or SDK call names no client ID: the platform uses the system-assigned identity, which is missing (error) or not the intended one (warning). Also a warning when a client ID matches none of the resource's identities. | Set `<prefix>__clientId`, `AZURE_CLIENT_ID`, or `keyVaultReferenceIdentity` to an attached identity. |
+| MIR005 | error / warning | An identity-based connection, Key Vault reference, or SDK call names no client ID: the platform uses the system-assigned identity, which is missing (error) or not the intended one (warning). Also a warning when a client ID (in settings or in code) cannot be matched to an identity attached to that resource. | Set `<prefix>__clientId`, `AZURE_CLIENT_ID`, or `keyVaultReferenceIdentity` to an attached identity. |
 | MIR006 | info | The target needs a non-RBAC grant (SQL contained user, Cosmos DB data-plane role, app role on Graph or a custom API). | Verify by hand (checklist). |
 | MIR007 | info | Code or `local.settings.json` authenticates as the developer locally, so local E2E cannot reveal MIR002. | Verify after deployment with the deployed identity. |
 | MIR008 | warning | Live state differs from IaC (extra consumer, undeclared grant or FIC). | Declare it in IaC or remove it. |

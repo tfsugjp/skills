@@ -56,6 +56,11 @@ SERVICES: Dict[str, Tuple[str, Tuple[str, ...], Optional[str]]] = {
     "keyvault": ("Key Vault", ("Key Vault Administrator", "Key Vault Secrets User", "Key Vault Secrets Officer",
                                "Key Vault Crypto User", "Key Vault Crypto Officer", "Key Vault Crypto Service Encryption User",
                                "Key Vault Certificate User", "Key Vault Certificates Officer"), None),
+    # Key Vault references read secrets; customer-managed keys wrap and unwrap keys (dataActions checked with az role definition list).
+    "keyvault-secret": ("Key Vault secrets", ("Key Vault Administrator", "Key Vault Secrets Officer", "Key Vault Secrets User",
+                                              "Key Vault Certificate User"), None),
+    "keyvault-key": ("Key Vault keys", ("Key Vault Administrator", "Key Vault Crypto Officer", "Key Vault Crypto User",
+                                        "Key Vault Crypto Service Encryption User"), None),
     "servicebus": ("Service Bus", ("Azure Service Bus Data Owner", "Azure Service Bus Data Sender", "Azure Service Bus Data Receiver"), None),
     "eventhubs": ("Event Hubs", ("Azure Event Hubs Data Owner", "Azure Event Hubs Data Sender", "Azure Event Hubs Data Receiver"), None),
     "appconfig": ("App Configuration", ("App Configuration Data Owner", "App Configuration Data Reader"), None),
@@ -122,6 +127,20 @@ ROLE_IDS = {
     "8ebe5a00-799e-43f5-93ac-243d3dce84a7": "Search Index Data Contributor",
     "420fcaa2-552c-430f-98ca-3264be4806c7": "SignalR App Server",
     "d5a91429-5739-47e2-a06b-3470a27159e7": "EventGrid Data Sender",
+    "7e4f1700-ea5a-4f59-8f37-079cfe29dce3": "SignalR Service Owner",
+    "69566ab7-960f-475b-8e7c-b3118f30c6bd": "Storage File Data Privileged Contributor",
+    "b8eda974-7b85-4f76-af95-65846b26df6d": "Storage File Data Privileged Reader",
+    "0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb": "Storage File Data SMB Share Contributor",
+    "aba4ae5f-2193-4029-9191-0cb91df5e314": "Storage File Data SMB Share Reader",
+    "b93aa761-3e63-49ed-ac28-beffa264f7ac": "Container Registry Repository Reader",
+    "2a1e307c-b015-4ebd-883e-5b7698a07328": "Container Registry Repository Writer",
+    "19c28022-e58e-450d-a464-0b2a53034789": "Cognitive Services Data Contributor (Preview)",
+    "64702f94-c441-49e6-a78b-ef80e0188fee": "Azure AI Developer",
+    "53ca6127-db72-4b80-b1b0-d745d6d5456d": "Foundry User",
+    "c883944f-8b7b-4483-af10-35834be79c4a": "Foundry Owner",
+    "eadc314b-1a2d-4efa-be10-5d325db5065e": "Foundry Project Manager",
+    "eed3b665-ab3a-47b6-8f48-c9382fb1dad6": "Foundry Agent Consumer",
+    "142bfaed-a13f-4c2d-bed2-6db62c4a1009": "Foundry Project Runtime User",
 }
 COSMOS_DATA_ROLES = {
     "00000000-0000-0000-0000-000000000001": "Cosmos DB Built-in Data Reader",
@@ -262,6 +281,7 @@ class Grant:
     plane: str = "rbac"  # rbac | cosmos | kv-access-policy
     scope: Optional[str] = None
     scope_path: Optional[str] = None  # set when the scope is a child of the resource (container, queue, secret)
+    scope_group: Optional[str] = None  # resource group of a resource-scope grant, when known
 
 
 @dataclass
@@ -318,6 +338,8 @@ class Model:
     targets: List[Target] = field(default_factory=list)
     vault_rbac: Dict[str, bool] = field(default_factory=dict)
     resource_types: Dict[str, str] = field(default_factory=dict)  # resource name (lower) -> type (lower)
+    resource_groups: Dict[str, str] = field(default_factory=dict)  # resource name (lower) -> resource group, when known
+    identity_groups: Dict[str, set] = field(default_factory=dict)  # identity key -> resource groups named in its references
 
     def note(self, message: str, fix: str = "", resource: Optional[str] = None, identity: Optional[str] = None) -> None:
         self.notes.append(Finding("MIR000", "note", identity, resource, message, fix or "Pass --parameters or review the reference by hand."))
@@ -358,6 +380,7 @@ class Partial(str):
 class ResourceRef:
     type: str
     name: Any  # str, Partial, or Unknown
+    group: Optional[str] = None  # resource group given explicitly in resourceId(...) or a literal ID
 
 
 @dataclass
@@ -452,7 +475,8 @@ def resource_ref_from_id(text: str) -> Optional[ResourceRef]:
     if not matches:
         return None
     rtype, name = matches[-1]
-    return ResourceRef(rtype, name)
+    group = re.search(r"/resourceGroups/([^/]+)/", text, re.I)
+    return ResourceRef(rtype, name, group.group(1) if group else None)
 
 
 class ArmContext:
@@ -548,10 +572,12 @@ class ArmContext:
                 return Unknown("resourceId")
             rtype = strings[type_index]
             names = strings[type_index + 1:]
+            group = strings[type_index - 1] if type_index >= 1 and isinstance(strings[type_index - 1], str) and \
+                not isinstance(strings[type_index - 1], Partial) and name == "resourceid" else None
             name_text = "/".join(str(as_text(n)) for n in names)
             if any(isinstance(n, (Unknown, Partial)) for n in names):
                 name_text = Partial(name_text)
-            return ResourceRef(rtype, name_text)
+            return ResourceRef(rtype, name_text, group)
         if name == "reference":
             target = args[0] if args else None
             if isinstance(target, ResourceRef):
@@ -864,7 +890,13 @@ def ingest_arm_role_assignment(ctx: ArmContext, model: Model, res: dict, name: A
         model.note(f"Role assignment ({role}) has a principalId that does not resolve to a managed identity in these templates.",
                    "Check whether the principal is a managed identity passed in as a parameter.")
         return
-    model.grants.append(Grant(principal, role, kind, scope_name, source, scope=scope_type, scope_path=child))
+    raw_scope = ctx.value(res["scope"]) if "scope" in res else None
+    group = raw_scope.group if isinstance(raw_scope, ResourceRef) else None
+    if isinstance(raw_scope, str) and re.search(r"/resourceGroups/([^/]+)", raw_scope, re.I):
+        group = re.search(r"/resourceGroups/([^/]+)", raw_scope, re.I).group(1)
+    model.grants.append(Grant(principal, role, kind, scope_name, source, scope=scope_type, scope_path=child, scope_group=group))
+    if kind == "unknown":
+        model.note(f"Role assignment ({role}) has a scope that cannot be resolved; it is not counted as covering any target.", identity=principal)
 
 
 def ingest_access_policy(ctx: ArmContext, model: Model, vault: str, policy: dict, source: str) -> None:
@@ -923,6 +955,8 @@ def ingest_arm_consumer(ctx: ArmContext, model: Model, res: dict, rtype: str, na
         ref = uami_ref(ctx.value(raw_key))
         if ref:
             ids.append(name_key(ref.name))
+            if ref.group:
+                model.identity_groups.setdefault(name_key(ref.name), set()).add(ref.group.lower())
         else:
             model.note(f"{key}: user-assigned identity reference {raw_key} cannot be resolved.", resource=key)
     system = "systemassigned" in str(ctx.value(identity.get("type", ""))).lower().replace(" ", "").replace(",", "")
@@ -1057,7 +1091,7 @@ class HclParser:
                     end = re.compile(r"^\s*" + match.group(1) + r"\s*$", re.M).search(self.text, match.end())
                     self.pos = end.end() if end else len(self.text)
                     continue
-            if self.text.startswith("#", self.pos) and depth == 0:
+            if depth == 0 and (self.text.startswith("#", self.pos) or self.text.startswith("//", self.pos) or self.text.startswith("/*", self.pos)):
                 break
             if ch in "([{":
                 depth += 1
@@ -1158,6 +1192,29 @@ class TerraformModel:
         literal = tf_literal(block.attrs.get("name", ""))
         return literal or f"{block.labels[0]}.{block.labels[1]}"
 
+    def group_of(self, block: HclBlock) -> Optional[str]:
+        expr = block.attrs.get("resource_group_name", "")
+        match = TF_REF.search(expr)
+        if match and match.group(2) == "azurerm_resource_group":
+            rg = self.blocks.get(("azurerm_resource_group", match.group(3)))
+            return (tf_literal(rg.attrs.get("name", "")) if rg else None) or match.group(3)
+        return tf_literal(expr)
+
+    def literal_identity(self, expr: str) -> Optional[str]:
+        """Model key for a literal user-assigned identity resource ID."""
+        ref = uami_ref(tf_literal(expr) or "")
+        if not ref:
+            return None
+        name = name_key(ref.name)
+        candidates = [i for i in self.model.identities.values() if i.kind == "user" and i.name.lower() == name.lower()]
+        if ref.group:
+            candidates = [i for i in candidates if not i.resource_group or i.resource_group.lower() == ref.group.lower()]
+        if len(candidates) == 1:
+            return candidates[0].key
+        key = f"{ref.group}/{name}" if ref.group and self.model.identities.get(name) else name
+        self.model.add_identity(Identity(key=key, kind="user", name=name, source="literal resource ID", resource_group=ref.group))
+        return key
+
     def ref(self, expr: str) -> Optional[Tuple[str, str, str]]:
         """Return (terraform type, model key, attribute path) for a direct reference."""
         match = TF_REF.search(expr or "")
@@ -1170,11 +1227,22 @@ class TerraformModel:
     def ingest(self, blocks: List[Tuple[HclBlock, str]]) -> None:
         resources = [(b, s) for b, s in blocks if b.type in ("resource", "data") and len(b.labels) == 2]
         for block, _ in resources:
-            self.labels[(block.labels[0], block.labels[1])] = self.resource_key(block)
-            self.types[(block.labels[0], block.labels[1])] = block.labels[0]
             self.blocks[(block.labels[0], block.labels[1])] = block
+        names: Dict[str, int] = {}
+        for block, _ in resources:
+            if block.type == "resource" and block.labels[0] == "azurerm_user_assigned_identity":
+                names[self.resource_key(block).lower()] = names.get(self.resource_key(block).lower(), 0) + 1
+        for block, _ in resources:
+            key = self.resource_key(block)
+            if block.type == "resource" and block.labels[0] == "azurerm_user_assigned_identity" and names.get(key.lower(), 0) > 1:
+                # Same name in different resource groups: different identities.
+                key = f"{self.group_of(block) or block.labels[1]}/{key}"
+            self.labels[(block.labels[0], block.labels[1])] = key
+            self.types[(block.labels[0], block.labels[1])] = block.labels[0]
             if block.type == "resource":
                 self.model.resource_types.setdefault(self.resource_key(block).lower(), block.labels[0])
+                if self.group_of(block):
+                    self.model.resource_groups.setdefault(self.resource_key(block).lower(), self.group_of(block))
         for block, source in resources:
             self.ingest_resource(block, source)
         for block, source in blocks:
@@ -1233,6 +1301,12 @@ class TerraformModel:
             return "resource", key, rtype, None
         return scope_from_ref(tf_literal(expr) or "", "unknown")
 
+    def scope_group(self, expr: str, kind: str, name: Optional[str]) -> Optional[str]:
+        literal = re.search(r"/resourceGroups/([^/]+)", tf_literal(expr) or "", re.I)
+        if literal:
+            return literal.group(1)
+        return self.model.resource_groups.get((name or "").lower()) if kind == "resource" else None
+
     def setting(self, name: str, expr: str) -> Setting:
         setting = Setting(name=name, value=None)
         ref = self.ref(expr)
@@ -1261,7 +1335,8 @@ class TerraformModel:
         if block.type == "data":
             return
         if rtype == "azurerm_user_assigned_identity":
-            model.add_identity(Identity(key=key, kind="user", name=key, source=source, resolved=bool(tf_literal(block.attrs.get("name", "")))))
+            model.add_identity(Identity(key=key, kind="user", name=self.resource_key(block), source=source,
+                                        resolved=bool(tf_literal(block.attrs.get("name", ""))), resource_group=self.group_of(block)))
             if not tf_literal(block.attrs.get("name", "")):
                 model.note(f"Identity {key} has a computed name; using the Terraform address.", TF_UNRESOLVED_FIX, identity=key)
             return
@@ -1285,7 +1360,12 @@ class TerraformModel:
                 role = ROLE_IDS.get(guid, f"role {guid or '?'}")
             kind, name, scope_type, child = self.scope(block.attrs.get("scope", ""))
             if principal:
-                model.grants.append(Grant(principal, role, kind, name, source, scope=scope_type, scope_path=child))
+                model.grants.append(Grant(principal, role, kind, name, source, scope=scope_type, scope_path=child,
+                                          scope_group=self.scope_group(block.attrs.get("scope", ""), kind, name)))
+                if kind == "unknown":
+                    model.note(f"Role assignment {block.labels[1]} ({role}) has a scope that cannot be resolved "
+                               f"(`{block.attrs.get('scope', '').strip()[:60]}`); it is not counted as covering any target.",
+                               TF_UNRESOLVED_FIX, identity=principal)
             else:
                 model.note(f"Role assignment {block.labels[1]} ({role}) has a principal_id that is not a managed identity in this configuration.", TF_UNRESOLVED_FIX)
             return
@@ -1339,8 +1419,11 @@ class TerraformModel:
             system = system or "systemassigned" in itype.replace(" ", "").replace(",", "")
             for item in hcl_list(ident.attrs.get("identity_ids", "")):
                 ref = self.ref(item)
+                literal = None if ref else self.literal_identity(item)
                 if ref and ref[0] == "azurerm_user_assigned_identity":
                     ids.append(ref[1])
+                elif literal:
+                    ids.append(literal)
                 else:
                     model.note(f"{key}: identity_ids entry `{item}` cannot be resolved to a user-assigned identity in this configuration.",
                                TF_UNRESOLVED_FIX, resource=key)
@@ -1481,6 +1564,40 @@ SCOPE_LITERAL = re.compile(r"[\"'](https://[A-Za-z0-9.\-]+(?:/[A-Za-z0-9.\-]*)?/
 ENDPOINT_LITERAL = re.compile(r"[\"']((?:https://)?[A-Za-z0-9\-{}]+\.(?:blob|queue|table|dfs|vault|servicebus|documents|database|azconfig|openai|cognitiveservices|search)\.(?:core\.windows\.net|azure\.net|windows\.net|azure\.com|io)[A-Za-z0-9./\-]*)")
 
 
+CLIENT_ID_OPTION = re.compile(r"(?:ManagedIdentityClientId|managed_identity_client_id|managedIdentityClientId|FromUserAssignedClientId)\s*[=:(]\s*([^,;)}\n]+)")
+ENV_READ = re.compile(r"GetEnvironmentVariable\(\s*\"([^\"]+)\"|os\.environ(?:\.get)?[\[(]\s*['\"]([^'\"]+)|os\.getenv\(\s*['\"]([^'\"]+)|"
+                      r"process\.env\.([A-Za-z_][A-Za-z0-9_]*)|process\.env\[\s*['\"]([^'\"]+)|[Cc]onfig(?:uration)?\[\s*\"([^\"]+)\"\]|"
+                      r"System\.getenv\(\s*\"([^\"]+)")
+
+
+def client_id_source(expr: str) -> str:
+    """How code supplies a managed identity client ID: setting:<name>, literal:<guid>, system, or expr:<text>."""
+    expr = expr.strip()
+    if not expr or "SystemAssigned" in expr:
+        return "system"
+    env = ENV_READ.search(expr)
+    if env:
+        return "setting:" + next(g for g in env.groups() if g).replace(":", "__")
+    guid = re.search(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}", expr)
+    if guid:
+        return "literal:" + guid.group(0)
+    return "expr:" + expr[:60]
+
+
+def call_argument(line: str, start: int) -> str:
+    """Text inside the parentheses that open at or after `start` on this line."""
+    open_at = line.find("(", start)
+    if open_at < 0:
+        return ""
+    depth = 0
+    for index in range(open_at, len(line)):
+        depth += line[index] == "("
+        depth -= line[index] == ")"
+        if depth == 0:
+            return line[open_at + 1:index]
+    return line[open_at + 1:]
+
+
 def scan_code(root: Path, model: Model, mapping: Dict[str, str]) -> None:
     for path in sorted(root.rglob("*")):
         if any(part in SKIP_DIRS for part in path.relative_to(root).parts) or not path.is_file():
@@ -1506,6 +1623,13 @@ def scan_code(root: Path, model: Model, mapping: Dict[str, str]) -> None:
                 if detail == "ManagedIdentityCredential" and re.search(r"ManagedIdentityCredential\s*\(\s*\)", line):
                     detail = "ManagedIdentityCredential() (system-assigned)"
                 model.code.append(CodeEvidence(rel, number, "credential", detail, resource=resource))
+                if match.group(1) == "ManagedIdentityCredential":
+                    argument = call_argument(line, match.end())
+                    argument = re.sub(r"^\s*\{?\s*(?:clientId|client_id)\s*[:=]\s*", "", argument).rstrip("} ")
+                    if "FromUserAssignedClientId" not in argument:
+                        model.code.append(CodeEvidence(rel, number, "client-id", client_id_source(argument), resource=resource))
+            for match in CLIENT_ID_OPTION.finditer(line):
+                model.code.append(CodeEvidence(rel, number, "client-id", client_id_source(match.group(1)), resource=resource))
             for match in SCOPE_LITERAL.finditer(line):
                 model.code.append(CodeEvidence(rel, number, "scope", match.group(1), service_from_text(match.group(1)), resource))
             for match in ENDPOINT_LITERAL.finditer(line):
@@ -1538,13 +1662,20 @@ def setting_identity(setting: Optional[Setting], resource: Resource, model: Mode
     if setting is None:
         return None, False
     if setting.identity_ref:
+        if setting.identity_ref not in resource.user_identities:
+            model.note(f"{resource.key}: {setting.name} names {setting.identity_ref}, which is not attached to {resource.key}.",
+                       "Attach that identity to the resource, or name an attached one.", resource=resource.key)
+            return "?", True
         return setting.identity_ref, True
     value = (setting.value or "").strip()
     for identity in model.identities.values():
-        if identity.client_id and value.lower() == identity.client_id.lower():
-            return identity.key, True
-        if identity.resource_id and value.lower() == identity.resource_id.lower():
-            return identity.key, True
+        if (identity.client_id and value.lower() == identity.client_id.lower()) or \
+                (identity.resource_id and value.lower() == identity.resource_id.lower()):
+            if identity.key in resource.user_identities:
+                return identity.key, True
+            model.note(f"{resource.key}: {setting.name} is the client ID of {identity.key}, which is not attached to {resource.key}.",
+                       "Attach that identity to the resource, or name an attached one.", resource=resource.key)
+            return "?", True
     if value:
         if len(resource.user_identities) == 1:
             model.note(f"{resource.key}: {setting.name} value cannot be matched to an identity; assuming {resource.user_identities[0]}.",
@@ -1554,6 +1685,31 @@ def setting_identity(setting: Optional[Setting], resource: Resource, model: Mode
                    "Reference the identity's clientId in IaC, or run live mode to match client IDs.", resource=resource.key)
         return "?", True
     return None, False
+
+
+def code_identity(resource: Resource, model: Model, file: str) -> Optional[Tuple[str, str]]:
+    """Identity chosen explicitly by code in `file` (ManagedIdentityCredential or a client ID option), if any."""
+    sources = [e for e in model.code if e.kind == "client-id" and e.file == file]
+    if not sources:
+        return None
+    source = sources[0].detail
+    where = f"{file}:{sources[0].line}"
+    if source == "system":
+        return f"system:{resource.key}", f"system-assigned in {where}"
+    if source.startswith("setting:"):
+        name = source[len("setting:"):]
+        setting = next((v for k, v in resource.settings.items() if k.lower() == name.lower()), None)
+        if setting is None:
+            model.note(f"{where} reads the client ID from {name}, which is not an app setting of {resource.key}.",
+                       "Add the setting in IaC with the intended identity's client ID.", resource=resource.key)
+            return "?", f"client ID from {name} in {where}"
+        key, _ = setting_identity(setting, resource, model)
+        return key or "?", f"client ID from {name} in {where}"
+    if source.startswith("literal:"):
+        guid = source[len("literal:"):].lower()
+        match = next((k for k in resource.user_identities if (model.identities[k].client_id or "").lower() == guid), None)
+        return match or "?", f"literal client ID in {where}"
+    return "?", f"client ID expression in {where}"
 
 
 def default_identity(resource: Resource, model: Model, setting_name: str = "") -> Tuple[str, str]:
@@ -1622,11 +1778,11 @@ def derive_targets(model: Model) -> None:
             value = setting.value or ""
             if name.startswith("secret:") and setting.service == "keyvault":
                 ident = setting.identity_ref if setting.identity_ref and setting.identity_ref != "system" else f"system:{resource.key}"
-                targets.append(Target(resource.key, "keyvault", setting.target_name, ident, f"secret {name[7:]} (Key Vault reference)", True))
+                targets.append(Target(resource.key, "keyvault-secret", setting.target_name, ident, f"secret {name[7:]} (Key Vault reference)", True))
                 continue
             if "@microsoft.keyvault(" in value.lower():
                 kv_ident = next((ident for path, ident in resource.slots if path.lower().endswith("keyvaultreferenceidentity") or path.endswith("key_vault_reference_identity_id")), None)
-                targets.append(Target(resource.key, "keyvault", target_name_from_endpoint(value), kv_ident or f"system:{resource.key}",
+                targets.append(Target(resource.key, "keyvault-secret", target_name_from_endpoint(value), kv_ident or f"system:{resource.key}",
                                       f"{name} (Key Vault reference)", True))
                 continue
             service = setting.service or service_from_text(value)
@@ -1638,18 +1794,18 @@ def derive_targets(model: Model) -> None:
             lpath = path.lower()
             slot_target = resource.slot_targets.get(path)
             if "encryption" in lpath or "customer_managed_key" in lpath:
-                targets.append(Target(resource.key, "keyvault", slot_target, ident, f"{path} (customer-managed key)", True))
+                targets.append(Target(resource.key, "keyvault-key", slot_target, ident, f"{path} (customer-managed key)", True))
             elif "registr" in lpath or "acr" in lpath:
                 targets.append(Target(resource.key, "acr", slot_target, ident, f"{path} (image pull)", True))
             elif "kubelet" in lpath:
                 targets.append(Target(resource.key, "acr", slot_target, ident, f"{path} (kubelet image pull)", True))
     attributed = set()
     for evidence in model.code:
-        if not evidence.service or evidence.kind in ("credential", "local-setting"):
+        if not evidence.service or evidence.kind in ("credential", "local-setting", "client-id"):
             continue
         if evidence.resource and evidence.resource in model.resources:
             resource = model.resources[evidence.resource]
-            ident, how = default_identity(resource, model)
+            ident, how = code_identity(resource, model, evidence.file) or default_identity(resource, model)
             endpoint = evidence.detail if evidence.kind == "endpoint" else None
             target_name = target_name_from_endpoint(endpoint) if endpoint else None
             key = (resource.key, evidence.service, ident, target_name, endpoint)
@@ -1688,7 +1844,7 @@ def grant_covers(grant: Grant, target: Target, model: Model) -> bool:
         if target.service != "cosmos":
             return False
     elif grant.plane == "kv-access-policy":
-        if target.service != "keyvault":
+        if not target.service.startswith("keyvault"):
             return False
         vault = grant.scope_name or target.target_name
         if vault and next((enabled for name, enabled in model.vault_rbac.items()
@@ -1698,7 +1854,14 @@ def grant_covers(grant: Grant, target: Target, model: Model) -> bool:
         return False
     elif target.service not in SERVICES or not role_covers(grant.role, target.service):
         return False
-    if grant.scope_kind in ("subscription", "managementGroup", "root", "unknown", "resourceGroup"):
+    if grant.scope_kind == "unknown":
+        return False
+    target_group = model.resource_groups.get((target.target_name or "").lower())
+    if grant.scope_kind == "resourceGroup" and grant.scope_name and target_group and "{" not in grant.scope_name:
+        return grant.scope_name.lower() == target_group.lower()
+    if grant.scope_group and target_group and grant.scope_kind == "resource" and grant.scope_group.lower() != target_group.lower():
+        return False
+    if grant.scope_kind in ("subscription", "managementGroup", "root", "resourceGroup"):
         return True
     if not target.target_name or not grant.scope_name or "{" in (grant.scope_name or "") or "{" in (target.target_name or ""):
         return True
@@ -1766,7 +1929,7 @@ def run_rules(model: Model) -> List[Finding]:
             if (target.resource, target.via) not in unmatched:
                 unmatched.add((target.resource, target.via))
                 findings.append(Finding("MIR005", "warning", None, target.resource,
-                                        f"{target.via} on {target.resource} names a client ID that matches none of the identities attached to it "
+                                        f"{target.via} on {target.resource} names a client ID that cannot be matched to the identities attached to it "
                                         f"({', '.join(model.resources[target.resource].user_identities) or 'none'}), so its grants cannot be checked.",
                                         "Reference the identity's clientId in IaC, or run live mode to match client IDs."))
             continue
@@ -1877,10 +2040,12 @@ def drift(static: Model, live: Model) -> List[Finding]:
         for missing in sorted(static_consumers - live_consumers):
             findings.append(Finding("MIR008", "warning", ident.key, missing, f"IaC attaches {ident.key} to {missing}, but Azure does not show it.",
                                     "Deploy, or remove the stale attachment from IaC."))
-        live_grants = {(g.role.lower(), (g.scope_name or "").lower()) for g in live.grants if g.identity == ident.key}
-        static_grants = {(g.role.lower(), (g.scope_name or "").lower()) for g in static.grants if g.identity == ident.key}
-        for role, scope in sorted(live_grants - static_grants):
-            if any(r == role and (not s or "{" in s) for r, s in static_grants):
+        def grant_key(g: Grant) -> Tuple[str, str, str]:
+            return g.role.lower(), (g.scope_path or g.scope_name or "").lower(), g.plane
+        live_grants = {grant_key(g) for g in live.grants if g.identity == ident.key}
+        static_grants = {grant_key(g) for g in static.grants if g.identity == ident.key}
+        for role, scope, plane in sorted(live_grants - static_grants):
+            if any(r == role and p == plane and (not s or "{" in s) for r, s, p in static_grants):
                 continue
             findings.append(Finding("MIR008", "warning", ident.key, None, f"{ident.key} holds {role} on {scope or '(scope)'} in Azure, but IaC does not declare it.",
                                     "Declare the grant in IaC so reviews see it, or remove it."))
@@ -2115,7 +2280,9 @@ def collect_live(args: argparse.Namespace) -> Model:
                                                          "--include-inherited", "--fill-principal-name", "false", "--subscription", sub]) or []
         for item in assignments:
             kind, scope_name, scope_type, child = parse_scope(item.get("scope", ""))
-            model.grants.append(Grant(key, item.get("roleDefinitionName") or "?", kind, scope_name, "live", scope=item.get("scope"), scope_path=child))
+            group = re.search(r"/resourceGroups/([^/]+)", item.get("scope", ""), re.I)
+            model.grants.append(Grant(key, item.get("roleDefinitionName") or "?", kind, scope_name, "live", scope=item.get("scope"),
+                                      scope_path=child, scope_group=group.group(1) if group and kind == "resource" else None))
     for vault in vaults:
         model.vault_rbac[vault["name"]] = bool(vault.get("rbac"))
         for policy in vault.get("accessPolicies") or []:
@@ -2146,9 +2313,17 @@ def select_identities(model: Model, args: argparse.Namespace) -> set:
     users = {k for k, i in model.identities.items() if i.kind == "user"}
     selected = set()
     for value in args.identity or []:
-        name = value.rstrip("/").split("/")[-1] if "/userassignedidentities/" in value.lower() else value
-        match = next((k for k in users if (model.identities[k].resource_id or "").rstrip("/").lower() == value.rstrip("/").lower()), None) or \
-            next((k for k in users if k.lower() == name.lower()), None)
+        match = next((k for k in users if (model.identities[k].resource_id or "").rstrip("/").lower() == value.rstrip("/").lower()), None)
+        ref = uami_ref(value)
+        if match is None and ref:
+            candidates = [k for k in users if model.identities[k].name.lower() == name_key(ref.name).lower() and
+                          (not ref.group or not model.identities[k].resource_group or
+                           model.identities[k].resource_group.lower() == ref.group.lower())]
+            if len(candidates) > 1:
+                raise SystemExit(f"identity is ambiguous: {value} matches {', '.join(sorted(candidates))}")
+            match = candidates[0] if candidates else None
+        if match is None:
+            match = next((k for k in users if k.lower() == value.lower()), None)
         if match is None:
             raise SystemExit(f"identity not found: {value}")
         selected.add(match)
@@ -2219,6 +2394,10 @@ def collect_static(args: argparse.Namespace) -> Model:
         blocks.extend((b, Path(args.tf_plan_json).name) for b in tf_plan_blocks(plan))
     if blocks:
         TerraformModel(model).ingest(blocks)
+    for key, groups in sorted(model.identity_groups.items()):
+        if len(groups) > 1:
+            model.note(f"Identity name {key} is referenced in resource groups {', '.join(sorted(groups))}; static mode merges them into one identity.",
+                       "Review with live mode, which keys identities by resource ID.", identity=key)
     mapping: Dict[str, str] = {}
     for item in args.map or []:
         directory, sep, resource = item.partition("=")
@@ -2329,6 +2508,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--identity", action="append", help="Limit the review to this identity (name or resource ID). Repeatable.")
     common.add_argument("--resource", action="append", help="Review the identities this resource uses and every other consumer of them. Repeatable.")
+    common.add_argument("--all", action="store_true", help="Review every user-assigned identity that has a consumer (the default).")
     common.add_argument("--json", action="store_true", help="Emit the model and findings as JSON.")
     static_opts = argparse.ArgumentParser(add_help=False)
     static_opts.add_argument("--parameters", action="append", help="ARM parameters JSON (or az bicep build-params output). Repeatable.")
@@ -2346,6 +2526,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_live.add_argument("--replay", help="Read recorded az output from this directory instead of calling az.")
     p_live.add_argument("--record", help="Record (masked) az output to this directory for later --replay.")
     args = parser.parse_args(argv)
+    if args.all and (args.identity or args.resource):
+        print("error: --all cannot be combined with --identity or --resource", file=sys.stderr)
+        return 2
     try:
         if args.command == "static":
             model = collect_static(args)

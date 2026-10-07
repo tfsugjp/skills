@@ -10,6 +10,7 @@ How `msi_review.py` decides what each consumer reaches, which identity it uses, 
 | Connection settings without `__credential` (for example `AzureWebJobsStorage__accountName`) | System-assigned in Azure; the developer's identity locally | same |
 | SDK code with `DefaultAzureCredential` | `AZURE_CLIENT_ID` if set, otherwise system-assigned in Azure; the developer locally | [Azure Identity](https://learn.microsoft.com/dotnet/api/overview/azure/identity-readme) |
 | `ManagedIdentityCredential()` with no client ID | System-assigned | same |
+| `ManagedIdentityCredential(<client ID>)`, `ManagedIdentityClientId`, `managed_identity_client_id`, `FromUserAssignedClientId(...)` in code | The identity whose client ID the code passes; a value read from an environment variable or configuration key is resolved through that app setting | same |
 | App Service / Functions Key Vault reference (`@Microsoft.KeyVault(...)`) | `keyVaultReferenceIdentity` (`key_vault_reference_identity_id`); system-assigned by default | [Key Vault references](https://learn.microsoft.com/azure/app-service/app-service-key-vault-references) |
 | Container Apps Key Vault secret | `configuration.secrets[].identity` (`secret.identity`) | |
 | Storage customer-managed key | `encryption.identity.userAssignedIdentity` (`customer_managed_key.user_assigned_identity_id`) | |
@@ -40,7 +41,9 @@ Targets found only from a URL or from code are marked as inferred: the app might
 | Queue Storage | Storage Queue Data Contributor / Reader / Message Sender / Message Processor | |
 | Table Storage | Storage Table Data Contributor / Reader | |
 | Azure Files | Storage File Data Privileged Contributor / Reader, SMB Share Contributor / Reader | |
-| Key Vault | Key Vault Administrator, Secrets User / Officer, Crypto User / Officer, Crypto Service Encryption User, Certificate User / Certificates Officer; or an access policy when the vault does not use RBAC | CMK needs Crypto Service Encryption User. Key Vault Reader cannot read secrets. |
+| Key Vault secrets (Key Vault references, Container Apps secrets) | Key Vault Administrator, Secrets Officer, Secrets User, Certificate User; or an access policy when the vault does not use RBAC | Key Vault Reader and the crypto roles cannot read secrets. |
+| Key Vault keys (customer-managed keys) | Key Vault Administrator, Crypto Officer, Crypto User, Crypto Service Encryption User; or an access policy | Secrets roles cannot wrap or unwrap keys. |
+| Key Vault (endpoint or token scope in code) | Any of the roles above | The operation is unknown, so any Key Vault data role counts. |
 | Service Bus | Azure Service Bus Data Owner / Sender / Receiver | |
 | Event Hubs | Azure Event Hubs Data Owner / Sender / Receiver | |
 | App Configuration | App Configuration Data Owner / Reader | |
@@ -53,6 +56,6 @@ Targets found only from a URL or from code are marked as inferred: the app might
 | Azure SQL | Contained database user and database roles | Always MIR006: not visible in ARM. |
 | Microsoft Graph, custom APIs | App role assignment on the API's service principal | Always MIR006. |
 
-Owner, Contributor, and other control-plane roles do not grant data access, so they never satisfy a data target; on a shared identity they are reported by MIR003. A grant covers a target when its scope is the target resource, or a resource group, subscription, or management group (the review cannot always prove containment, so broader scopes count as covering and are reported by MIR003 instead). A grant on a child of the target (a blob container, queue, secret, or Service Bus queue) counts only for that child: when it is the only grant, MIR002 reports a warning so the reviewer confirms the consumer uses nothing else.
+Owner, Contributor, and other control-plane roles do not grant data access, so they never satisfy a data target; on a shared identity they are reported by MIR003. A grant covers a target when its scope is the target resource, or a resource group, subscription, or management group. When the resource groups of both the grant and the target are known (Terraform, literal resource IDs, live mode), they must match; otherwise containment cannot be proved, so broader scopes count as covering and are reported by MIR003 instead. A grant whose scope cannot be resolved (for example `var.scope`) never counts and is reported as MIR000. A grant on a child of the target (a blob container, queue, secret, or Service Bus queue) counts only for that child: when it is the only grant, MIR002 reports a warning so the reviewer confirms the consumer uses nothing else.
 
 Target names come from the setting value, the `VaultName=` or `SecretUri=` of a Key Vault reference, a registry's login server, or a customer-managed key's vault. When no name can be found, any grant of the right role counts.

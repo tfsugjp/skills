@@ -132,14 +132,14 @@ class RuleTests(unittest.TestCase):
         self.assertIn("app-one", findings(data, "MIR001")[0]["message"])
         self.assertIn("app-two", findings(data, "MIR001")[0]["message"])  # literal resource ID key
         self.assertTrue(any("Contributor at subscription" in f["message"] for f in findings(data, "MIR003")))
-        self.assertTrue(any(f["resource"] == "app-two" and f["severity"] == "warning" and "matches none" in f["message"]
+        self.assertTrue(any(f["resource"] == "app-two" and f["severity"] == "warning" and "cannot be matched" in f["message"]
                             for f in findings(data, "MIR005")))
 
     def test_grants_on_the_wrong_resource(self) -> None:
         code, data = review("static", str(FIXTURES / "terraform-regressions"))
         self.assertEqual(code, 1)
         errors = {(f["resource"], f["message"].split(" with ")[0]) for f in findings(data, "MIR002") if f["severity"] == "error"}
-        self.assertIn(("web-a", "web-a reaches Key Vault kv-web"), errors)
+        self.assertIn(("web-a", "web-a reaches Key Vault secrets kv-web"), errors)
         self.assertIn(("ca-api", "ca-api reaches Container Registry acrone"), errors)
         self.assertIn(("func-events", "func-events reaches Event Hubs eh-ns"), errors)
         child = [f for f in findings(data, "MIR002") if f["severity"] == "warning" and f["resource"] == "func-events"]
@@ -163,6 +163,49 @@ class RuleTests(unittest.TestCase):
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 code = msi_review.main(["static", str(FIXTURES / "arm-canonical"), "--map", value])
             self.assertEqual(code, 2, value)
+
+    def test_review_scoping_and_key_vault_purposes(self) -> None:
+        _, data = review("static", str(FIXTURES / "terraform-review"))
+        users = {i["key"] for i in data["identities"] if i["kind"] == "user"}
+        self.assertTrue({"rg-a/id-dup", "rg-b/id-dup", "id-lit"} <= users)  # same names in different groups stay apart
+        missing = {(f["resource"], f["identity"]) for f in findings(data, "MIR002")}
+        self.assertIn(("func-b", "rg-b/id-dup"), missing)  # rg-a's grant does not cover rg-b's identity
+        self.assertIn(("stcmk001", "id-kv"), missing)  # Secrets User does not wrap keys
+        self.assertIn(("app-lit", "id-lit"), missing)  # literal ID attached; grants in other groups do not cover
+        messages = " ".join(f["message"] for f in findings(data, "MIR002") if f["resource"] == "app-lit")
+        self.assertIn("Queue Storage stb001", messages)  # resource-group grant on rg-other
+        self.assertIn("Table Storage stsame001", messages)  # same name in rg-x
+        self.assertTrue(any(f["resource"] == "app-lit" for f in findings(data, "MIR005")))  # client ID of an unattached identity
+        self.assertTrue(any("var.scope" in f["message"] for f in findings(data, "MIR000")))
+
+    def test_client_id_chosen_in_code(self) -> None:
+        _, data = review("static", str(FIXTURES / "code-client-id"), "--map", "src/app=app-code")
+        queue = [t for t in data["targets"] if t["service"] == "storage-queue"]
+        self.assertEqual([t["identity"] for t in queue], ["id-orders"])
+        self.assertFalse(findings(data, "MIR002"))
+        self.assertTrue(any("AUDIT_CLIENT_ID" in f["message"] for f in findings(data, "MIR005")))
+
+    def test_all_flag(self) -> None:
+        code, data = review("static", str(FIXTURES / "terraform-canonical"), "--all")
+        self.assertEqual(code, 1)
+        self.assertTrue(findings(data, "MIR001"))
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertEqual(msi_review.main(["static", str(FIXTURES / "terraform-canonical"), "--all", "--resource", "func-orders"]), 2)
+
+    def test_drift_compares_child_scopes(self) -> None:
+        static = msi_review.Model(origin="static")
+        live = msi_review.Model(origin="live")
+        for model in (static, live):
+            model.add_identity(msi_review.Identity(key="id-x", kind="user", name="id-x", source="t"))
+        static.grants.append(msi_review.Grant("id-x", "Storage Blob Data Contributor", "resource", "stdata", "t", scope_path="stdata/reports"))
+        live.grants.append(msi_review.Grant("id-x", "Storage Blob Data Contributor", "resource", "stdata", "t", scope_path="stdata/invoices"))
+        messages = [f.message for f in msi_review.drift(static, live)]
+        self.assertTrue(any("stdata/invoices" in m for m in messages), messages)
+
+    def test_every_service_role_has_a_verified_id(self) -> None:
+        names = set(msi_review.ROLE_IDS.values())
+        missing = sorted({r for _, roles, _ in msi_review.SERVICES.values() for r in roles if r != "*" and r not in names})
+        self.assertEqual(missing, [])
 
     def test_every_rule_has_a_positive_fixture(self) -> None:
         seen: set[str] = set()
