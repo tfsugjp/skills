@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Personal plugins for Azure DevOps, GitHub, .NET package maintenance, and Relaypublisher workflows (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
+Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, and Windows shell-safe command execution workflows (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
 
 ## Plugins
 
@@ -65,6 +65,23 @@ Use `repository-init` only with an explicit `$repository-init` request. It initi
 
 The Codex local marketplace is intended for development and team distribution. Public Codex listing submission is a separate release step after the plugins pass validation.
 
+## Windows Shell Safety
+
+`windows-shell-safety` is for agents (and people) running Azure CLI and other native commands on Windows. `az` is the batch file `az.cmd`, so its arguments are parsed by PowerShell and then by `cmd.exe`: unquoted `|`, `&`, `<`, `>`, `^` are consumed, `%VAR%` is expanded, and double quotes inside inline JSON are stripped. Retrying with different escaping wastes time; the skill prescribes one safe path instead.
+
+- Rules: use `pwsh` only, run scripts with `pwsh -File` instead of `-Command` strings, pass JSON through a UTF-8 file as `'@<file>'`, filter `az` output with `ConvertFrom-Json` (or load `--query` from `'@<file>'`), and set UTF-8 console encoding before parsing native output.
+- Lint before running: `Test-NativeCommand.ps1` reports rules WSS001-WSS009 (for example `cmd.exe`, nested `-Command`, `cmd` metacharacters or inline JSON passed to `az`, unquoted `@file`) with the reason and the safe rewrite, and exits with 1 when it finds anything.
+- Helper: dot-source `Invoke-NativeJson.ps1` for `Invoke-AzJson` / `Invoke-NativeJson` (UTF-8 body file, parsed JSON output, `-Raw` for text output, refusal of arguments `cmd.exe` would rewrite) and `-EchoArgs` / `Show-NativeArgs` to see the argv a `.cmd` target actually receives.
+
+```powershell
+$skill = 'plugins/windows-shell-safety/skills/windows-shell-safety'
+pwsh -NoProfile -File "$skill/scripts/Test-NativeCommand.ps1" -Command 'az version --query "keys(@)|[0]" -o tsv'
+. "$skill/scripts/Invoke-NativeJson.ps1"
+(Invoke-AzJson -Arguments 'version').'azure-cli'
+```
+
+The skill is advisory: it ships no hook, so lint findings never block a tool call on their own.
+
 ## Project Documentation
 
 The [project-documentation skill](.github/skills/project-documentation/SKILL.md) creates English project records organized under `docs/adr/`, `docs/architecture/`, `docs/infra/`, `docs/test/e2e/`, and `docs/setup/`. It requires explicit approval before changing existing records, retains reasons and history for in-place decision updates, and records architecture rationale URLs and actual E2E evidence.
@@ -100,7 +117,7 @@ python scripts/validate_marketplaces.py
 python -m unittest discover -s plugins/github-plan-wiki/skills/github-wiki-plan/tests -p 'test_*.py'
 ```
 
-The validators check JSON syntax, matching plugin names and versions, skill frontmatter, source paths, relative links, plugin-root boundaries, and flattened GitHub Wiki template routes. The same checks run in GitHub Actions for pushes to `main` and pull requests.
+The validators check JSON syntax, matching plugin names and versions, skill frontmatter, source paths, relative links, plugin-root boundaries, and flattened GitHub Wiki template routes. The same checks run in GitHub Actions for pushes to `main` and pull requests. The `tests` job also runs every plugin's `tests/test_*.py` (the `windows-shell-safety` tests need `pwsh`), and the `windows-shell-safety` job on `windows-latest` reproduces the `cmd.exe` argument loss and verifies the safe patterns.
 
 When editing a plugin during local Codex development, refresh the local installation after changing the manifest and start a new conversation to pick up the updated skills.
 
