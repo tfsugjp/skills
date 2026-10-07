@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "rgName": { "type": "string", "defaultValue": "rg-sub" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(subscription().id, 'id-sub', 'contributor')]",
+      "properties": {
+        "principalId": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('rgName')), 'Microsoft.ManagedIdentity/userAssignedIdentities', 'id-sub'), '2023-01-31').principalId]",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "apps",
+      "resourceGroup": "[parameters('rgName')]",
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": { "scope": "inner" },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "resources": [
+            { "type": "Microsoft.ManagedIdentity/userAssignedIdentities", "apiVersion": "2023-01-31", "name": "id-sub", "location": "japaneast" },
+            { "type": "Microsoft.ManagedIdentity/userAssignedIdentities", "apiVersion": "2023-01-31", "name": "id-other", "location": "japaneast" },
+            {
+              "type": "Microsoft.Web/sites", "apiVersion": "2023-12-01", "name": "app-one", "location": "japaneast",
+              "identity": { "type": "UserAssigned", "userAssignedIdentities": { "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'id-sub')]": {} } },
+              "properties": {}
+            },
+            {
+              "type": "Microsoft.Web/sites", "apiVersion": "2023-12-01", "name": "app-two", "location": "japaneast",
+              "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                  "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sub/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-sub": {},
+                  "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'id-other')]": {}
+                }
+              },
+              "properties": {
+                "siteConfig": {
+                  "appSettings": [
+                    { "name": "Q__queueServiceUri", "value": "https://stq001.queue.core.windows.net" },
+                    { "name": "Q__credential", "value": "managedidentity" },
+                    { "name": "Q__clientId", "value": "11111111-2222-3333-4444-555555555555" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

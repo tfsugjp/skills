@@ -96,6 +96,15 @@
       "license": "MIT",
       "keywords": ["windows", "powershell", "azure-cli", "json", "quoting"],
       "category": "Developer Tools"
+    },
+    {
+      "name": "azure-managed-identity-review",
+      "description": "Review Azure managed identities across every resource and federated credential that shares them: find missing grants for each consumer's audience and grants leaked to other consumers, from Bicep, Terraform, and the live subscription.",
+      "version": "0.1.0",
+      "source": "./plugins/azure-managed-identity-review",
+      "license": "MIT",
+      "keywords": ["azure", "managed-identity", "rbac", "bicep", "terraform", "security"],
+      "category": "Developer Tools"
     }
   ]
 }

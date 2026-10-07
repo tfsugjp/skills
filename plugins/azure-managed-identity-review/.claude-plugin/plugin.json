@@ -1,0 +1,11 @@
+{
+  "name": "azure-managed-identity-review",
+  "version": "0.1.0",
+  "description": "Review Azure managed identities across every resource and federated credential that shares them: find missing grants for each consumer's audience and grants leaked to other consumers, from Bicep, Terraform, and the live subscription.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["azure", "managed-identity", "rbac", "bicep", "terraform", "security"],
+  "skills": "./skills/"
+}

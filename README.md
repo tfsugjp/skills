@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, and Windows shell-safe command execution workflows (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
+Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, Windows shell-safe command execution, and Azure managed identity review workflows (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
 
 ## Plugins
 
@@ -12,6 +12,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublis
 | `github-plan-wiki` | Skills: GitHub Plan Issues (parent + sub-issue hierarchy via `gh`), GitHub Wiki Plan (bilingual GitHub wiki publishing and Home index maintenance) |
 | `relaypublisher-manifest` | Relaypublisher manifest creation, updates, and static validation for v1.1.0, including Windows Win32 script/file-system detection and multi-bundle macOS PKG/LOB detection |
 | `repository-init` | Explicit repository initialization for license, security, language rules, and `AGENTS.md` guidance |
+| `azure-managed-identity-review` | Read-only review of Azure managed identities: finds every resource, app setting, code path, and federated credential that shares an identity, and reports missing grants for each consumer's audience, grants leaked to other consumers, identity selection mistakes, and IaC drift (`msi_review.py`, rules MIR000-MIR008) |
 | `windows-shell-safety` | Windows-safe Azure CLI, JSON, and pipe execution: rules against `cmd.exe` argument loss, a pre-execution lint (`Test-NativeCommand.ps1`), and a PowerShell 7 helper that sends JSON through UTF-8 `@<file>` |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
@@ -29,6 +30,7 @@ claude plugin install github-plan-wiki@tfsugjp-agent-skills
 claude plugin install relaypublisher-manifest@tfsugjp-agent-skills
 claude plugin install repository-init@tfsugjp-agent-skills
 claude plugin install windows-shell-safety@tfsugjp-agent-skills
+claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
 ```
 
 ## Install from the GitHub Copilot marketplace
@@ -44,6 +46,7 @@ copilot plugin install github-plan-wiki@tfsugjp-agent-skills
 copilot plugin install relaypublisher-manifest@tfsugjp-agent-skills
 copilot plugin install repository-init@tfsugjp-agent-skills
 copilot plugin install windows-shell-safety@tfsugjp-agent-skills
+copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
 ```
 
 ## Install from the Codex repository-local marketplace
@@ -59,6 +62,7 @@ codex plugin add github-plan-wiki@tfsugjp-agent-skills
 codex plugin add relaypublisher-manifest@tfsugjp-agent-skills
 codex plugin add repository-init@tfsugjp-agent-skills
 codex plugin add windows-shell-safety@tfsugjp-agent-skills
+codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 ```
 
 Use `repository-init` only with an explicit `$repository-init` request. It initializes missing governance files in a new or existing repository, records the resolved license and language profile in `.repository-init.json`, and leaves a completed repository unchanged on later invocations. It does not initialize Git, create remotes, create issues or work items, publish Wiki pages, commit, or push.
@@ -81,6 +85,25 @@ pwsh -NoProfile -File "$skill/scripts/Test-NativeCommand.ps1" -Command 'az versi
 ```
 
 The skill is advisory: it ships no hook, so lint findings never block a tool call on their own.
+
+## Azure Managed Identity Review
+
+`azure-managed-identity-review` is for changes that give a resource a managed identity. A user-assigned identity created for one resource (for example a storage account's customer-managed key) is often reused by others (a Function App, a GitHub Actions workflow through a federated credential). Grants made for the first purpose then miss the other consumers' audiences (Service Bus, SQL, Cosmos DB data plane, custom APIs), or leak to consumers that should not have them. Local E2E runs as the developer, so missing grants only appear after deployment.
+
+- `msi_review.py static` reads Bicep (compiled with the Bicep CLI), ARM JSON, Terraform (`*.tf` or `terraform show -json`), app settings, and source code; `--resource <name>` reviews the identities that resource uses and every other consumer of them.
+- `msi_review.py live` reads the subscription with read-only `az` calls (Resource Graph, role assignments, federated credentials, masked app settings); with `--static` it also reports drift from IaC.
+- The report shows, per identity, its consumers and what each uses it for, its grants and which consumer needs each one, and its federated credentials, followed by findings MIR000-MIR008 with fixes. The skill never creates role assignments or credentials.
+
+```bash
+python3 plugins/azure-managed-identity-review/skills/azure-managed-identity-review/scripts/msi_review.py static plugins/azure-managed-identity-review/skills/azure-managed-identity-review/tests/fixtures/terraform-canonical --resource stshared001
+```
+
+```powershell
+$skill = 'plugins/azure-managed-identity-review/skills/azure-managed-identity-review'
+python3 "$skill/scripts/msi_review.py" static "$skill/tests/fixtures/terraform-canonical" --resource stshared001
+```
+
+On Windows, run the same script with `python`.
 
 ## Project Documentation
 

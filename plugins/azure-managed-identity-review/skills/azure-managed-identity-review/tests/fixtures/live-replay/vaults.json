@@ -1,0 +1,1 @@
+{"totalRecords": 1, "count": 1, "data": [{"id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders/providers/Microsoft.KeyVault/vaults/kv-shared-001", "name": "kv-shared-001", "resourceGroup": "rg-orders", "rbac": true, "accessPolicies": []}]}

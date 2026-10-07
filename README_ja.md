@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行のワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
+Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行、Azure マネージド ID レビューのワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
 
 ## Plugin
 
@@ -12,6 +12,7 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `github-plan-wiki` | スキル: GitHub Plan Issues（親 issue と sub-issue の階層）、GitHub Wiki Plan（英日 Wiki plan と Home index の管理） |
 | `relaypublisher-manifest` | Relaypublisher manifest (v1.1.0) の作成・更新・静的検証。Windows Win32 の script/file-system detection と、複数 bundle を含む macOS PKG/LOB の detection に対応 |
 | `repository-init` | ライセンス、セキュリティ、言語方針、`AGENTS.md` をリポジトリ作成時に一度だけ初期化 |
+| `azure-managed-identity-review` | Azure のマネージド ID を読み取り専用でレビューします。同じ ID を共有するリソース・アプリ設定・コード・フェデレーション資格情報（FIC）をすべて洗い出し、各利用者の audience に対する権限漏れ、他の利用者への権限の漏洩、ID 選択の誤り、IaC とのドリフトを報告します（`msi_review.py`、規則 MIR000-MIR008） |
 | `windows-shell-safety` | Windows で Azure CLI・JSON・パイプを安全に実行するための規則、`cmd.exe` による引数欠落を実行前に検出する lint（`Test-NativeCommand.ps1`）、JSON を UTF-8 の `@<file>` で渡す PowerShell 7 ヘルパー |
 
 すべて MIT License で配布します。認証情報は含めず、MCP server も自動構成しません。Azure DevOps の認証と権限は利用者が設定してください。
@@ -27,6 +28,7 @@ claude plugin install github-plan-wiki@tfsugjp-agent-skills
 claude plugin install relaypublisher-manifest@tfsugjp-agent-skills
 claude plugin install repository-init@tfsugjp-agent-skills
 claude plugin install windows-shell-safety@tfsugjp-agent-skills
+claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
 ```
 
 ## GitHub Copilot からインストール
@@ -42,6 +44,7 @@ copilot plugin install github-plan-wiki@tfsugjp-agent-skills
 copilot plugin install relaypublisher-manifest@tfsugjp-agent-skills
 copilot plugin install repository-init@tfsugjp-agent-skills
 copilot plugin install windows-shell-safety@tfsugjp-agent-skills
+copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
 ```
 
 ## Codex の repository-local marketplace からインストール
@@ -57,6 +60,7 @@ codex plugin add github-plan-wiki@tfsugjp-agent-skills
 codex plugin add relaypublisher-manifest@tfsugjp-agent-skills
 codex plugin add repository-init@tfsugjp-agent-skills
 codex plugin add windows-shell-safety@tfsugjp-agent-skills
+codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 ```
 
 Codex の local marketplace は開発・チーム配布用です。公開 listing への申請は、検証完了後の別リリース作業とします。
@@ -79,6 +83,25 @@ pwsh -NoProfile -File "$skill/scripts/Test-NativeCommand.ps1" -Command 'az versi
 ```
 
 このスキルは助言用です。フックを同梱しないため、lint の指摘だけでツール呼び出しが止まることはありません。
+
+## Azure Managed Identity Review
+
+`azure-managed-identity-review` は、リソースにマネージド ID を設定する変更のためのプラグインです。あるリソース用に作ったユーザー割り当て ID（たとえばストレージのカスタマーマネージドキー用）は、ほかのリソース（Function App や、フェデレーション資格情報経由の GitHub Actions など）でも使い回されがちです。最初の用途で付けた権限は、ほかの利用者が使う audience（Service Bus、SQL、Cosmos DB データプレーン、独自 API）をカバーせず、逆に不要な利用者にまで権限が漏れます。ローカル E2E は開発者本人の権限で動くため、権限漏れはデプロイ後まで分かりません。
+
+- `msi_review.py static` は Bicep（Bicep CLI でコンパイル）、ARM JSON、Terraform（`*.tf` または `terraform show -json`）、アプリ設定、ソースコードを読み取ります。`--resource <name>` を指定すると、そのリソースが使う ID と、その ID を使うほかのすべての利用者をレビューします。
+- `msi_review.py live` は読み取り専用の `az` 呼び出し（Resource Graph、ロール割り当て、フェデレーション資格情報、マスクしたアプリ設定）でサブスクリプションを読み取ります。`--static` を付けると IaC とのドリフトも報告します。
+- レポートには ID ごとに、利用者とその用途、権限とそれを必要とする利用者、フェデレーション資格情報を示し、続けて修正方法つきの指摘 MIR000-MIR008 を出力します。ロール割り当てや資格情報を作成することはありません。
+
+```bash
+python3 plugins/azure-managed-identity-review/skills/azure-managed-identity-review/scripts/msi_review.py static plugins/azure-managed-identity-review/skills/azure-managed-identity-review/tests/fixtures/terraform-canonical --resource stshared001
+```
+
+```powershell
+$skill = 'plugins/azure-managed-identity-review/skills/azure-managed-identity-review'
+python3 "$skill/scripts/msi_review.py" static "$skill/tests/fixtures/terraform-canonical" --resource stshared001
+```
+
+Windows では同じスクリプトを `python` で実行します。
 
 ## プロジェクト文書管理
 

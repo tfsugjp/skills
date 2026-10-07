@@ -1,0 +1,24 @@
+{
+  "name": "azure-managed-identity-review",
+  "version": "0.1.0",
+  "description": "Review Azure managed identities across every resource and federated credential that shares them: find missing grants for each consumer's audience and grants leaked to other consumers, from Bicep, Terraform, and the live subscription.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["azure", "managed-identity", "rbac", "bicep", "terraform", "security"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Azure Managed Identity Review",
+    "shortDescription": "Find who else uses a managed identity and what each one needs",
+    "longDescription": "A read-only review that builds a consumer x target x grant matrix for Azure managed identities from Bicep, ARM, Terraform, app settings, code, and the live subscription. It reports missing grants that local E2E cannot reveal, grants and federated credentials shared beyond their purpose, identity selection mistakes, non-RBAC grants to check by hand, and drift between Azure and IaC.",
+    "developerName": "Team Foundation Users Japan",
+    "category": "Developer Tools",
+    "capabilities": ["Read"],
+    "defaultPrompt": [
+      "I'm giving this storage account a managed identity. Who else uses that identity, and are all their permissions covered?",
+      "Review the managed identities in this Bicep before I deploy.",
+      "My Function App gets 403 only after deployment. Check its managed identity grants."
+    ]
+  }
+}
