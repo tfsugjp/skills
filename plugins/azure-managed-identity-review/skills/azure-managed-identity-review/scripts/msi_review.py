@@ -1951,7 +1951,7 @@ class AzRunner:
         if mask:
             data = mask(data)
         if self.record:
-            name = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12] + ".json"
+            name = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16] + ".json"
             (self.record / name).write_text(json.dumps(data, indent=2), encoding="utf-8")
             self.index[key] = name
             (self.record / "index.json").write_text(json.dumps(self.index, indent=2, sort_keys=True), encoding="utf-8")
