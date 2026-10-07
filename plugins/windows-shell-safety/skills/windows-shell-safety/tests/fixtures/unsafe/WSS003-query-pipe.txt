@@ -1,0 +1,1 @@
+az version --query "keys(@)|[0]" -o tsv

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Windows Shell Safety"
+  short_description: "Windows-safe az, JSON, and pipe execution"
+  default_prompt: "Use $windows-shell-safety to lint and rewrite this Windows command so pipes, quotes, and JSON survive cmd.exe."

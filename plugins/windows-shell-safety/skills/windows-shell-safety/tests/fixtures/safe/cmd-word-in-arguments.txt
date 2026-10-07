@@ -1,0 +1,2 @@
+az vm run-command invoke --command-id RunPowerShellScript --name cmdvm -g rg
+Get-ChildItem cmd-scripts

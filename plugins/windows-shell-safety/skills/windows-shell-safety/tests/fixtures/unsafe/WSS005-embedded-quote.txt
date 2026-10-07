@@ -1,0 +1,1 @@
+az resource update --ids $id --set 'properties.note=say "hi"'

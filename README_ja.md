@@ -12,6 +12,7 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `github-plan-wiki` | スキル: GitHub Plan Issues（親 issue と sub-issue の階層）、GitHub Wiki Plan（英日 Wiki plan と Home index の管理） |
 | `relaypublisher-manifest` | Relaypublisher manifest (v1.1.0) の作成・更新・静的検証。Windows Win32 の script/file-system detection と、複数 bundle を含む macOS PKG/LOB の detection に対応 |
 | `repository-init` | ライセンス、セキュリティ、言語方針、`AGENTS.md` をリポジトリ作成時に一度だけ初期化 |
+| `windows-shell-safety` | Windows で Azure CLI・JSON・パイプを安全に実行するための規則、`cmd.exe` による引数欠落を実行前に検出する lint（`Test-NativeCommand.ps1`）、JSON を UTF-8 の `@<file>` で渡す PowerShell 7 ヘルパー |
 
 すべて MIT License で配布します。認証情報は含めず、MCP server も自動構成しません。Azure DevOps の認証と権限は利用者が設定してください。
 
@@ -25,6 +26,7 @@ claude plugin install dependabot-safe-merge@tfsugjp-agent-skills
 claude plugin install github-plan-wiki@tfsugjp-agent-skills
 claude plugin install relaypublisher-manifest@tfsugjp-agent-skills
 claude plugin install repository-init@tfsugjp-agent-skills
+claude plugin install windows-shell-safety@tfsugjp-agent-skills
 ```
 
 ## GitHub Copilot からインストール
@@ -39,6 +41,7 @@ copilot plugin install dependabot-safe-merge@tfsugjp-agent-skills
 copilot plugin install github-plan-wiki@tfsugjp-agent-skills
 copilot plugin install relaypublisher-manifest@tfsugjp-agent-skills
 copilot plugin install repository-init@tfsugjp-agent-skills
+copilot plugin install windows-shell-safety@tfsugjp-agent-skills
 ```
 
 ## Codex の repository-local marketplace からインストール
@@ -53,6 +56,7 @@ codex plugin add dependabot-safe-merge@tfsugjp-agent-skills
 codex plugin add github-plan-wiki@tfsugjp-agent-skills
 codex plugin add relaypublisher-manifest@tfsugjp-agent-skills
 codex plugin add repository-init@tfsugjp-agent-skills
+codex plugin add windows-shell-safety@tfsugjp-agent-skills
 ```
 
 Codex の local marketplace は開発・チーム配布用です。公開 listing への申請は、検証完了後の別リリース作業とします。

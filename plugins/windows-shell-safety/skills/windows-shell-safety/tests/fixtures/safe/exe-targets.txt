@@ -1,0 +1,2 @@
+gh api repos/o/r/issues --jq ".[] | .title"
+git log --format="%H|%s" -5

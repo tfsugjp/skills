@@ -1,0 +1,1 @@
+pwsh -NoProfile -Command "az group list -o json | ConvertFrom-Json | Select-Object name"

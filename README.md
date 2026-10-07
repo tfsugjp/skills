@@ -12,6 +12,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, and Relaypu
 | `github-plan-wiki` | Skills: GitHub Plan Issues (parent + sub-issue hierarchy via `gh`), GitHub Wiki Plan (bilingual GitHub wiki publishing and Home index maintenance) |
 | `relaypublisher-manifest` | Relaypublisher manifest creation, updates, and static validation for v1.1.0, including Windows Win32 script/file-system detection and multi-bundle macOS PKG/LOB detection |
 | `repository-init` | Explicit repository initialization for license, security, language rules, and `AGENTS.md` guidance |
+| `windows-shell-safety` | Windows-safe Azure CLI, JSON, and pipe execution: rules against `cmd.exe` argument loss, a pre-execution lint (`Test-NativeCommand.ps1`), and a PowerShell 7 helper that sends JSON through UTF-8 `@<file>` |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 
@@ -27,6 +28,7 @@ claude plugin install dependabot-safe-merge@tfsugjp-agent-skills
 claude plugin install github-plan-wiki@tfsugjp-agent-skills
 claude plugin install relaypublisher-manifest@tfsugjp-agent-skills
 claude plugin install repository-init@tfsugjp-agent-skills
+claude plugin install windows-shell-safety@tfsugjp-agent-skills
 ```
 
 ## Install from the GitHub Copilot marketplace
@@ -41,6 +43,7 @@ copilot plugin install dependabot-safe-merge@tfsugjp-agent-skills
 copilot plugin install github-plan-wiki@tfsugjp-agent-skills
 copilot plugin install relaypublisher-manifest@tfsugjp-agent-skills
 copilot plugin install repository-init@tfsugjp-agent-skills
+copilot plugin install windows-shell-safety@tfsugjp-agent-skills
 ```
 
 ## Install from the Codex repository-local marketplace
@@ -55,6 +58,7 @@ codex plugin add dependabot-safe-merge@tfsugjp-agent-skills
 codex plugin add github-plan-wiki@tfsugjp-agent-skills
 codex plugin add relaypublisher-manifest@tfsugjp-agent-skills
 codex plugin add repository-init@tfsugjp-agent-skills
+codex plugin add windows-shell-safety@tfsugjp-agent-skills
 ```
 
 Use `repository-init` only with an explicit `$repository-init` request. It initializes missing governance files in a new or existing repository, records the resolved license and language profile in `.repository-init.json`, and leaves a completed repository unchanged on later invocations. It does not initialize Git, create remotes, create issues or work items, publish Wiki pages, commit, or push.

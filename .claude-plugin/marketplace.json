@@ -87,6 +87,15 @@
       "license": "MIT",
       "keywords": ["repository", "initialization", "agents", "policy"],
       "category": "Developer Tools"
+    },
+    {
+      "name": "windows-shell-safety",
+      "description": "Run Azure CLI and other native commands on Windows without losing pipes, quotes, JSON, or special characters to cmd.exe, with a pre-execution lint.",
+      "version": "0.1.0",
+      "source": "./plugins/windows-shell-safety",
+      "license": "MIT",
+      "keywords": ["windows", "powershell", "azure-cli", "json", "quoting"],
+      "category": "Developer Tools"
     }
   ]
 }

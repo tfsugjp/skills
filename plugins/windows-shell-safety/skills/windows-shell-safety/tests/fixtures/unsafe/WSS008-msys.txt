@@ -1,0 +1,1 @@
+MSYS_NO_PATHCONV=1 az repos show --repository /project/repo

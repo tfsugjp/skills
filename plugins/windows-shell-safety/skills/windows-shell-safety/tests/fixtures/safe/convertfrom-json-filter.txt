@@ -1,0 +1,4 @@
+[Console]::OutputEncoding = $OutputEncoding = [Text.UTF8Encoding]::new($false)
+$env:PYTHONIOENCODING = 'utf-8'
+$groups = az group list -o json | ConvertFrom-Json
+$groups | Where-Object location -eq 'japaneast' | Select-Object -First 1 -ExpandProperty name

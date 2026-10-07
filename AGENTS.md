@@ -22,3 +22,4 @@
 | [nuget-validate](plugins/nuget-validate/skills/nuget-validate/SKILL.md) | Validate NuGet package versions for vulnerabilities, deprecation, freshness, and listing status before package changes. |
 | [relaypublisher-manifest](plugins/relaypublisher-manifest/skills/relaypublisher-manifest/SKILL.md) | Create, update, and statically validate Relaypublisher manifests, including Windows Win32 and multi-bundle macOS PKG/LOB primary detection. |
 | [repository-init](plugins/repository-init/skills/repository-init/SKILL.md) | Initialize repository policy files once, only when explicitly invoked. Preserve existing project rules and resume saved decisions. |
+| [windows-shell-safety](plugins/windows-shell-safety/skills/windows-shell-safety/SKILL.md) | Run Azure CLI (az), gh, npm, and other native commands on Windows without losing pipes, quotes, JSON, or special characters to cmd.exe, nested -Command strings, or console encoding; lint commands before running them. |

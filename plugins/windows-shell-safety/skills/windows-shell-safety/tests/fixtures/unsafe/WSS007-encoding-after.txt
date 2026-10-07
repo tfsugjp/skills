@@ -1,0 +1,2 @@
+$groups = az group list -o json | ConvertFrom-Json
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)

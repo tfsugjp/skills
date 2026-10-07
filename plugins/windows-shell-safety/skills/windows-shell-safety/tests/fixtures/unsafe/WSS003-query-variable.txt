@@ -1,0 +1,2 @@
+$query = "[?location=='japaneast']|[0].name"
+az group list --query $query -o tsv

@@ -1,0 +1,11 @@
+{
+  "name": "windows-shell-safety",
+  "version": "0.1.0",
+  "description": "Run Azure CLI and other native commands on Windows without losing pipes, quotes, JSON, or special characters to cmd.exe, with a pre-execution lint.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["windows", "powershell", "azure-cli", "json", "quoting"],
+  "skills": "./skills/"
+}

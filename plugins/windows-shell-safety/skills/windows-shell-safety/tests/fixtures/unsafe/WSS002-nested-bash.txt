@@ -1,0 +1,1 @@
+bash -c 'pwsh -c "Get-ChildItem | Select-Object Name"'

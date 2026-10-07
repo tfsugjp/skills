@@ -1,0 +1,4 @@
+[Console]::OutputEncoding = $OutputEncoding = [Text.UTF8Encoding]::new($false)
+foreach ($name in $names) {
+    $group = az group show -n $name -o json | ConvertFrom-Json
+}

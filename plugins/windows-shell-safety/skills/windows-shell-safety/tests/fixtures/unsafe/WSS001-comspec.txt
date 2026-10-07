@@ -1,0 +1,1 @@
+& $env:COMSPEC /c az account show
