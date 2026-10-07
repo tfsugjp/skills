@@ -1,0 +1,45 @@
+{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {"address": "azurerm_user_assigned_identity.shared", "mode": "managed", "type": "azurerm_user_assigned_identity", "name": "shared",
+         "values": {"name": "id-shared", "location": "japaneast", "resource_group_name": "rg-orders"}},
+        {"address": "azurerm_linux_function_app.orders", "mode": "managed", "type": "azurerm_linux_function_app", "name": "orders",
+         "values": {"name": "func-orders", "app_settings": {
+           "ServiceBusConnection__fullyQualifiedNamespace": "sb-orders.servicebus.windows.net",
+           "ServiceBusConnection__credential": "managedidentity"}}},
+        {"address": "azurerm_linux_web_app.admin", "mode": "managed", "type": "azurerm_linux_web_app", "name": "admin",
+         "values": {"name": "app-admin"}}
+      ]
+    }
+  },
+  "resource_changes": [
+    {"address": "azurerm_linux_function_app.orders", "change": {"actions": ["create"], "after_unknown": {"app_settings": {"ServiceBusConnection__clientId": true}}}}
+  ],
+  "configuration": {
+    "root_module": {
+      "resources": [
+        {"address": "azurerm_user_assigned_identity.shared", "mode": "managed", "type": "azurerm_user_assigned_identity", "name": "shared",
+         "expressions": {"name": {"constant_value": "id-shared"}, "location": {"constant_value": "japaneast"}}},
+        {"address": "azurerm_linux_function_app.orders", "mode": "managed", "type": "azurerm_linux_function_app", "name": "orders",
+         "expressions": {
+           "name": {"constant_value": "func-orders"},
+           "identity": [{"type": {"constant_value": "UserAssigned"},
+                         "identity_ids": {"references": ["azurerm_user_assigned_identity.shared.id", "azurerm_user_assigned_identity.shared"]}}],
+           "app_settings": {"references": ["azurerm_user_assigned_identity.shared.client_id", "azurerm_user_assigned_identity.shared"]},
+           "site_config": [{}]}},
+        {"address": "azurerm_linux_web_app.admin", "mode": "managed", "type": "azurerm_linux_web_app", "name": "admin",
+         "expressions": {
+           "name": {"constant_value": "app-admin"},
+           "identity": [{"type": {"constant_value": "UserAssigned"},
+                         "identity_ids": {"references": ["azurerm_user_assigned_identity.shared.id", "azurerm_user_assigned_identity.shared"]}}]}},
+        {"address": "azurerm_role_assignment.admin_reader", "mode": "managed", "type": "azurerm_role_assignment", "name": "admin_reader",
+         "expressions": {
+           "scope": {"references": ["data.azurerm_subscription.current.id", "data.azurerm_subscription.current"]},
+           "role_definition_name": {"constant_value": "Reader"},
+           "principal_id": {"references": ["azurerm_user_assigned_identity.shared.principal_id", "azurerm_user_assigned_identity.shared"]}}}
+      ]
+    }
+  }
+}

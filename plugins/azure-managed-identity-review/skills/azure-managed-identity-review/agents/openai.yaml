@@ -1,0 +1,4 @@
+interface:
+  display_name: "Azure Managed Identity Review"
+  short_description: "Find who else uses a managed identity and what each one needs"
+  default_prompt: "Use $azure-managed-identity-review to review every consumer of the managed identities this change touches, and report missing or leaked grants."
