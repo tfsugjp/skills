@@ -328,16 +328,16 @@ If az emits an encoding warning, preserve the original title and body, read the 
 
 The following patterns are for Linux/macOS shells only. They must not be copied into a Windows MSYS2 or Git Bash session. They need `curl`, `jq`, and `python3`.
 
-`ADO_WORK_ITEM_BODY_FILE` is the UTF-8 Markdown source. `ADO_WORK_ITEM_HTML_FILE` is an HTML rendering of it made with a Markdown renderer and is used only by the HTML fallback; re-render it whenever the Markdown source changes. Define the helpers once per shell:
+`ADO_WORK_ITEM_BODY_FILE` is the UTF-8 Markdown source. `ADO_MARKDOWN_TO_HTML` is a Markdown renderer command that reads Markdown on standard input and writes HTML to standard output (for example `pandoc -f gfm -t html`); the HTML fallback runs it on the current source every time, so the HTML never lags behind the source. Define the helpers once per shell:
 
     base_uri="$ADO_ORG_URL/$ADO_PROJECT/_apis/wit"
     body_file="$ADO_WORK_ITEM_BODY_FILE"
-    html_file="$ADO_WORK_ITEM_HTML_FILE"
     type_enc=$(jq -rn --arg t "$ADO_WORK_ITEM_TYPE" '$t | @uri')
     field=System.Description
     [ "$ADO_WORK_ITEM_TYPE" = Bug ] && field=Microsoft.VSTS.TCM.ReproSteps
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "$tmp_dir"' EXIT
+    html_file="$tmp_dir/body.html"
 
     check_bug_sections() {
       python3 - "$body_file" <<'PY'
@@ -443,6 +443,11 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
     PY
     }
 
+    render_html() { # renders the current Markdown source into $html_file for the HTML fallback
+      sh -c "$ADO_MARKDOWN_TO_HTML" <"$body_file" >"$html_file" || return 1
+      check_html "$html_file" "$html_file" "$body_file"
+    }
+
     send_patch() { # $1: method, $2: URI, $3: patch file; prints the HTTP status
       curl -sS -o "$tmp_dir/response.json" -w '%{http_code}' -X "$1" \
         -H "Authorization: Bearer $ADO_TOKEN" \
@@ -475,7 +480,7 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
       if [ "$status" = 400 ]; then
         # The server rejected the format operation and wrote nothing; resend with HTML.
         sent_markdown=0
-        check_html "$html_file" "$html_file" "$body_file" || return 1
+        render_html || return 1
         jq -n --argjson title "$title_ops" --argjson extra "$extra" --arg field "$field" --rawfile html "$html_file" \
           '$title + [{"op":"add","path":("/fields/" + $field),"value":$html}] + $extra' >"$tmp_dir/patch.json"
         status=$(send_patch "$method" "$uri" "$tmp_dir/patch.json")
@@ -501,7 +506,7 @@ The following patterns are for Linux/macOS shells only. They must not be copied 
       else
         if [ "$sent_markdown" = 1 ]; then
           # The field stayed HTML: never leave raw Markdown in it.
-          check_html "$html_file" "$html_file" "$body_file" || return 1
+          render_html || return 1
           jq -n --arg field "$field" --rawfile html "$html_file" \
             '[{"op":"add","path":("/fields/" + $field),"value":$html}]' >"$tmp_dir/patch.json"
           [ "$(send_patch PATCH "$base_uri/workitems/$id?api-version=7.1" "$tmp_dir/patch.json")" = 200 ] ||
@@ -521,7 +526,7 @@ Create a work item, or rewrite the body of an existing one:
     id=$(write_body "") || exit 1
     write_body "$ADO_WORK_ITEM_ID" >/dev/null || exit 1
 
-Wiki back-link. The function rewrites the `## Wiki` section in the Markdown source (taking the stored body when it is already Markdown), adds the `Hyperlink` relation only when it is missing, and verifies both. When the field is still HTML, re-render `$html_file` from the updated source before the fallback needs it:
+Wiki back-link. The function rewrites the `## Wiki` section in the Markdown source (taking the stored body when it is already Markdown), adds the `Hyperlink` relation only when it is missing, and verifies both. When the field is still HTML, the fallback in `write_body` renders the updated source:
 
     add_wiki_back_link() { # $1: work item ID, $2: page path, $3: page remoteUrl
       read_back "$1" || return 1
