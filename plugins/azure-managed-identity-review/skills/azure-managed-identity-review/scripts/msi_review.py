@@ -433,8 +433,8 @@ class ArmExpr:
         if kind == "num":
             return ("lit", value)
         if kind == "id":
-            if value in ("true", "false", "null"):
-                return ("lit", value)
+            if value in ("true", "false", "null") and (not self.peek() or self.peek()[1] != "("):
+                return ("lit", {"true": True, "false": False, "null": None}[value])
             args: List[Any] = []
             self.take("(")
             if self.peek() and self.peek()[1] != ")":
@@ -492,7 +492,23 @@ class ArmContext:
             if isinstance(base, (dict, list, PropRef)):
                 return self.member(base, str(index))
             return Unknown("index")
-        name, args = node[1], [self.eval(arg) for arg in node[2]]
+        name = node[1]
+        if name == "if" and len(node[2]) == 3:
+            condition = self.eval(node[2][0])
+            if not isinstance(condition, bool):
+                return Unknown("if")
+            return self.eval(node[2][1] if condition else node[2][2])
+        args = [self.eval(arg) for arg in node[2]]
+        if name in ("true", "false") and not args:
+            return name == "true"
+        if name == "bool" and len(args) == 1:
+            if isinstance(args[0], bool):
+                return args[0]
+            if isinstance(args[0], str) and args[0].lower() in ("true", "false"):
+                return args[0].lower() == "true"
+            if isinstance(args[0], int):
+                return args[0] != 0
+            return Unknown("bool")
         if name == "parameters":
             key = str(args[0])
             return self.params.get(key, Unknown(f"param:{key}"))
@@ -549,8 +565,6 @@ class ArmContext:
             return Unknown("reference")
         if name == "resourceinfo" and args and isinstance(args[0], str) and args[0] in self.symbols:
             return self.symbols[args[0]]
-        if name == "if" and len(args) == 3:
-            return args[1] if not isinstance(args[1], Unknown) else args[2]
         return Unknown(name)
 
     def member(self, base: Any, name: str) -> Any:
@@ -1051,7 +1065,7 @@ class HclParser:
                 if depth == 0:
                     break
                 depth -= 1
-            elif ch == "\n" and depth == 0:
+            elif ch in "\n," and depth == 0:
                 break
             self.pos += 1
         return self.text[start:self.pos]
@@ -1635,13 +1649,15 @@ def derive_targets(model: Model) -> None:
             continue
         if evidence.resource and evidence.resource in model.resources:
             resource = model.resources[evidence.resource]
-            key = (resource.key, evidence.service)
+            ident, how = default_identity(resource, model)
+            endpoint = evidence.detail if evidence.kind == "endpoint" else None
+            target_name = target_name_from_endpoint(endpoint) if endpoint else None
+            key = (resource.key, evidence.service, ident, target_name, endpoint)
             if key in attributed:
                 continue
             attributed.add(key)
-            ident, how = default_identity(resource, model)
-            targets.append(Target(resource.key, evidence.service, None if evidence.kind != "endpoint" else target_name_from_endpoint(evidence.detail),
-                                  ident, f"code {evidence.file}:{evidence.line} ({how})", False))
+            targets.append(Target(resource.key, evidence.service, target_name,
+                                  ident, f"code {evidence.file}:{evidence.line} ({how})", False, endpoint))
     for target in targets:
         # Event Hubs and Service Bus namespaces share the *.servicebus.* host; the resource type decides.
         rtype = model.resource_types.get((target.target_name or "").lower(), "")
@@ -1673,6 +1689,10 @@ def grant_covers(grant: Grant, target: Target, model: Model) -> bool:
             return False
     elif grant.plane == "kv-access-policy":
         if target.service != "keyvault":
+            return False
+        vault = grant.scope_name or target.target_name
+        if vault and next((enabled for name, enabled in model.vault_rbac.items()
+                           if name.lower() == vault.lower()), False):
             return False
     elif target.service in SERVICES and SERVICES[target.service][2]:
         return False
@@ -1750,7 +1770,8 @@ def run_rules(model: Model) -> List[Finding]:
                                         f"({', '.join(model.resources[target.resource].user_identities) or 'none'}), so its grants cannot be checked.",
                                         "Reference the identity's clientId in IaC, or run live mode to match client IDs."))
             continue
-        key = (target.resource, target.service, target.target_name, target.identity)
+        key = (target.resource, target.service, target.target_name, target.identity,
+               target.value if target.via.startswith("code ") else None)
         if key in seen:
             continue
         seen.add(key)
@@ -1793,11 +1814,13 @@ def run_rules(model: Model) -> List[Finding]:
             if target.via in reported:
                 continue
             reported.add(target.via)
-            if not resource.system_assigned and resource.user_identities:
+            credential_in_code = target.via.startswith("code ") and any(
+                e.kind == "credential" and e.resource == resource.key for e in model.code)
+            if not resource.system_assigned and (resource.user_identities or target.explicit or credential_in_code):
                 findings.append(Finding("MIR005", "error", None, resource.key,
                                         f"{target.via} on {resource.key} names no client ID, so the platform requests a token for the system-assigned identity, which is not enabled "
-                                        f"(user-assigned: {', '.join(resource.user_identities)}).",
-                                        "Set <prefix>__clientId (or AZURE_CLIENT_ID for SDK code) to the intended identity's client ID."))
+                                        f"(user-assigned: {', '.join(resource.user_identities) or 'none'}).",
+                                        "Enable the system-assigned identity, or attach a user-assigned identity and set <prefix>__clientId (or AZURE_CLIENT_ID for SDK code) to its client ID."))
             elif resource.system_assigned and resource.user_identities:
                 findings.append(Finding("MIR005", "warning", None, resource.key,
                                         f"{target.via} on {resource.key} names no client ID and uses the system-assigned identity, although user-assigned identities "
@@ -1997,8 +2020,13 @@ def collect_live(args: argparse.Namespace) -> Model:
     identities = graph(runner, "graph:identities", sub,
                        "resources | where type =~ 'microsoft.managedidentity/userassignedidentities' "
                        "| project id, name, resourceGroup, principalId = tostring(properties.principalId), clientId = tostring(properties.clientId)")
+    identity_name_counts: Dict[str, int] = {}
     for row in identities:
-        model.add_identity(Identity(key=row["name"], kind="user", name=row["name"], source="live", client_id=row.get("clientId"),
+        identity_name_counts[row["name"].lower()] = identity_name_counts.get(row["name"].lower(), 0) + 1
+    for row in identities:
+        normalized_id = row["id"].rstrip("/").lower()
+        key = row["name"] if identity_name_counts[row["name"].lower()] == 1 else normalized_id
+        model.add_identity(Identity(key=key, kind="user", name=row["name"], source="live", client_id=row.get("clientId"),
                                     principal_id=row.get("principalId"), resource_id=row["id"], resource_group=row.get("resourceGroup")))
     holders = graph(runner, "graph:holders", sub,
                     "resources | where isnotnull(identity) or type =~ 'microsoft.containerservice/managedclusters' "
@@ -2007,7 +2035,7 @@ def collect_live(args: argparse.Namespace) -> Model:
                     "registries = properties.configuration.registries, secrets = properties.configuration.secrets, "
                     "containers = properties.template.containers, acrClientId = properties.siteConfig.acrUserManagedIdentityID",
                     mask_graph)
-    by_id = {i.resource_id.lower(): i.key for i in model.identities.values() if i.resource_id}
+    by_id = {i.resource_id.rstrip("/").lower(): i.key for i in model.identities.values() if i.resource_id}
     by_client = {i.client_id.lower(): i.key for i in model.identities.values() if i.client_id}
     by_principal = {i.principal_id.lower(): i.key for i in model.identities.values() if i.principal_id}
     vaults = graph(runner, "graph:vaults", sub,
@@ -2017,10 +2045,15 @@ def collect_live(args: argparse.Namespace) -> Model:
                    "resources | where type =~ 'microsoft.documentdb/databaseaccounts' | project id, name, resourceGroup")
     for row in graph(runner, "graph:eventhubs", sub, "resources | where type =~ 'microsoft.eventhub/namespaces' | project name"):
         model.resource_types[row["name"].lower()] = "microsoft.eventhub/namespaces"
+    resource_name_counts: Dict[str, int] = {}
+    for row in holders:
+        resource_name_counts[row["name"].lower()] = resource_name_counts.get(row["name"].lower(), 0) + 1
     for row in holders:
         identity = row.get("identity") or {}
-        uamis = [by_id.get(k.lower(), resource_ref_from_id(k).name if resource_ref_from_id(k) else k) for k in (identity.get("userAssignedIdentities") or {})]
-        resource = Resource(key=row["name"], type=row.get("type", ""), source="live", user_identities=sorted(uamis),
+        uamis = [by_id.get(k.rstrip("/").lower(), resource_ref_from_id(k).name if resource_ref_from_id(k) else k) for k in (identity.get("userAssignedIdentities") or {})]
+        normalized_resource_id = row["id"].rstrip("/").lower()
+        resource_key = row["name"] if resource_name_counts[row["name"].lower()] == 1 else normalized_resource_id
+        resource = Resource(key=resource_key, type=row.get("type", ""), source="live", user_identities=sorted(uamis),
                             system_assigned="systemassigned" in str(identity.get("type", "")).lower().replace(",", "").replace(" ", ""),
                             resource_id=row["id"])
         if resource.system_assigned and identity.get("principalId"):
@@ -2060,7 +2093,7 @@ def collect_live(args: argparse.Namespace) -> Model:
         resource = model.resources[name]
         if resource.type.lower() == "microsoft.web/sites":
             group = re.search(r"/resourceGroups/([^/]+)/", resource.resource_id or "", re.I)
-            settings = runner.run(f"appsettings:{resource.resource_id}", ["webapp", "config", "appsettings", "list", "--name", resource.key,
+            settings = runner.run(f"appsettings:{resource.resource_id}", ["webapp", "config", "appsettings", "list", "--name", (resource.resource_id or resource.key).rstrip("/").split("/")[-1],
                                                                           "--resource-group", group.group(1) if group else "", "--subscription", sub],
                                   mask=mask_appsettings) or []
             for item in settings:
@@ -2114,28 +2147,36 @@ def select_identities(model: Model, args: argparse.Namespace) -> set:
     selected = set()
     for value in args.identity or []:
         name = value.rstrip("/").split("/")[-1] if "/userassignedidentities/" in value.lower() else value
-        match = next((k for k in users if (model.identities[k].resource_id or "").lower() == value.lower()), None) or \
+        match = next((k for k in users if (model.identities[k].resource_id or "").rstrip("/").lower() == value.rstrip("/").lower()), None) or \
             next((k for k in users if k.lower() == name.lower()), None)
         if match is None:
             raise SystemExit(f"identity not found: {value}")
         selected.add(match)
     for value in args.resource or []:
-        resource = next((r for r in model.resources.values() if r.key.lower() == value.lower()), None)
-        if resource is None:
+        normalized = value.rstrip("/").lower()
+        matches = [r for r in model.resources.values() if r.key.lower() == normalized or
+                   (r.resource_id or "").rstrip("/").lower() == normalized or
+                   (r.resource_id or "").rstrip("/").split("/")[-1].lower() == normalized]
+        if not matches:
             raise SystemExit(f"resource not found: {value}")
-        selected.update(resource.user_identities)
-        selected.update(i for _, i in resource.slots)
-        selected.add(f"system:{resource.key}")
+        for resource in matches:
+            selected.update(resource.user_identities)
+            selected.update(i for _, i in resource.slots)
+            selected.add(f"system:{resource.key}")
     if not (args.identity or args.resource):
-        selected = {k for k in users if consumers_of(model, k)}
+        selected = users
     return selected
 
 
 def related_resources(model: Model, selected: set, args: argparse.Namespace) -> set:
     """Resources that hold a selected identity, plus the resources named with --resource."""
+    if not (args.identity or args.resource):
+        return set(model.resources)
     related = {r.key for r in model.resources.values() if set(r.user_identities) & selected or any(i in selected for _, i in r.slots)}
-    named = {v.lower() for v in (args.resource or [])}
-    return related | {r.key for r in model.resources.values() if r.key.lower() in named}
+    named = {v.rstrip("/").lower() for v in (args.resource or [])}
+    return related | {r.key for r in model.resources.values() if r.key.lower() in named or
+                      (r.resource_id or "").rstrip("/").lower() in named or
+                      (r.resource_id or "").rstrip("/").split("/")[-1].lower() in named}
 
 
 # --------------------------------------------------------------------------
