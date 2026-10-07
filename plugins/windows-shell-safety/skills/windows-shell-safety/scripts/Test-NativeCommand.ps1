@@ -115,11 +115,43 @@ end {
             })
     }
 
+    $tokens = $null
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$tokens, [ref]$parseErrors)
+
+    # Line rules see the text with comments and message strings blanked out, so prose such as
+    # "# never wrap this in cmd /c" or Write-Host 'avoid powershell.exe' is not reported.
+    $masked = $text.ToCharArray()
+    function Hide-Extent([System.Management.Automation.Language.IScriptExtent]$Extent) {
+        for ($c = $Extent.StartOffset; $c -lt $Extent.EndOffset; $c++) {
+            if ($masked[$c] -ne "`n" -and $masked[$c] -ne "`r") { $masked[$c] = ' ' }
+        }
+    }
+    foreach ($token in $tokens) {
+        if ($token.Kind -eq [System.Management.Automation.Language.TokenKind]::Comment) { Hide-Extent $token.Extent }
+    }
+    $messageCommands = 'Write-Host', 'Write-Output', 'Write-Error', 'Write-Warning', 'Write-Verbose',
+    'Write-Debug', 'Write-Information', 'echo'
+    $messageStrings = $ast.FindAll({
+            param($n)
+            if ($n -isnot [System.Management.Automation.Language.StringConstantExpressionAst] -and
+                $n -isnot [System.Management.Automation.Language.ExpandableStringExpressionAst]) { return $false }
+            if ($n.Parent -is [System.Management.Automation.Language.CommandAst]) {
+                return $n.Parent.CommandElements[0] -ne $n -and $messageCommands -contains $n.Parent.GetCommandName()
+            }
+            $n.Parent -is [System.Management.Automation.Language.ThrowStatementAst] -or
+            ($n.Parent -is [System.Management.Automation.Language.CommandExpressionAst] -and
+                $n.Parent.Parent -is [System.Management.Automation.Language.PipelineAst] -and
+                $n.Parent.Parent.Parent -is [System.Management.Automation.Language.ThrowStatementAst])
+        }, $true)
+    foreach ($node in $messageStrings) { Hide-Extent $node.Extent }
+    $maskedLines = (-join $masked) -split "`r?`n"
+
     # Line rules work for PowerShell and for Bash/cmd command lines alike.
     $shellWord = '(?<![\w.$-])'
     for ($i = 0; $i -lt $sourceLines.Count; $i++) {
         $line = $sourceLines[$i]
-        $code = $line -replace '^\s*#.*$', ''
+        $code = $maskedLines[$i]
         if ($code -match "$shellWord(cmd(\.exe)?)[`"']?\s+[/-]{1,2}[ck]\b" -or $code -match '%COMSPEC%|\$env:COMSPEC') {
             Add-Finding 'WSS001' ($i + 1) $line
         }
@@ -136,9 +168,6 @@ end {
     }
 
     # AST rules: arguments passed to batch-file targets.
-    $tokens = $null
-    $parseErrors = $null
-    $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$tokens, [ref]$parseErrors)
 
     $batchTools = 'az', 'npm', 'npx', 'pnpm', 'yarn', 'code', 'func', 'ng'
     $cmdMeta = '[|&<>^]|%[^%\s]+%'
@@ -250,21 +279,40 @@ end {
         }
     }
 
-    # Script rule: native output parsed as JSON without forcing a UTF-8 console encoding.
-    $setsEncoding = $text -match '\[Console\]::OutputEncoding\s*='
-    if (-not $setsEncoding) {
-        foreach ($pipeline in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.PipelineAst] }, $true)) {
-            $parts = $pipeline.PipelineElements
-            if ($parts.Count -lt 2 -or $parts[0] -isnot [System.Management.Automation.Language.CommandAst]) { continue }
-            $first = $parts[0].GetCommandName()
-            if (-not $first -or $first.Contains('-') -or (Get-Alias -Name $first -ErrorAction Ignore)) { continue }
-            $parsesJson = $parts | Select-Object -Skip 1 | Where-Object {
-                $_ -is [System.Management.Automation.Language.CommandAst] -and $_.GetCommandName() -eq 'ConvertFrom-Json'
+    # Script rule: native output parsed as JSON before a UTF-8 console encoding is in effect.
+    # A setting counts only when it runs earlier in the same or an enclosing block of the pipeline,
+    # so comments, later assignments, and assignments inside other branches do not suppress it.
+    $encodingSettings = @($ast.FindAll({
+                param($n)
+                $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                $n.Left.Extent.Text -match '^\[(System\.)?Console\]::OutputEncoding$'
+            }, $true))
+
+    function Test-EncodingInEffect([System.Management.Automation.Language.Ast]$Pipeline) {
+        foreach ($setting in $encodingSettings) {
+            if ($setting.Extent.EndOffset -gt $Pipeline.Extent.StartOffset) { continue }
+            $block = $setting.Parent
+            while ($block -and $block -isnot [System.Management.Automation.Language.StatementBlockAst] -and
+                $block -isnot [System.Management.Automation.Language.NamedBlockAst]) { $block = $block.Parent }
+            $ancestor = $Pipeline.Parent
+            while ($ancestor) {
+                if ($ancestor -eq $block) { return $true }
+                $ancestor = $ancestor.Parent
             }
-            if ($parsesJson) {
-                Add-Finding 'WSS007' $pipeline.Extent.StartLineNumber $sourceLines[$pipeline.Extent.StartLineNumber - 1]
-                break
-            }
+        }
+        $false
+    }
+
+    foreach ($pipeline in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.PipelineAst] }, $true)) {
+        $parts = $pipeline.PipelineElements
+        if ($parts.Count -lt 2 -or $parts[0] -isnot [System.Management.Automation.Language.CommandAst]) { continue }
+        $first = $parts[0].GetCommandName()
+        if (-not $first -or $first.Contains('-') -or (Get-Alias -Name $first -ErrorAction Ignore)) { continue }
+        $parsesJson = $parts | Select-Object -Skip 1 | Where-Object {
+            $_ -is [System.Management.Automation.Language.CommandAst] -and $_.GetCommandName() -eq 'ConvertFrom-Json'
+        }
+        if ($parsesJson -and -not (Test-EncodingInEffect $pipeline)) {
+            Add-Finding 'WSS007' $pipeline.Extent.StartLineNumber $sourceLines[$pipeline.Extent.StartLineNumber - 1]
         }
     }
 

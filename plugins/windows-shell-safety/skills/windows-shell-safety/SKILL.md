@@ -26,7 +26,7 @@ pwsh -NoProfile -File scripts/Test-NativeCommand.ps1 -Command 'az version --quer
 pwsh -NoProfile -File scripts/Test-NativeCommand.ps1 -Path ./deploy.ps1 -AsJson
 ```
 
-Exit code 0 means clean, 1 means findings (each with `why` and `fix`), 2 means the input file is missing. The lint parses PowerShell, but its line rules also catch `cmd /c`, nested `-Command`, and MSYS workarounds in Bash command lines.
+Exit code 0 means clean, 1 means findings (each with `why` and `fix`), 2 means the input file is missing. The lint parses PowerShell, but its line rules also catch `cmd /c`, nested `-Command`, and MSYS workarounds in Bash command lines. Comments and message strings (`Write-Host`, `Write-Error`, `throw`, ...) are ignored.
 
 | Rule | Detects | Safe rewrite |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ Exit code 0 means clean, 1 means findings (each with `why` and `fix`), 2 means t
 | WSS004 | Inline JSON (literal, `ConvertTo-Json` result, or variable) to a `.cmd`/`.bat` | UTF-8 file + `'@<file>'` |
 | WSS005 | Double quotes inside an argument to a `.cmd`/`.bat` | `'@<file>'` |
 | WSS006 | Windows PowerShell 5.1 (`powershell.exe`) | `pwsh` |
-| WSS007 | Native output piped to `ConvertFrom-Json` without UTF-8 console encoding | Rule 5 |
+| WSS007 | Native output piped to `ConvertFrom-Json` with no UTF-8 console encoding set earlier in the same or an enclosing block | Rule 5 |
 | WSS008 | `MSYS_NO_PATHCONV`, `MSYS2_ARG_CONV_EXCL` | Run from pwsh |
 | WSS009 | Unquoted `@file` argument (PowerShell splatting) | `'@file'` |
 

@@ -141,3 +141,5 @@ Show-NativeArgs '--query' "[?name=='a']|[0]" '{"k":"v"}'
 ```
 
 On Windows this runs through a `.cmd` shim that forwards `%*` exactly like `az.cmd` and prints each received argument in brackets. If the output differs from what you passed, change the pattern (file or PowerShell filtering), not the escaping.
+
+A script that ends right after a failing native call (or a lint run with findings) exits with that stale `$LASTEXITCODE` when it is launched with `pwsh -Command`, as the GitHub Actions `pwsh` shell does. End such scripts with an explicit `exit 0` or `exit 1`.

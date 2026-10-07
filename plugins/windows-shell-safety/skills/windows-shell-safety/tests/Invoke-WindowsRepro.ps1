@@ -83,3 +83,5 @@ if ($failures -gt 0) {
     exit 1
 }
 Write-Host 'All Windows reproduction checks passed.'
+# The last lint call leaves $LASTEXITCODE = 1; the CI pwsh wrapper would report it as the step result.
+exit 0
