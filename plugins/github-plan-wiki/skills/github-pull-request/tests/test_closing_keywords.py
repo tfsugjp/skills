@@ -66,6 +66,26 @@ class ClosingKeywordsTests(unittest.TestCase):
         for body in ("\\`\n\nFixed #10\n`", "Unmatched `tick\n\nFixed #10"):
             self.assertEqual([], self.check(body, bugs=["10"]))
 
+    def test_indented_text_inside_list_item_is_visible(self):
+        self.assertEqual([], self.check("- Related:\n    Close #10", closes=["10"]))
+        self.assertEqual([], self.check("1. Related:\n   Close #10", closes=["10"]))
+        self.assertTrue(self.check("- Related:\n    Close #10", closes=["11"]))
+        self.assertTrue(self.check("- Related:\n    Close #10", reference_only=True))
+
+    def test_code_block_inside_list_item_stays_hidden(self):
+        self.assertTrue(self.check("- Related:\n\n      Close #10", closes=["10"]))
+        self.assertTrue(self.check("Text\n\n    Close #10", closes=["10"]))
+        self.assertTrue(self.check("- item\n\ntext\n\n    Close #10", closes=["10"]))
+
+    def test_commit_message_closing_keywords_are_checked(self):
+        body = "Fixed #10\nRefs #30\n"
+        ok = "feat: x\n\nFixes #10\nRefs #30"
+        self.assertEqual([], validator.validate(body, "team/repo", ["10"], (), False, ok))
+        for message in ("Fixes #30", "closes: team/repo#30", "Resolved #30"):
+            with self.subTest(message=message):
+                self.assertTrue(validator.validate(body, "team/repo", ["10"], (), False, message))
+        self.assertTrue(validator.validate("Refs #30", "team/repo", (), (), True, "Fixes #30"))
+
     def test_duplicate_closure_is_rejected(self):
         self.assertTrue(self.check("Fixed #10\nFixed TEAM/REPO#10", bugs=["10"]))
 

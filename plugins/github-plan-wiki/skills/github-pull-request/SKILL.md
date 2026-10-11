@@ -31,10 +31,12 @@ GitHub interprets PR-body closing keywords only when the PR targets the reposito
 
 Save the complete template-based body as a real UTF-8 file with actual newlines. Run [scripts/validate_closing_keywords.py](scripts/validate_closing_keywords.py) with **every intended closure target**, derived from the issues and work scope, not extracted from the drafted body. Repeat `--bug` or `--close` for each target; numeric targets belong to `--repo`, fully qualified targets belong to the specified repository. Fix errors before any write. The same preflight is mandatory for creation and body updates.
 
+GitHub also closes issues from closing keywords in the messages of commits merged into the default branch, and these are not reflected in `closingIssuesReferences`. Save the full messages (headline and body) of every commit in the PR's `base..head` range to a UTF-8 file, for example with `git log --format='%B' '<base>..<head>'` or the PR's `commits` JSON, and pass it with `--commit-messages "$commits_file"`. Any commit-message closing keyword for an issue outside the intended closure set fails validation; reword the commit or rewrite its history only with authorization, otherwise report it.
+
 ```bash
 set -e
 python3 "<skill-dir>/scripts/validate_closing_keywords.py" "$body_file" \
-  --repo '<owner>/<repo>' --bug 10 --bug 11 --close 20
+  --repo '<owner>/<repo>' --bug 10 --bug 11 --close 20 --commit-messages "$commits_file"
 # For a PR with no completed issues, use --reference-only instead of target flags.
 gh pr create --repo '<owner>/<repo>' --base '<base>' --head '<head>' \
   --title '<template-compatible title>' --body-file "$body_file"
@@ -42,7 +44,7 @@ gh pr create --repo '<owner>/<repo>' --base '<base>' --head '<head>' \
 
 ```powershell
 python '<skill-dir>/scripts/validate_closing_keywords.py' $bodyFile `
-  --repo '<owner>/<repo>' --bug 10 --bug 11 --close 20
+  --repo '<owner>/<repo>' --bug 10 --bug 11 --close 20 --commit-messages $commitsFile
 if ($LASTEXITCODE -ne 0) { throw 'PR closing keyword validation failed.' }
 gh pr create --repo '<owner>/<repo>' --base '<base>' --head '<head>' `
   --title '<template-compatible title>' --body-file $bodyFile
@@ -51,11 +53,11 @@ if ($LASTEXITCODE -ne 0) { throw 'PR creation failed; inspect existing PRs befor
 
 In PowerShell, write with `[IO.File]::WriteAllText($bodyFile, $body, [Text.UTF8Encoding]::new($false))`. For updates, use `gh pr edit <number> --repo <owner>/<repo> --body-file <file>` or the equivalent connector operation. Preserve requested draft state and other PR metadata.
 
-The validator intentionally accepts only standalone `Fixed`/`Close` entries, rejects missing, wrong-type, or unplanned closing entries, and excludes comments, code, and blockquotes. It does not establish issue completion, template compliance, or GitHub linkage; verify those separately.
+The validator intentionally accepts only standalone `Fixed`/`Close` entries, rejects missing, wrong-type, or unplanned closing entries, and excludes comments, code, and blockquotes; text indented under a list item is treated as visible unless it is indented four or more columns past the item's content. It does not establish issue completion, template compliance, or GitHub linkage; verify those separately.
 
 ## Read back and verify
 
-After a successful write, read the PR's persisted `body`, `baseRefName`, and `headRefName` (for example, `gh pr view <number> --repo <owner>/<repo> --json body,baseRefName,headRefName,closingIssuesReferences`). Compare the body to the submitted file, normalizing CRLF to LF, and run the validator on the persisted body with the same target flags. Verify base/head and, when targeting the default branch, confirm every intended target appears in `closingIssuesReferences` or GitHub's linked-issue view. Missing linkage remains an incomplete result even if the text looks correct.
+After a successful write, read the PR's persisted `body`, `baseRefName`, and `headRefName` (for example, `gh pr view <number> --repo <owner>/<repo> --json body,baseRefName,headRefName,closingIssuesReferences`). Compare the body to the submitted file, normalizing CRLF to LF, and run the validator on the persisted body with the same target flags and the current commit messages (`commits` JSON field or `git log`), since commits may have been added after the write. Verify base/head and, when targeting the default branch, confirm every intended target appears in `closingIssuesReferences` or GitHub's linked-issue view. Missing linkage remains an incomplete result even if the text looks correct.
 
 Correct a mismatch within the authorized PR body-edit scope and read back once more. If it persists, stop and report the discrepancy; do not loop or create another PR. A failed or ambiguous creation must first be checked for an already-created PR before retrying. Report the PR link, closure targets, and any non-default-base limitation. Creation does not prove the issues are already closed.
 

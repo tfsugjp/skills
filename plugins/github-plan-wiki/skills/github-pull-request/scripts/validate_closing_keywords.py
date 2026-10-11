@@ -12,6 +12,7 @@ import sys
 REPOSITORY = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 REFERENCE = rf"(?:{REPOSITORY})?#[1-9][0-9]*"
 ENTRY = re.compile(rf"(?:[-+*] +)?(Fixed|Close) +({REFERENCE})\.?", re.I)
+LIST_ITEM = re.compile(r"^( *)(?:[-+*]|[0-9]{1,9}[.)])( +|$)")
 CLOSING = re.compile(
     rf"\b(?:close[sd]?|fix(?:es|ed)?|resolve[sd]?)\s*:?[ \t]+({REFERENCE})(?![\w/])",
     re.I,
@@ -31,6 +32,8 @@ def prose_lines(body: str):
     body = re.sub(r"<!--[\s\S]*?(?:-->|\Z)", "\n", body)
     body = re.sub(r"<(pre|code|script|style)\b[^>]*>[\s\S]*?(?:</\1\s*>|\Z)", "\n", body, flags=re.I)
     fence = None
+    list_content = None  # content column of the innermost open list item
+    after_blank = False
     visible = []
     for line in body.splitlines():
         marker = re.match(r"^\s*(?:[-+*] +)?(`{3,}|~{3,})(.*)$", line)
@@ -41,9 +44,26 @@ def prose_lines(body: str):
         if marker:
             fence = marker[1]
             continue
-        if line.startswith(("    ", "\t")) or line.lstrip().startswith(">"):
+        expanded = line.expandtabs(4)
+        indent = len(expanded) - len(expanded.lstrip(" "))
+        if not expanded.strip():
+            after_blank = True
             visible.append("")
             continue
+        # An indented line is a code block only when it is 4+ columns past the
+        # enclosing list item's content column (CommonMark list-item rules).
+        base = list_content if list_content is not None else 0
+        item = LIST_ITEM.match(expanded)
+        if indent >= base + 4 or expanded.lstrip().startswith(">"):
+            visible.append("")
+            continue
+        if item:
+            spaces = len(item[2])
+            marker_end = item.end() - spaces
+            list_content = marker_end + (spaces if 1 <= spaces <= 4 else 1)
+        elif indent < base and after_blank:
+            list_content = None  # a blank line then dedented text ends the list
+        after_blank = False
         visible.append(line)
     text = "\n".join(visible)
     ticks = list(re.finditer(r"`+", text))
@@ -66,7 +86,7 @@ def prose_lines(body: str):
     yield from (line.strip() for line in "".join(output).splitlines())
 
 
-def validate(body: str, repository: str, bugs=(), closes=(), reference_only=False) -> list[str]:
+def validate(body: str, repository: str, bugs=(), closes=(), reference_only=False, commit_messages: str = "") -> list[str]:
     if not re.fullmatch(REPOSITORY, repository):
         raise ValueError("--repo must be owner/repository")
     expected = {}
@@ -99,6 +119,17 @@ def validate(body: str, repository: str, bugs=(), closes=(), reference_only=Fals
             errors.append(f"Use one standalone Fixed/Close entry per issue: {line}")
     for issue in sorted(expected.keys() - seen):
         errors.append(f"Missing {expected[issue].title()} entry: {issue}")
+    errors.extend(commit_errors(commit_messages, repository, set(expected)))
+    return errors
+
+
+def commit_errors(messages: str, repository: str, expected: set[str]) -> list[str]:
+    """Flag closing keywords in commit messages that GitHub would act on at merge."""
+    errors = []
+    for match in CLOSING.finditer(messages):
+        issue = target(match[1], repository)
+        if issue not in expected:
+            errors.append(f"Unplanned closure in commit message: {issue}")
     return errors
 
 
@@ -108,11 +139,13 @@ def main() -> int:
     parser.add_argument("--repo", required=True)
     parser.add_argument("--bug", action="append", default=[])
     parser.add_argument("--close", action="append", default=[])
+    parser.add_argument("--commit-messages", type=Path, help="file with the full messages of the PR's commits")
     parser.add_argument("--reference-only", action="store_true")
     args = parser.parse_args()
     try:
         body = args.body_file.read_text(encoding="utf-8")
-        errors = validate(body, args.repo, args.bug, args.close, args.reference_only)
+        commits = args.commit_messages.read_text(encoding="utf-8") if args.commit_messages else ""
+        errors = validate(body, args.repo, args.bug, args.close, args.reference_only, commits)
     except (OSError, UnicodeError, ValueError) as error:
         errors = [str(error)]
     if errors:
