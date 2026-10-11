@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Pull Request"
+  short_description: "Create template-aware PRs with per-issue closure"
+  default_prompt: "Use $github-pull-request to create a PR that follows repository templates and closes each completed issue."

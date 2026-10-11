@@ -9,7 +9,7 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `azure-devops-toolkit` | スキル: Azure DevOps Foundation、Boards、Repos、Pipelines、Artifacts、Test Plans、Wikis、Advanced Security、CLI、security triage。Boards は Windows でネイティブ PowerShell を使い、本文を Markdown で書き込み、Bug の Repro Steps に根本原因と修正方針を記録し、Work Item から Wiki ページへ逆リンクします。また、Feature 相当の Work Item と承認済みのバグ修正方針は Wiki への登録を必須とします。Wikis は計画とバグ修正方針を、リポジトリをルートとする階層（`/<repo>` の全体設計、`/<repo>/plan` と `/<repo>/bug` の一覧）に、同梱のページテンプレートと検証スクリプトを使って登録します。エージェント: Azure DevOps Agent、Azure DevOps Work Item Agent |
 | `nuget-validate` | NuGet の脆弱性、非推奨、掲載状態、公開からの経過日数、プロジェクト監査 |
 | `dependabot-safe-merge` | Dependabot pull request の安全な更新、公開経過時間ポリシー、マージゲート、メジャーアップグレード計画 |
-| `github-plan-wiki` | スキル: GitHub Plan Issues（親 issue と sub-issue の階層）、GitHub Wiki Plan（英日 Wiki plan と Home index の管理） |
+| `github-plan-wiki` | スキル: GitHub Plan Issues（テンプレートに従った親 issue と sub-issue の階層）、GitHub Wiki Plan（英日 Wiki plan と Home index の管理）、GitHub Pull Request（PR テンプレート、Issue ごとの閉鎖キーワード、本文の読み戻し） |
 | `relaypublisher-manifest` | Relaypublisher manifest (v1.1.0) の作成・更新・静的検証。Windows Win32 の script/file-system detection と、複数 bundle を含む macOS PKG/LOB の detection に対応 |
 | `repository-init` | ライセンス、セキュリティ、言語方針、`AGENTS.md` をリポジトリ作成時に一度だけ初期化 |
 | `azure-managed-identity-review` | Azure のマネージド ID を読み取り専用でレビューします。同じ ID を共有するリソース・アプリ設定・コード・フェデレーション資格情報（FIC）をすべて洗い出し、各利用者の audience に対する権限漏れ、他の利用者への権限の漏洩、ID 選択の誤り、IaC とのドリフトを報告します（`msi_review.py`、規則 MIR000-MIR008） |
@@ -66,6 +66,12 @@ codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 Codex の local marketplace は開発・チーム配布用です。公開 listing への申請は、検証完了後の別リリース作業とします。
 
 `repository-init` は `$repository-init` を明示的に呼び出したときだけ使用します。新規または既存リポジトリの不足するガバナンスファイルを整備し、確定したライセンスと言語プロファイルを `.repository-init.json` に保存します。完了後に再度呼び出してもファイルを変更しません。Git の初期化、リモート作成、Issue／Work Item 作成、Wiki 公開、コミット、プッシュは行いません。
+
+## GitHub PR と Issue テンプレート
+
+[github-pull-request](plugins/github-plan-wiki/skills/github-pull-request/SKILL.md) は GitHub PR の作成と本文更新に使います。リポジトリの PR テンプレートに従い、完了する Bug の Issue ごとに `Fixed #番号`、それ以外の Issue ごとに `Close #番号` を独立した行で記載します。`Close #10, #11` のような一括記載は必須の本文事前検証で失敗します。参照だけの Issue と未完了の親 Issue は閉じません。自動閉鎖はデフォルトブランチへのマージ後に働き、それ以外のブランチを対象とする PR では制約を報告します。
+
+[github-plan-issues](plugins/github-plan-wiki/skills/github-plan-issues/SKILL.md) もリポジトリの Issue テンプレートとフォームの必須項目に従います。両ワークフローはテンプレートの要件を保った UTF-8 本文を送信し、書き込み後に保存された本文を確認します。必要に応じて `$github-pull-request` を明示的に指定してください。プラグインをインストールすると自動検出の対象になりますが、呼び出しはクライアントが制御します。検証スクリプトはスキル手順として必須であり、GitHub サーバー側の強制ルールではありません。
 
 ## Windows Shell Safety
 
