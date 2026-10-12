@@ -28,6 +28,8 @@ Turn an approved plan into a GitHub issue hierarchy with the `gh` CLI (2.6x+, te
    - bug fix, patch, CI/CD fix, typo, dependency bump → no wiki publishing.
    - If it's genuinely ambiguous, ask the user — don't default to "no wiki" just because it's easier.
 
+4. **Read repository Issue templates before proposing titles or bodies.** Inspect `.github/ISSUE_TEMPLATE/` Markdown templates and YAML forms on the default branch, its `config.yml`, and legacy `ISSUE_TEMPLATE.*` files in `.github/`, the root, or `docs/` (case-insensitive). If the repository supplies none, check applicable defaults in the owner's public `.github` repository; an access failure is not proof of absence. Choose the template appropriate to each parent/child's work type and preserve required sections, title prefixes, fields, and applicable labels/assignees. For forms, include each required input and option/checkbox response in the rendered Markdown, or use the form UI if its constraints cannot be represented faithfully. Do not invent evidence or check unverified items. `--body-file` and connector writes do not apply templates automatically: render the template yourself and verify its requirements before validation. If a required answer is unknown, ask for it before creating the issue.
+
 ## Phase 1 — Decide parent vs. sub-issues
 
 Apply these rules in order:
@@ -90,7 +92,7 @@ gh issue create --repo <owner>/<repo> \
   --label enhancement
 ```
 
-Body should include: a one-paragraph summary, acceptance criteria, and a checklist of the sub-issues to come (fill in numbers after Phase 3).
+Fit a one-paragraph summary, acceptance criteria, and a checklist of sub-issues to come into the selected template (fill in numbers after Phase 3). If no template applies, use these as the body structure. Do not replace the repository template with a generic plan body.
 
 ## Phase 3 — Create sub-issues
 
@@ -116,6 +118,10 @@ gh issue create --repo <owner>/<repo> --parent <parent-number> \
 - Create the topic branch per the team's branch naming convention (e.g. `feature/<issue-number>-<short-description>`); reuse `git-flow-branch-creator` if available.
 - If Phase 0 classified this as `feature`/`refactor`/`perf`, **load and run the `github-wiki-plan` skill** (`../github-wiki-plan/SKILL.md`), passing it: parent issue number + URL, plan body, slug, and approval date.
 - If it was classified as work-type (bugfix/patch/CI), skip the wiki step and say so explicitly — don't silently omit it.
+
+## PR handoff
+
+When the user later asks to create a GitHub PR or update its body, load [github-pull-request](../github-pull-request/SKILL.md). Pass the tracking hierarchy and the issues actually completed by the PR. That skill preserves the PR template and requires a separate `Fixed #number` entry for every completed bug issue or `Close #number` entry for every other completed issue. Never replace these with `Refs` or a single keyword followed by multiple issue numbers. Keep unfinished parent issues as references. Issue creation does not authorize PR creation.
 
 ## Pitfalls
 

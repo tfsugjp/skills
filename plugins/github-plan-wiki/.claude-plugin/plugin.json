@@ -1,11 +1,11 @@
 {
   "name": "github-plan-wiki",
-  "version": "0.1.1",
-  "description": "Break an approved plan into a parent GitHub issue plus sub-issues, and publish feature/refactor/perf plans to the repository's GitHub wiki in English and Japanese.",
+  "version": "0.2.0",
+  "description": "Create template-aware GitHub issues and pull requests with per-issue closing keywords, and publish approved plans to the GitHub wiki in English and Japanese.",
   "author": {
     "name": "Team Foundation Users Japan"
   },
   "license": "MIT",
-  "keywords": ["github", "issues", "sub-issues", "wiki", "planning"],
+  "keywords": ["github", "issues", "sub-issues", "wiki", "planning", "pull-requests", "templates"],
   "skills": "./skills/"
 }

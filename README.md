@@ -9,7 +9,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublis
 | `azure-devops-toolkit` | Skills: Azure DevOps Foundation, Boards, Repos, Pipelines, Artifacts, Test Plans, Wikis, Advanced Security, CLI, security triage. Boards uses native PowerShell on Windows, writes body fields as Markdown, records the root cause and fix approach in a Bug's Repro Steps, links work items back to their Wiki pages, and Feature-equivalent Work Items and approved Bug fix plans require Wiki traceability. Wikis publishes plans and bug fix plans under a repository-rooted hierarchy (`/<repo>` overall design, `/<repo>/plan` and `/<repo>/bug` indexes) with bundled page templates and validators. Agents: Azure DevOps Agent, Azure DevOps Work Item Agent |
 | `nuget-validate` | NuGet vulnerability, deprecation, listing, freshness, and project-audit validation |
 | `dependabot-safe-merge` | Safe Dependabot refresh, release-age policy, merge gates, and major-upgrade planning |
-| `github-plan-wiki` | Skills: GitHub Plan Issues (parent + sub-issue hierarchy via `gh`), GitHub Wiki Plan (bilingual GitHub wiki publishing and Home index maintenance) |
+| `github-plan-wiki` | Skills: GitHub Plan Issues (template-aware parent + sub-issue hierarchy via `gh`), GitHub Wiki Plan (bilingual GitHub wiki publishing and Home index maintenance), GitHub Pull Request (repository PR templates, per-issue closing keywords, and body readback) |
 | `relaypublisher-manifest` | Relaypublisher manifest creation, updates, and static validation for v1.1.0, including Windows Win32 script/file-system detection and multi-bundle macOS PKG/LOB detection |
 | `repository-init` | Explicit repository initialization for license, security, language rules, and `AGENTS.md` guidance |
 | `azure-managed-identity-review` | Read-only review of Azure managed identities: finds every resource, app setting, code path, and federated credential that shares an identity, and reports missing grants for each consumer's audience, grants leaked to other consumers, identity selection mistakes, and IaC drift (`msi_review.py`, rules MIR000-MIR008) |
@@ -68,6 +68,12 @@ codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 Use `repository-init` only with an explicit `$repository-init` request. It initializes missing governance files in a new or existing repository, records the resolved license and language profile in `.repository-init.json`, and leaves a completed repository unchanged on later invocations. It does not initialize Git, create remotes, create issues or work items, publish Wiki pages, commit, or push.
 
 The Codex local marketplace is intended for development and team distribution. Public Codex listing submission is a separate release step after the plugins pass validation.
+
+## GitHub Pull Requests and Issue Templates
+
+Use [github-pull-request](plugins/github-plan-wiki/skills/github-pull-request/SKILL.md) to create a GitHub PR or update its description. It follows the repository's PR template and requires a separate `Fixed #number` line for each completed bug issue or `Close #number` line for each other completed issue. Grouped references such as `Close #10, #11` fail the mandatory body preflight. Reference-only issues and unfinished parent issues stay open. Automatic closure occurs after a merge into the default branch; a PR targeting another branch reports that limitation.
+
+The [github-plan-issues](plugins/github-plan-wiki/skills/github-plan-issues/SKILL.md) skill also follows repository Issue templates and required form fields. Both workflows preserve template requirements before submitting a UTF-8 body and verify the stored body after writing. Use `$github-pull-request` explicitly when needed; installing the plugin makes the skill available for automatic discovery, but the client controls invocation. The validator is a required skill step, not a GitHub server-side enforcement rule.
 
 ## Windows Shell Safety
 

@@ -51,8 +51,8 @@
     },
     {
       "name": "github-plan-wiki",
-      "description": "Break an approved plan into a parent GitHub issue plus sub-issues, and publish feature/refactor/perf plans to the repository's GitHub wiki in English and Japanese.",
-      "version": "0.1.1",
+      "description": "Create template-aware GitHub issues and pull requests with per-issue closing keywords, and publish approved plans to the GitHub wiki in English and Japanese.",
+      "version": "0.2.0",
       "source": "./plugins/github-plan-wiki",
       "license": "MIT",
       "keywords": [
