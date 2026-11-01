@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, Windows shell-safe command execution, and Azure managed identity review workflows (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
+Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, Windows shell-safe command execution, Azure managed identity review, and native container workflows on Windows and macOS (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
 
 ## Plugins
 
@@ -14,6 +14,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublis
 | `repository-init` | Explicit repository initialization for license, security, language rules, and `AGENTS.md` guidance |
 | `azure-managed-identity-review` | Read-only review of Azure managed identities: finds every resource, app setting, code path, and federated credential that shares an identity, and reports missing grants for each consumer's audience, grants leaked to other consumers, identity selection mistakes, and IaC drift (`msi_review.py`, rules MIR000-MIR008) |
 | `windows-shell-safety` | Windows-safe Azure CLI, JSON, and pipe execution: rules against `cmd.exe` argument loss, a pre-execution lint (`Test-NativeCommand.ps1`), and a PowerShell 7 helper that sends JSON through UTF-8 `@<file>` |
+| `native-container-cli` | Prefer WSL Containers on Windows and Apple container on macOS; translate supported Docker commands and ask before Docker fallback, including unsupported Compose or Docker API integrations |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 
@@ -31,6 +32,7 @@ claude plugin install relaypublisher-manifest@tfsugjp-agent-skills
 claude plugin install repository-init@tfsugjp-agent-skills
 claude plugin install windows-shell-safety@tfsugjp-agent-skills
 claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
+claude plugin install native-container-cli@tfsugjp-agent-skills
 ```
 
 ## Install from the GitHub Copilot marketplace
@@ -47,6 +49,7 @@ copilot plugin install relaypublisher-manifest@tfsugjp-agent-skills
 copilot plugin install repository-init@tfsugjp-agent-skills
 copilot plugin install windows-shell-safety@tfsugjp-agent-skills
 copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
+copilot plugin install native-container-cli@tfsugjp-agent-skills
 ```
 
 ## Install from the Codex repository-local marketplace
@@ -63,6 +66,7 @@ codex plugin add relaypublisher-manifest@tfsugjp-agent-skills
 codex plugin add repository-init@tfsugjp-agent-skills
 codex plugin add windows-shell-safety@tfsugjp-agent-skills
 codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
+codex plugin add native-container-cli@tfsugjp-agent-skills
 ```
 
 Use `repository-init` only with an explicit `$repository-init` request. It initializes missing governance files in a new or existing repository, records the resolved license and language profile in `.repository-init.json`, and leaves a completed repository unchanged on later invocations. It does not initialize Git, create remotes, create issues or work items, publish Wiki pages, commit, or push.
@@ -91,6 +95,12 @@ pwsh -NoProfile -File "$skill/scripts/Test-NativeCommand.ps1" -Command 'az versi
 ```
 
 The skill is advisory: it ships no hook, so lint findings never block a tool call on their own.
+
+## Native Container CLI
+
+[native-container-cli](plugins/native-container-cli/skills/native-container-cli/SKILL.md) selects `wslc.exe` on Windows and Apple's `container` on macOS for local Linux-container operations. It adapts Docker examples using the installed CLI's supported commands and flags, preserving mounts, ports, platforms, lifecycle, and output parsing. Linux and remote execution targets retain their selected runtime.
+
+When a faithful native equivalent is unavailable, the skill asks before invoking Docker, including Compose, diagnostic probes, and integrations that call Docker internally. Installing the plugin enables normal skill discovery; it does not install container software or enforce a shell hook. See the [Japanese guide](docs/skill-guides/native-container-cli_ja.md).
 
 ## Azure Managed Identity Review
 
