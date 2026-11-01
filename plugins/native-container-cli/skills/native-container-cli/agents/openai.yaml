@@ -1,0 +1,3 @@
+interface:
+  display_name: "Native Container CLI"
+  short_description: "Prefer WSL and Apple containers over Docker"

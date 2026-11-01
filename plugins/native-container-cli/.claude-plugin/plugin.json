@@ -1,0 +1,11 @@
+{
+  "name": "native-container-cli",
+  "version": "0.1.0",
+  "description": "Prefer WSL Containers on Windows and Apple container on macOS, translate supported Docker commands, and ask before Docker fallback.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["containers", "windows", "wsl", "macos", "docker"],
+  "skills": "./skills/"
+}

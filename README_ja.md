@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行、Azure マネージド ID レビューのワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
+Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行、Azure マネージド ID レビュー、Windows と macOS のネイティブコンテナー操作のワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
 
 ## Plugin
 
@@ -14,6 +14,7 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `repository-init` | ライセンス、セキュリティ、言語方針、`AGENTS.md` をリポジトリ作成時に一度だけ初期化 |
 | `azure-managed-identity-review` | Azure のマネージド ID を読み取り専用でレビューします。同じ ID を共有するリソース・アプリ設定・コード・フェデレーション資格情報（FIC）をすべて洗い出し、各利用者の audience に対する権限漏れ、他の利用者への権限の漏洩、ID 選択の誤り、IaC とのドリフトを報告します（`msi_review.py`、規則 MIR000-MIR008） |
 | `windows-shell-safety` | Windows で Azure CLI・JSON・パイプを安全に実行するための規則、`cmd.exe` による引数欠落を実行前に検出する lint（`Test-NativeCommand.ps1`）、JSON を UTF-8 の `@<file>` で渡す PowerShell 7 ヘルパー |
+| `native-container-cli` | WindowsではWSL Containers、macOSではApple containerを優先。対応するDockerコマンドを変換し、ComposeやDocker API連携などでDockerへの切り替えが必要な場合は実行前に確認 |
 
 すべて MIT License で配布します。認証情報は含めず、MCP server も自動構成しません。Azure DevOps の認証と権限は利用者が設定してください。
 
@@ -29,6 +30,7 @@ claude plugin install relaypublisher-manifest@tfsugjp-agent-skills
 claude plugin install repository-init@tfsugjp-agent-skills
 claude plugin install windows-shell-safety@tfsugjp-agent-skills
 claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
+claude plugin install native-container-cli@tfsugjp-agent-skills
 ```
 
 ## GitHub Copilot からインストール
@@ -45,6 +47,7 @@ copilot plugin install relaypublisher-manifest@tfsugjp-agent-skills
 copilot plugin install repository-init@tfsugjp-agent-skills
 copilot plugin install windows-shell-safety@tfsugjp-agent-skills
 copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
+copilot plugin install native-container-cli@tfsugjp-agent-skills
 ```
 
 ## Codex の repository-local marketplace からインストール
@@ -61,6 +64,7 @@ codex plugin add relaypublisher-manifest@tfsugjp-agent-skills
 codex plugin add repository-init@tfsugjp-agent-skills
 codex plugin add windows-shell-safety@tfsugjp-agent-skills
 codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
+codex plugin add native-container-cli@tfsugjp-agent-skills
 ```
 
 Codex の local marketplace は開発・チーム配布用です。公開 listing への申請は、検証完了後の別リリース作業とします。
@@ -89,6 +93,12 @@ pwsh -NoProfile -File "$skill/scripts/Test-NativeCommand.ps1" -Command 'az versi
 ```
 
 このスキルは助言用です。フックを同梱しないため、lint の指摘だけでツール呼び出しが止まることはありません。
+
+## Native Container CLI
+
+[native-container-cli](plugins/native-container-cli/skills/native-container-cli/SKILL.md) は、ローカルのLinuxコンテナー操作でWindowsの`wslc.exe`、macOSのApple `container`を選択します。利用中のCLIが対応するコマンドとオプションを確認し、マウント・ポート・プラットフォーム・終了処理・出力解析の意味を保ってDockerの例を変換します。Linuxやリモートの実行先については、選択済みのランタイムを維持します。
+
+忠実な変換ができない場合は、Compose、診断用の確認コマンド、内部でDockerを起動する連携ツールも含め、Dockerを実行する前に確認します。プラグインのインストールで通常のスキル検出が有効になりますが、コンテナーソフトウェアの導入やシェルフックによる強制は行いません。詳細は[日本語ガイド](docs/skill-guides/native-container-cli_ja.md)を参照してください。
 
 ## Azure Managed Identity Review
 

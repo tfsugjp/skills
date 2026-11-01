@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Skills and plugins for Azure DevOps, GitHub, .NET, NuGet, and Relaypublisher workflows.",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "plugins": [
     {
@@ -104,6 +104,21 @@
       "source": "./plugins/azure-managed-identity-review",
       "license": "MIT",
       "keywords": ["azure", "managed-identity", "rbac", "bicep", "terraform", "security"],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "native-container-cli",
+      "description": "Prefer WSL Containers on Windows and Apple container on macOS, translate supported Docker commands, and ask before Docker fallback.",
+      "version": "0.1.0",
+      "source": "./plugins/native-container-cli",
+      "license": "MIT",
+      "keywords": [
+        "containers",
+        "windows",
+        "wsl",
+        "macos",
+        "docker"
+      ],
       "category": "Developer Tools"
     }
   ]
