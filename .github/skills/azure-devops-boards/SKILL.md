@@ -85,6 +85,22 @@ When the plan, bug fix plan, or other content of a work item of any type — Fea
 
 Page links point into the team's own authenticated organization and are part of the work item's purpose; write them in full.
 
+## Acceptance criteria progress from a pull request
+
+When a PR creates or updates implementation evidence for a Work Item, the calling [azure-devops-repos](../azure-devops-repos/SKILL.md) workflow owns acceptance-criteria reconciliation. Read the Work Item and identify the field that contains its criteria (for example, a process-defined Acceptance Criteria field or an explicit checklist in the body). Compare every criterion with the change and its verification evidence:
+
+- Mark only criteria whose full requirement is demonstrated as complete. Partial, blocked, ambiguous, or unverified criteria remain unchanged.
+- Do not treat PR linkage, a PR description, or an unrelated passing test as evidence that a criterion is met. Keep references and unfinished parent items distinct from items this PR completes.
+- The criteria field is normally `Microsoft.VSTS.Common.AcceptanceCriteria` (Agile, Scrum, CMMI); confirm with `get_type`. Read the field with its current format and write it back with a JSON Patch `replace` on `/fields/<reference name>` that carries the full updated value.
+- Preserve the existing field's text, format, order, and unrelated entries. Update only existing checkboxes (Markdown `- [ ]`/`- [x]`, or the checked state of an HTML task-list item). Never rewrite prose into a new checklist.
+- When the criteria are bullets or prose with no checkboxes (the common case), leave the field unchanged and record per-criterion progress as a `wit_work_item_comment_write` `add` comment: each criterion with met / not met / unverified and its evidence. Report in the result that the field itself was not changed.
+- Use the field's declared format and the [Long-text field format](#long-text-field-format) rules for rich-text fields. Do not change a field's Markdown/HTML mode just to update a checkbox.
+- Read the Work Item back after writing. Verify completed entries match the evidence and that uncompleted entries and surrounding content are unchanged. If the read-back cannot establish this, report the update as incomplete.
+
+Criterion progress and Work Item state are separate. Do not set a terminal `System.State` as a side effect of checking criteria or linking a PR. State changes follow [Close with traceability](#close-with-traceability) and the confirmation guardrail.
+
+For the PR relation, use `wit_work_item_link_write` `link_to_pull_request` and then read the Work Item with relations expanded to verify the intended pull request is present. Avoid duplicate links. A description's `AB#<id>` mention provides navigation but does not replace verification of the explicit PR relation.
+
 ## When to use
 
 - Creating bugs, tasks, user stories, features, or epics

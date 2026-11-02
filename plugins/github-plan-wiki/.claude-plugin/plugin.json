@@ -1,6 +1,6 @@
 {
   "name": "github-plan-wiki",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Create template-aware GitHub issues and pull requests with per-issue closing keywords, and publish approved plans to the GitHub wiki in English and Japanese.",
   "author": {
     "name": "Team Foundation Users Japan"

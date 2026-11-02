@@ -5,7 +5,7 @@ description: 'Break an approved implementation plan into a GitHub issue hierarch
 
 # GitHub Plan Issues
 
-Turn an approved plan into a GitHub issue hierarchy with the `gh` CLI (2.6x+, tested against 2.97.0). The core rule: **when a piece of work needs more than one issue, it is always a parent issue with sub-issues — never a set of independent flat issues.**
+Turn an approved plan into a GitHub issue hierarchy with the `gh` CLI (2.6x+ for native sub-issues). The core rule: **when a piece of work needs more than one issue, it is always a parent issue with sub-issues — never a set of independent flat issues.**
 
 ## Phase 0 — Preconditions and work-type classification
 
@@ -29,6 +29,8 @@ Turn an approved plan into a GitHub issue hierarchy with the `gh` CLI (2.6x+, te
    - If it's genuinely ambiguous, ask the user — don't default to "no wiki" just because it's easier.
 
 4. **Read repository Issue templates before proposing titles or bodies.** Inspect `.github/ISSUE_TEMPLATE/` Markdown templates and YAML forms on the default branch, its `config.yml`, and legacy `ISSUE_TEMPLATE.*` files in `.github/`, the root, or `docs/` (case-insensitive). If the repository supplies none, check applicable defaults in the owner's public `.github` repository; an access failure is not proof of absence. Choose the template appropriate to each parent/child's work type and preserve required sections, title prefixes, fields, and applicable labels/assignees. For forms, include each required input and option/checkbox response in the rendered Markdown, or use the form UI if its constraints cannot be represented faithfully. Do not invent evidence or check unverified items. `--body-file` and connector writes do not apply templates automatically: render the template yourself and verify its requirements before validation. If a required answer is unknown, ask for it before creating the issue.
+
+5. **Choose where detailed content belongs.** Keep each issue body focused on its summary, acceptance criteria, and parent/child checklist. When supporting detail would make the body long or should be a separately maintained record, hand it to [github-issue-artifacts](../github-issue-artifacts/SKILL.md) and follow that skill's required artifact workflow.
 
 ## Phase 1 — Decide parent vs. sub-issues
 
@@ -92,7 +94,7 @@ gh issue create --repo <owner>/<repo> \
   --label enhancement
 ```
 
-Fit a one-paragraph summary, acceptance criteria, and a checklist of sub-issues to come into the selected template (fill in numbers after Phase 3). If no template applies, use these as the body structure. Do not replace the repository template with a generic plan body.
+Fit a concise summary, acceptance criteria, and a checklist of sub-issues into the selected template (fill in numbers after Phase 3). Hand off detailed plan content to [github-issue-artifacts](../github-issue-artifacts/SKILL.md) when it belongs in an artifact. If no template applies, use the concise body structure. Do not replace the repository template with a generic plan body.
 
 ## Phase 3 — Create sub-issues
 

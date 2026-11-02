@@ -2,6 +2,8 @@
 
 ## 未リリース
 
+- `github-plan-wiki` を 0.2.1、`azure-devops-toolkit` を 0.3.2 に更新しました。GitHub PR と Azure DevOps Repos の手順は、先に PR を作成してリンクしてから、証拠のある受け入れ基準を更新します（Issue 本文は書き込み直前に再読込し、チェックボックスのない Work Item ではコメントで進捗を記録）。PR の追跡リンクも確認し、未完了の基準を保持し、追跡項目自体のクローズは別に扱います。
+- `github-issue-artifacts` スキル（`github-plan-wiki`）を追加しました。`gh issue artifact` で長い補足資料やリッチな記録を扱い、Artifact が使えない場合は内容を捨てずに Wiki 登録へ回し、未完了として報告します。
 - `azure-managed-identity-review` プラグインを追加しました。ある利用者（たとえばストレージのカスタマーマネージドキー）のために付けた権限は、同じ ID を使うほかの利用者の audience をカバーせず、その利用者だけにとどまりもしません。しかもローカル E2E は開発者本人の権限で動きます。そこで、このスキルは ID を共有するすべてのリソース・アプリ設定・コード・フェデレーション資格情報を横断してレビューします。`msi_review.py` は Bicep、ARM、Terraform、アプリ設定、コード（`static`）、または読み取り専用の `az` 呼び出しでサブスクリプション（`live`、アプリ設定はマスクし IaC とのドリフトも検出）を読み取り、規則 MIR000-MIR008 を報告します。
 - `windows-shell-safety` プラグインを追加しました。Windows で `az`（`az.cmd`）などのバッチファイルが `cmd.exe` を経由するときに `|`、`&`、`%VAR%`、二重引用符、インライン JSON が失われる問題や、シェルをまたいで `-Command` 文字列を入れ子にする問題を防ぐスキルです。実行前 lint（`Test-NativeCommand.ps1`、規則 WSS001-WSS009）と、本文を UTF-8 の `@<file>` で渡す PowerShell 7 ヘルパー（`Invoke-AzJson`、`Invoke-NativeJson`、`Show-NativeArgs`）を同梱します。`windows-latest` の CI ジョブで引数の欠落を再現し、安全なパターンを検証します。
 - `azure-devops-toolkit` を 0.3.1 に更新しました。`azure-devops-boards` スキルは、`/multilineFieldsFormat/<field>`（MCP では `format: "Markdown"`）でフィールドを Markdown に切り替えてから本文を Markdown で書き込みます。サーバーが Markdown フィールドに対応していない場合に限り HTML に切り替え、読み戻し検査も形式に応じて行います。Azure DevOps Services での実機確認に基づき、`<` は本文中では `&amp;lt;`、コード内では `&lt;` に変換します。サーバーはタグの形をした文字列を削除し、フォームのプレビューは値を一度デコードしてから描画するためです（MCP サーバーと同じ一重の `&lt;script&gt;` では、それ以降の本文が表示されませんでした）。
