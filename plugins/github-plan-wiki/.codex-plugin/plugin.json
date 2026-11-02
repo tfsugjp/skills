@@ -1,6 +1,6 @@
 {
   "name": "github-plan-wiki",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Create template-aware GitHub issues and pull requests with per-issue closing keywords, and publish approved plans to the GitHub wiki in English and Japanese.",
   "author": {
     "name": "Team Foundation Users Japan"
@@ -11,7 +11,7 @@
   "interface": {
     "displayName": "GitHub Plan & Wiki",
     "shortDescription": "Template-aware issues, PR closure, and wiki plans",
-    "longDescription": "Turns approved plans into template-aware GitHub issue hierarchies and bilingual wiki pages, and creates or updates PR bodies with repository templates, a Fixed or Close keyword per completed issue, mandatory validation, and readback.",
+    "longDescription": "Turns approved plans into template-aware GitHub issue hierarchies and bilingual wiki pages, and creates or updates PRs with evidence-based acceptance tracking, repository templates, issue links, and readback.",
     "developerName": "Team Foundation Users Japan",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Write"],

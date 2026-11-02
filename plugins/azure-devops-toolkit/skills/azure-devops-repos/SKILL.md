@@ -1,6 +1,6 @@
 ---
 name: azure-devops-repos
-description: 'Work with Azure Repos pull requests: create PRs, review and vote, manage comment threads, resolve comments, and complete or abandon PRs. Use when the user asks to create, review, comment on, or merge pull requests in Azure DevOps. Prefers Azure DevOps MCP Server tools and falls back to the REST API.'
+description: 'Work with Azure Repos pull requests: create or update PRs, link work items and record their acceptance-criteria progress, review and vote, manage comment threads, and complete or abandon PRs. Use when the user asks to create, update, review, comment on, or merge pull requests in Azure DevOps. Prefers Azure DevOps MCP Server tools and falls back to the REST API.'
 compatibility: 'Azure DevOps Services. MCP tools require the Azure DevOps MCP Server (repos toolset).'
 ---
 
@@ -81,11 +81,16 @@ On Windows, use the PowerShell 7 file-based REST pattern in [azure-devops-founda
 
 ## Common workflows
 
-### Create a PR with work item linkage
-1. `repo_create_branch` (or confirm the source branch exists with `repo_branch` `get`).
-2. `repo_pull_request_write` `create` with a clear title and a description that references the work item (`AB#<id>` auto-links on Azure Repos).
-3. `wit_work_item_link_write` `link_to_pull_request` (see [azure-devops-boards](../azure-devops-boards/SKILL.md)) for explicit linking.
-4. `repo_pull_request_write` `update_reviewers` to add required reviewers, optionally `update` to enable autocomplete.
+### Create or update a PR with work item linkage
+1. Resolve every work item this PR is intended to complete or partially address. Read the full item, its type and available fields, and any parent/child items that define scope. Keep reference-only and unfinished parent items separate from completed items.
+2. Look for an existing active PR for the source branch (`repo_pull_request` list/get). If one exists, use `repo_pull_request_write` `update` and preserve its description. Otherwise `repo_create_branch` (or confirm the source branch exists with `repo_branch` `get`), then `repo_pull_request_write` `create` with a clear title and a description referencing each relevant work item (`AB#<id>` auto-links on Azure Repos). Stop if the PR was not created; do not touch any Work Item criteria.
+3. Call `wit_work_item_link_write` `link_to_pull_request` (see [azure-devops-boards](../azure-devops-boards/SKILL.md)) for explicit linkage where needed. Read the PR and each Work Item's relations back and verify they identify the intended PR and items. The `AB#<id>` mention alone is not proof that the explicit relation exists.
+4. Only after the PR exists and is linked, reconcile acceptance criteria as defined in [azure-devops-boards](../azure-devops-boards/SKILL.md#acceptance-criteria-progress-from-a-pull-request) (field, format, comment fallback, read-back). Compare each criterion individually with the implementation and verification evidence and mark it complete only when all of it is satisfied by evidence in this change. The result reflects the evidence at PR time; if the PR is later abandoned or rejected, revert or annotate those entries.
+5. Read each changed Work Item back and verify that only evidence-backed criteria changed and all other content is intact. If verification fails, report the item and the failed read-back; do not claim it is synchronized.
+6. On PR updates, preserve the existing description, reconcile only criteria whose evidence is new or changed since the last reconciliation, and leave previously completed entries alone unless new evidence shows a regression (then report it rather than silently unchecking). Verify the resulting PR description and Work Item links.
+7. Use `repo_pull_request_write` `update_reviewers` to add required reviewers, optionally `update` to enable autocomplete.
+
+Updating acceptance criteria records criterion progress only. It does not transition `System.State`, close the Work Item, or authorize PR completion; handle those as separate operations under [azure-devops-boards](../azure-devops-boards/SKILL.md#guardrails) and this skill's Guardrails.
 
 ### Review a PR
 1. `repo_pull_request` `get` for metadata; `repo_file` `get_content` / iteration changes for the diff context.
