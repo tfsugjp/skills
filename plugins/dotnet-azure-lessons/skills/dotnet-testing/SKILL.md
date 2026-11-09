@@ -1,6 +1,6 @@
 ---
 name: dotnet-testing
-description: 'Verification rules for .NET and Azure work, learned from changes reported as done that failed in real use. Use while writing MSTest, xUnit, or NUnit tests; adding OS-specific or ARM64 tests; adding sample files or manifests the product validates; testing concurrency, ordering, or serialization; and before reporting any change as verified or done. Not for investigating an existing failure (dotnet-debugging) or CI YAML changes (dotnet-ci-cd).'
+description: 'Verification rules for .NET, Azure, and PowerShell, learned from changes reported as done that failed in real use. Use while writing MSTest, xUnit, or NUnit tests, adding OS-specific or ARM64 tests, validating samples or artifacts, checking concurrency and serialization, or deciding whether a change passed its acceptance gates. Not for investigating an existing failure (dotnet-debugging) or CI YAML changes (dotnet-ci-cd).'
 ---
 
 # .NET Testing and Verification
@@ -45,11 +45,11 @@ description: 'Verification rules for .NET and Azure work, learned from changes r
 - **Check:** The CI matrix has an ARM64 test job, not only an ARM64 build step.
 - **Why:** The user had to ask for native ARM64 testing after ARM64 was only cross-compiled.
 
-### 6. Keep samples valid under the product's own validator
+### 6. Validate samples and verify artifacts
 
-- **Rule:** Every sample manifest, configuration, or template shipped in the repository passes the product's `validate` command in a test or CI step. Intentionally invalid samples live in a separate, clearly named folder.
-- **Check:** A test enumerates the sample folder and validates each file.
-- **Why:** A macOS sample failed the product's own validation for a missing required field.
+- **Rule:** Validate each shipped sample manifest, configuration, or template with the product's own validator. Keep intentionally invalid samples in a separate, clearly named folder. For release manifests, verify the digest of the actual asset for the specified version, OS, and architecture. When package contents are an acceptance condition, inspect the built package for its required files and contract metadata.
+- **Check:** A test enumerates and validates the sample files. Report manifest validity, digest verification, and package contents separately when applicable.
+- **Why:** A sample failed validation for a missing required field. A different manifest was structurally valid but listed the wrong digest for its asset.
 
 ### 7. Pin serialization of external payloads
 
@@ -59,15 +59,15 @@ description: 'Verification rules for .NET and Azure work, learned from changes r
 
 ### 8. Test ordering and concurrency explicitly
 
-- **Rule:** When code depends on order or runs concurrently, test the order (A, B, C), concurrent operations (two requests in flight), re-initialization, and an item added while an async operation is pending.
-- **Check:** Such tests exist for every queue, pending-operation field, and post-send cleanup.
+- **Rule:** When code depends on order or runs concurrently, choose cases that exercise the relevant race: ordering (A, B, C), concurrent operations, re-initialization, or an item added while an operation is pending. For an operation tied to a selection, cover switching the selection before a success, failure, or notification arrives and both response and notification orders when they can race.
+- **Check:** Each affected queue, pending operation, or post-send cleanup has a test that exercises the relevant ordering or race.
 - **Why:** Reordered notifications, a single pending-operation slot, and cleared in-flight attachments all reached review.
 
-### 9. Report what was not run
+### 9. Record test execution and acceptance gates separately
 
-- **Rule:** When a test cannot run locally (no Docker, no ARM64 machine, no signed-in account), state that it was not run and which CI job or person will run it. Never mark an item verified without evidence; record who verified it and how when the user did.
-- **Check:** The report separates "verified", "verified by the user", and "not run".
-- **Why:** Unverified items were nearly recorded as verified.
+- **Rule:** Record the commit or artifact, configuration, counts, and skip reasons. Compare these with the required gate even if the test process exits successfully. Attribute user acceptance to the person, target, and conditions verified. Record harness results and real-host acceptance separately. If a required check could not start, name the gap and the job or person that can run it.
+- **Check:** The report separates test results, gate status, acceptance evidence, and checks that did not run. Later user acceptance retains the original test and gate results.
+- **Why:** A test process succeeded with privilege-related skips while a mandatory evidence gate remained blocked. Later real-host acceptance covered a different verification condition.
 
 ### 10. Clean up test data in real services
 
@@ -81,7 +81,7 @@ description: 'Verification rules for .NET and Azure work, learned from changes r
 - [ ] UI states were checked from screenshots.
 - [ ] Neighboring paths were re-checked.
 - [ ] OS-specific tests are conditioned; ARM64 runs natively when possible.
-- [ ] Samples pass the product validator.
+- [ ] Samples pass the product validator, and required artifact contents and digests are checked separately.
 - [ ] External payloads, ordering, and concurrency have tests.
-- [ ] The report separates verified, user-verified, and not run.
+- [ ] The report separates test execution, skips, gate status, and user or real-host acceptance.
 - [ ] Test data in real services is deleted.

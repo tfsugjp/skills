@@ -53,15 +53,21 @@ Documentation problems in past sessions were rarely style issues. They were stat
 
 ### 7. Record verification honestly
 
-- **Rule:** Mark an item verified only with evidence. When the user verified it, write who verified it and how (for example "verified by the user in the Experimental instance").
-- **Check:** Every "verified" mark has a source.
-- **Why:** Verification status was nearly recorded without evidence.
+- **Rule:** Tie verification to the commit or artifact, configuration, environment, and observed result. Attribute user verification to the person and what they exercised. Append later acceptance evidence to the condition it satisfies and retain the original skips, blocked gates, or checks that never started.
+- **Check:** Each verification claim traces to evidence for that target. A harness result and real-host acceptance have separate entries when both matter.
+- **Why:** Later user acceptance covered a real-host condition while the earlier evidence gate remained blocked.
 
 ### 8. Follow the repository's language and placeholder rules
 
 - **Rule:** Write documents in the language the repository requires (for example English with `_ja.md` translations for MIT repositories), keep translated pairs one-to-one, and use placeholders instead of real URLs, IP addresses, host names, and email addresses, except where the repository rules allow them.
 - **Check:** Translated pairs have the same headings and tables; a search for URLs finds only allowed ones.
 - **Why:** Repository rules require it, and leaked hosts are hard to remove later.
+
+### 9. Reconcile documentation after conflicts
+
+- **Rule:** Compare the resolved document with both sides of a merge. Check scope, stage labels, versions, and verification status. If text is garbled, recover the affected text from a known-good revision and reapply the intended edits.
+- **Check:** Read the resolved files as UTF-8. For translated pairs, verify that versions, conditions, and completion status agree as well as headings and tables.
+- **Why:** Conflict resolution garbled words and left contradictory verification-stage wording in English and Japanese.
 
 ## Done checklist
 
@@ -73,3 +79,4 @@ Documentation problems in past sessions were rarely style issues. They were stat
 - [ ] Snippets use consistent names.
 - [ ] Verified marks have sources.
 - [ ] Language, translation pairs, and placeholders follow repository rules.
+- [ ] Resolved documentation conflicts preserve both sides' intended changes and matching verification status.

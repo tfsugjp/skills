@@ -1,6 +1,6 @@
 ---
 name: powershell-scripting
-description: 'Rules for writing PowerShell 7 scripts, learned from review findings and failed runs. Use while writing or changing a .ps1 script or module that filters with Where-Object and then uses .Count or [0], writes checksum or other text files with Out-File or Set-Content for other operating systems, locates executables such as python or dotnet through PATH, mise, or pyenv shims, or composes agent shell commands that must match permission allow rules. For quoting, JSON, pipes, and encoding when calling az, gh, or other native commands on Windows, use windows-shell-safety instead.'
+description: 'Rules for writing PowerShell scripts, learned from review findings and failed runs. Use for pipeline result cardinality, cross-platform text files, executable shims, permission-matching command shapes, and batch changes that call WinGet, az, or other native programs and must handle partial failure. For native argument quoting, JSON, pipes, and console encoding, use windows-shell-safety.'
 ---
 
 # PowerShell Scripting
@@ -45,11 +45,11 @@ These rules cover PowerShell behavior that differs from what the code appears to
 - **Check:** The command's first word is the program that the allow rule names.
 - **Why:** Commands that started with a variable assignment did not match the allow rules, which interrupted unattended work.
 
-### 6. Fail on native command errors
+### 6. Classify native command failures before continuing
 
-- **Rule:** After calling a native program, check `$LASTEXITCODE` and throw on failure, or set `$PSNativeCommandUseErrorActionPreference = $true` with `$ErrorActionPreference = 'Stop'`.
-- **Check:** A forced failure of the native call stops the script with a message.
-- **Why:** Scripts that ignored exit codes reported success after a failed step.
+- **Rule:** Capture `$LASTEXITCODE` immediately after a native call and fail on unhandled exit codes. Resolve the exact package or resource ID and its source or environment before making a change. Stop if a failed prerequisite makes the target set unreliable. Continue after an individual failure only when the operation's contract allows it, retain each failure in the summary, and follow the agreed exit-code policy.
+- **Check:** Mock a failed discovery or source refresh and assert that no item changes run. Mock an allowed item failure and assert that the next item is attempted and the failure appears in the final result. Check behavior on rerun after partial success and run the tests under the supported PowerShell versions, including Windows PowerShell 5.1 when supported.
+- **Why:** A batch needed to continue after one package update failed while still stopping when package discovery or source refresh failed.
 
 ## Done checklist
 
@@ -58,5 +58,5 @@ These rules cover PowerShell behavior that differs from what the code appears to
 - [ ] Snippet file names match the names they verify.
 - [ ] Tool discovery works through version-manager shims.
 - [ ] Agent commands start with the program and use absolute paths.
-- [ ] Native exit codes are checked.
+- [ ] Native exit codes, exact targets, partial failures, and failed prerequisites are covered on the supported shells.
 - [ ] Native calls with JSON, queries, or pipes follow `windows-shell-safety`.

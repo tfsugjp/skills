@@ -17,8 +17,8 @@ Each rule below comes from a design that passed review and later failed in produ
 
 ### 1. Gate version-dependent features on the connected peer
 
-- **Rule:** Enable a feature that needs a newer server, CLI, or protocol only when the version reported by the connected peer (for example the `initialize` response) supports it. Do not gate on the package version you built against.
-- **Check:** The design names the minimum supported version, the feature gate per version, and the error shown when the peer is below the minimum.
+- **Rule:** Gate a feature on the connected peer's reported version or negotiated capabilities. Record the recommended version, the minimum supported version, the versions users can obtain through the supported distribution channels, and the feature threshold separately. For shared settings, specify read and write eligibility separately and define when applying a setting may replace an existing draft.
+- **Check:** The design covers peers below the minimum, at the minimum, and at each feature boundary, plus a peer whose version cannot be determined. Each case identifies the features available and the fallback or error.
 - **Why:** A feature gated on the build-time version broke when the user connected to an older peer, and an unsupported version had to be rejected explicitly afterwards.
 
 ### 2. List an external API's required fields and preconditions before designing the payload
@@ -75,9 +75,21 @@ Each rule below comes from a design that passed review and later failed in produ
 - **Check:** The report lists each user decision and the section that now reflects it, including values that were undefined (for example what `null` means for an optional tier setting).
 - **Why:** A revised design omitted a whole section, an ADR revision, and the meaning of a `null` value the user had specified.
 
+### 11. Define recovery across a queue and a store
+
+- **Rule:** For a queue-triggered Azure Function that persists a result, define when the trigger considers processing complete, what can be retried, and which key makes replay safe. Use the delivery and retry semantics of the chosen trigger.
+- **Check:** The design covers interruption before persistence, interruption after persistence but before completion, duplicate delivery, and what happens when retries are exhausted.
+- **Why:** A restart between persistence and completion can replay work that has already changed durable state.
+
+### 12. Separate package updates from framework migration
+
+- **Rule:** Before planning an update, identify the effective SDK, target frameworks, and resolved direct and transitive dependencies for each affected project. Check parent version ranges and package assets before proposing a new pin. Treat a required framework change or preview SDK as a separate design decision and use `nuget-validate` to vet candidate versions.
+- **Check:** The plan distinguishes updates that resolve within the current targets from updates that require a migration. Every proposed central pin is used by a project in scope.
+- **Why:** A parent package constrained a transitive update to an older major, and a central package list included entries unused by the requested project.
+
 ## Done checklist
 
-- [ ] Minimum versions and per-version gates are stated, based on the connected peer.
+- [ ] Minimum, recommended, and distributed versions are distinct from feature gates based on the connected peer.
 - [ ] Required properties and preconditions of each external resource are listed.
 - [ ] The hosting service's supported stack is cited.
 - [ ] Host-dependent settings are lists.
@@ -87,3 +99,5 @@ Each rule below comes from a design that passed review and later failed in produ
 - [ ] CI platform matches the repository host.
 - [ ] Solutions are `.slnx`, with no leftover `.sln` or stale references, unless an exception is recorded.
 - [ ] Design, ADR, Wiki, and issue are updated together, and every user decision is traced to a section.
+- [ ] Queue replay and partial persistence have a defined outcome when applicable.
+- [ ] Package updates and required SDK or framework migrations are distinguished.

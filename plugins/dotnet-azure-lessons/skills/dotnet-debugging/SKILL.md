@@ -29,9 +29,9 @@ Most wasted debugging time in past sessions came from testing a different binary
 
 ### 3. Read the failure before changing code
 
-- **Rule:** For CI failures, read the failing job's log (`gh pr checks`, `gh run view --log-failed`, or the Azure Pipelines log) and quote the first real error. For HTTP failures, capture the status, the error body, and the request payload.
-- **Check:** The quoted error line explains the fix.
-- **Why:** A Linux-only build failure and a Graph 400 were both explained exactly by their logs; guessing would have changed unrelated code.
+- **Rule:** For CI failures, identify the run, commit, failed job, and step. Read the failed job's log and quote the first error that explains the failure. If credentials or the CLI prevent log retrieval, try an already authorized path to the same run. If access remains blocked, report the retrieval error and the evidence needed to resume, with the job's cause undetermined. For HTTP failures, capture the status and redact sensitive fields before recording the response or request.
+- **Check:** The report cites the log that supports the diagnosis or names the run and missing log explicitly.
+- **Why:** A Linux build failure and a Graph 400 were explained by their logs. A credential-store failure occurred before an Azure Pipelines job log could be read.
 
 ### 4. Change approach after the same failure twice
 
@@ -63,11 +63,18 @@ Most wasted debugging time in past sessions came from testing a different binary
 - **Check:** The log shows the interrupt request and the operation's completion event.
 - **Why:** A stop button changed state while the turn kept running to the end.
 
+### 9. Preserve evidence from intermittent failures
+
+- **Rule:** Save the initial error and, when useful and authorized, rerun only the affected job or test on the same commit and configuration. Distinguish a dependency download failure, a timeout, and an assertion failure before deciding whether to change code.
+- **Check:** Record the initial outcome, the rerun scope, and the result. Report an intermittent cause as undetermined when the rerun passes without identifying it.
+- **Why:** A transient download error and an intermittent test timeout both passed on retry, but involved different failure points.
+
 ## Done checklist
 
 - [ ] Binary paths and versions are recorded.
 - [ ] The failure and the fix were confirmed with the real peer, or the gap is stated.
-- [ ] The first real error line is quoted.
+- [ ] The first job error is quoted, or the blocked log retrieval and missing evidence are stated.
 - [ ] No third retry of the same shape.
 - [ ] Missing-work claims cite `git` or `gh` output.
 - [ ] Neighboring paths and cancellation were checked when relevant.
+- [ ] Initial and rerun outcomes are both recorded for intermittent failures.

@@ -27,11 +27,11 @@ Each rule is a defect that shipped or reached review at least once. Apply it whi
 - **Check:** A test sends A, B, C and asserts the handler observed A, B, C; a test fills the queue and shows the read loop still parses responses.
 - **Why:** Parallel handling reordered message deltas and turn completion.
 
-### 3. Clear only what you sent
+### 3. Apply async results to the original target
 
-- **Rule:** After an async send succeeds, remove only the items captured in the send snapshot (by reference or ID). Never call `Clear()` on a collection the user can modify during the send.
-- **Check:** A test adds an item while the send is pending and asserts it remains.
-- **Why:** `Attachments.Clear()` after a successful send deleted attachments added while the send was in flight.
+- **Rule:** Carry the target and, when multiple operations can overlap, the operation ID into success, failure, and notification handlers. Apply results to the original target. Update the active view only when the target matches and the result still applies to that view. After a successful send, remove only the items captured in the send snapshot, by reference or ID.
+- **Check:** Tests add an item while the send is pending and switch targets before a response or notification arrives. The new item remains, and a late success or failure affects only its original target.
+- **Why:** Send cleanup deleted newly added attachments, and a delayed result appeared in a different view after selection changed.
 
 ### 4. Reject unknown enum and option values
 
@@ -47,9 +47,9 @@ Each rule is a defect that shipped or reached review at least once. Apply it whi
 
 ### 6. Keep omitted, null, and value distinct
 
-- **Rule:** For configuration that is imported, exported, or applied, model omitted, explicit `null`, and a value as three states (`Optional<T>`, a nullable wrapper with a presence flag, or `JsonElement.ValueKind`). Write `null` back only when the source had it.
-- **Check:** A round-trip test covers all three states, and the serialized request for a delete or reset matches the receiver's required fields.
-- **Why:** An explicit `null` meaning "any app" was treated as omitted and pinned to a specific app on apply; a delete request with `null` failed because the receiver required the field.
+- **Rule:** Preserve the distinctions the contract makes between omitted fields, explicit `null`, empty strings, and other values. Use a presence flag or an equivalent representation when omission and explicit `null` differ. For settings merges, inspect an existing file for distinct shapes such as arrays and metadata maps and preserve metadata the merge does not own.
+- **Check:** Round-trip tests cover the distinct states the contract supports and the serialized request matches the receiver's required fields. For a merge, check that existing metadata survives and update assertions about the complete key set when its expected contents change.
+- **Why:** An explicit `null` meaning "any app" was treated as omitted, and a settings merge tried to process a metadata map as an array. Preserving that map also required updating an existing expected-key assertion.
 
 ### 7. Use Path APIs for paths
 
@@ -71,19 +71,19 @@ Each rule is a defect that shipped or reached review at least once. Apply it whi
 
 ### 10. Parse every input shape the user named
 
-- **Rule:** When adding a parser or recognizer, list the input shapes in the request (single and multiple questions, intermediate and final messages) and add one test per shape before implementing.
-- **Check:** The test list matches the request wording.
-- **Why:** A choice recognizer handled only a single question in the last message and had to be extended twice.
+- **Rule:** When adding a parser or recognizer, test each requested input shape before implementing. For a text parsing bug, keep the exact failing input, including markup and line boundaries. Normalize only the part needed for recognition and preserve exclusions such as fenced code.
+- **Check:** The tests cover each requested shape and, for a bug fix, the original failing input and a similar input that must remain excluded.
+- **Why:** A choice recognizer missed some requested message shapes, and inline emphasis after a question mark hid an otherwise valid question.
 
 ## Done checklist
 
 - [ ] No notification handler awaits a request on its own connection; the read loop survives handler exceptions.
 - [ ] Ordered streams use one consumer and have an order test.
-- [ ] Post-send cleanup removes only the snapshot.
+- [ ] Async results stay with the original target, and post-send cleanup removes only the snapshot.
 - [ ] Unknown enum values fail.
 - [ ] Uniqueness keys include every distinguishing field.
-- [ ] Omitted, null, and value round-trip distinctly.
+- [ ] Distinct configuration values round-trip, and merges preserve metadata.
 - [ ] Paths use `System.IO.Path`.
 - [ ] Messages match exit codes.
 - [ ] Loopback connections try IPv6 and IPv4.
-- [ ] Each requested input shape has a test.
+- [ ] Requested parser shapes and applicable regression inputs and exclusions have tests.
