@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行、Azure マネージド ID レビュー、Windows と macOS のネイティブコンテナー操作のワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
+Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行、Azure マネージド ID レビュー、Windows と macOS のネイティブコンテナー操作、.NET・Azure・PowerShell 開発の再発防止ルールのワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
 
 ## Plugin
 
@@ -15,6 +15,7 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `azure-managed-identity-review` | Azure のマネージド ID を読み取り専用でレビューします。同じ ID を共有するリソース・アプリ設定・コード・フェデレーション資格情報（FIC）をすべて洗い出し、各利用者の audience に対する権限漏れ、他の利用者への権限の漏洩、ID 選択の誤り、IaC とのドリフトを報告します（`msi_review.py`、規則 MIR000-MIR008） |
 | `windows-shell-safety` | Windows で Azure CLI・JSON・パイプを安全に実行するための規則、`cmd.exe` による引数欠落を実行前に検出する lint（`Test-NativeCommand.ps1`）、JSON を UTF-8 の `@<file>` で渡す PowerShell 7 ヘルパー |
 | `native-container-cli` | WindowsではWSL Containers、macOSではApple containerを優先。対応するDockerコマンドを変換し、ComposeやDocker API連携などでDockerへの切り替えが必要な場合は実行前に確認 |
+| `dotnet-azure-lessons` | スキル: .NET Architecture Design、.NET Coding、VS Extension Remote UI、PowerShell Scripting、.NET Debugging、.NET Testing、.NET Documentation、.NET CI/CD、PR and Issue Workflow。いずれも過去の訂正から得たルール、確認方法、完了チェックリストを持ちます。エージェント: .NET Lessons Reviewer（これらのチェックリストで差分を読み取り専用でレビュー） |
 
 すべて MIT License で配布します。認証情報は含めず、MCP server も自動構成しません。Azure DevOps の認証と権限は利用者が設定してください。
 
@@ -31,6 +32,7 @@ claude plugin install repository-init@tfsugjp-agent-skills
 claude plugin install windows-shell-safety@tfsugjp-agent-skills
 claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
 claude plugin install native-container-cli@tfsugjp-agent-skills
+claude plugin install dotnet-azure-lessons@tfsugjp-agent-skills
 ```
 
 ## GitHub Copilot からインストール
@@ -48,6 +50,7 @@ copilot plugin install repository-init@tfsugjp-agent-skills
 copilot plugin install windows-shell-safety@tfsugjp-agent-skills
 copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
 copilot plugin install native-container-cli@tfsugjp-agent-skills
+copilot plugin install dotnet-azure-lessons@tfsugjp-agent-skills
 ```
 
 ## Codex の repository-local marketplace からインストール
@@ -65,6 +68,7 @@ codex plugin add repository-init@tfsugjp-agent-skills
 codex plugin add windows-shell-safety@tfsugjp-agent-skills
 codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 codex plugin add native-container-cli@tfsugjp-agent-skills
+codex plugin add dotnet-azure-lessons@tfsugjp-agent-skills
 ```
 
 Codex の local marketplace は開発・チーム配布用です。公開 listing への申請は、検証完了後の別リリース作業とします。
@@ -122,6 +126,24 @@ python3 "$skill/scripts/msi_review.py" static "$skill/tests/fixtures/terraform-c
 ```
 
 Windows では同じスクリプトを `python` で実行します。
+
+## .NET / Azure Lessons
+
+`dotnet-azure-lessons` は、過去のエージェントセッションでのやり直しの依頼、ユーザーの訂正、レビューの指摘からルールを集め、同じ誤りの再発を防ぎます。各スキルは作業の 1 つの工程で読み込まれ、ルールを確認方法と理由付きで示し、最後に完了チェックリストを置きます。既存スキル（`windows-shell-safety`、`github-pull-request`、`github-plan-issues`、`azure-devops-pipelines`、`project-documentation`、`nuget-validate`）が扱う手順は繰り返さず、引き渡し先として示します。
+
+| スキル | 読み込まれる場面 |
+|---|---|
+| [dotnet-architecture-design](plugins/dotnet-azure-lessons/skills/dotnet-architecture-design/SKILL.md) | .NET / Azure のアーキテクチャ、ADR、対応バージョンを設計・改定するとき |
+| [dotnet-coding](plugins/dotnet-azure-lessons/skills/dotnet-coding/SKILL.md) | 非同期 RPC、通知、コレクション、解析、CLI の C# を書くとき |
+| [vs-extension-remote-ui](plugins/dotnet-azure-lessons/skills/vs-extension-remote-ui/SKILL.md) | VisualStudio.Extensibility の Remote UI の ViewModel や XAML を編集するとき |
+| [powershell-scripting](plugins/dotnet-azure-lessons/skills/powershell-scripting/SKILL.md) | フィルター、ファイル出力、ツール検出を行う PowerShell スクリプトを書くとき |
+| [dotnet-debugging](plugins/dotnet-azure-lessons/skills/dotnet-debugging/SKILL.md) | 障害、CI の失敗、テストと異なる挙動を調査するとき |
+| [dotnet-testing](plugins/dotnet-azure-lessons/skills/dotnet-testing/SKILL.md) | テストを書くとき、または変更が検証済みかを判断するとき |
+| [dotnet-documentation](plugins/dotnet-azure-lessons/skills/dotnet-documentation/SKILL.md) | コードに合わせて README、セットアップ手順、XML ドキュメント、Wiki を編集するとき |
+| [dotnet-ci-cd](plugins/dotnet-azure-lessons/skills/dotnet-ci-cd/SKILL.md) | GitHub Actions や Azure Pipelines の定義とパッケージングを編集するとき |
+| [pr-issue-workflow](plugins/dotnet-azure-lessons/skills/pr-issue-workflow/SKILL.md) | レビュースレッド、コミット、マージ、Issue のクローズを扱うとき |
+
+変更を完了と報告する前に、`dotnet-lessons-reviewer` エージェントに差分を確認させてください。変更されたファイルに当てはまるスキルを選び、ルール・ファイル・行ごとに問題を報告します。ファイルは編集しません。
 
 ## プロジェクト文書管理
 

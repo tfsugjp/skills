@@ -2,6 +2,7 @@
 
 ## 未リリース
 
+- `dotnet-azure-lessons` プラグインを追加しました。過去のエージェントセッションでのやり直しの依頼、ユーザーの訂正、レビューの指摘を一般化し、.NET・Azure・PowerShell 開発向けに工程別の 9 個のスキル（アーキテクチャ設計、コーディング、Visual Studio Remote UI、PowerShell スクリプト、デバッグ、テスト、ドキュメント、CI/CD、PR と Issue の運用）にまとめました。各スキルはルール、確認方法、理由、完了チェックリストを持ちます。これらで差分を確認する読み取り専用の `dotnet-lessons-reviewer` エージェントも追加しました。ソリューションファイルは `.slnx` を既定とし、既存の `.sln` は `dotnet sln migrate` で移行します。既存スキルが扱う手順は繰り返さず、そちらへ引き渡します。
 - `github-plan-wiki` を 0.2.1、`azure-devops-toolkit` を 0.3.2 に更新しました。GitHub PR と Azure DevOps Repos の手順は、先に PR を作成してリンクしてから、証拠のある受け入れ基準を更新します（Issue 本文は書き込み直前に再読込し、チェックボックスのない Work Item ではコメントで進捗を記録）。PR の追跡リンクも確認し、未完了の基準を保持し、追跡項目自体のクローズは別に扱います。
 - `github-issue-artifacts` スキル（`github-plan-wiki`）を追加しました。`gh issue artifact` で長い補足資料やリッチな記録を扱い、Artifact が使えない場合は内容を捨てずに Wiki 登録へ回し、未完了として報告します。
 - `azure-managed-identity-review` プラグインを追加しました。ある利用者（たとえばストレージのカスタマーマネージドキー）のために付けた権限は、同じ ID を使うほかの利用者の audience をカバーせず、その利用者だけにとどまりもしません。しかもローカル E2E は開発者本人の権限で動きます。そこで、このスキルは ID を共有するすべてのリソース・アプリ設定・コード・フェデレーション資格情報を横断してレビューします。`msi_review.py` は Bicep、ARM、Terraform、アプリ設定、コード（`static`）、または読み取り専用の `az` 呼び出しでサブスクリプション（`live`、アプリ設定はマスクし IaC とのドリフトも検出）を読み取り、規則 MIR000-MIR008 を報告します。
