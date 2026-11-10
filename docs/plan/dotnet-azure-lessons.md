@@ -6,8 +6,8 @@
 
 ## Design
 
-- Source: redo requests, user corrections, and reviewer, Copilot, and Codex findings from agent sessions in 17 projects, about 70 cases after merging duplicates. Project names, host names, domains, and URLs are generalized and not published.
-- Each skill loads in one phase of the work and uses the same structure: when to use, when not to use, rules (rule, check, reason), and a done checklist.
+- Source: redo requests, user corrections, and reviewer, Copilot, and Codex findings from agent sessions in 17 projects, about 70 cases after merging duplicates, then cross-checked against Claude Code and Codex sessions from a second workstation (13 projects), which added missing lessons, corrected rules the history contradicted, and merged rules that overlapped between skills. Project names, host names, domains, and URLs are generalized and not published.
+- Each skill loads in one phase of the work and uses the same structure: when to use, when not to use, rules (a rule with its reason, and a check where the rule is not self-checking), and a done checklist.
 - Skills hand off to existing skills instead of repeating them: `windows-shell-safety` for native command quoting, `github-pull-request` for PR bodies and closing keywords, `github-plan-issues` for issue hierarchies, `azure-devops-pipelines` for pipeline runs, `project-documentation` for ADR and architecture documents, and `nuget-validate` for package versions.
 - The `dotnet-lessons-reviewer` agent selects the skills that apply to a diff, checks the diff against their done checklists, and reports findings without editing files.
 

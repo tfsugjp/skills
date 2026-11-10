@@ -52,9 +52,8 @@ Remote UI view models live in the extension process and are serialized to Visual
 
 ### 7. Verify in the Experimental instance, including visual states
 
-- **Rule:** After a Remote UI change, run the extension in the Experimental instance and check enabled and disabled states, selection and focus colors, a narrow tool window, theme or high contrast, and the language setting when localization changed.
-- **Check:** The report includes screenshots and a pass or fail per state. If the user verified it, record who verified it and how.
-- **Why:** A stop button that looked disabled, a selection that rendered white, truncated account information in a narrow window, and an untranslated UI were found only in the real IDE after the build and tests passed.
+- **Rule:** After a Remote UI change, run the extension in the Experimental instance with the build just produced and apply `dotnet-testing` rule 2 there, adding the language setting when localization changed. In a narrow window, every choice and button that needs a response stays reachable.
+- **Why:** A stop button that looked disabled, a white selection, truncated account information, choices cut off so the user could not answer, and an untranslated UI were found only in the real IDE after the build and tests passed.
 
 ## Done checklist
 

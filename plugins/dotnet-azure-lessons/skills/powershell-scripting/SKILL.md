@@ -5,13 +5,13 @@ description: 'Rules for writing PowerShell scripts, learned from review findings
 
 # PowerShell Scripting
 
-These rules cover PowerShell behavior that differs from what the code appears to say. Native command argument passing on Windows is covered by `windows-shell-safety`; follow that skill whenever the script calls `az`, `gh`, `npm`, or another native tool with JSON, `--query`, or pipes.
+These rules cover PowerShell behavior that differs from what the code appears to say.
 
 ## When not to use
 
-- `az`, `gh`, or `.cmd` argument quoting, inline JSON, `cmd.exe` metacharacters, and console encoding: use `windows-shell-safety`.
-- Azure DevOps REST writes: use the `azure-devops-foundation` skill.
-- Scripts and executable examples in documentation: delegate to the `script-author` agent when it is available.
+- `az`, `gh`, or `.cmd` argument quoting, inline JSON, `cmd.exe` metacharacters, and console encoding: `windows-shell-safety`.
+- Azure DevOps REST writes: `azure-devops-foundation`.
+- Scripts and executable examples in documentation: the `script-author` agent when available; snippet naming is in `dotnet-documentation`.
 
 ## Rules
 
@@ -23,40 +23,33 @@ These rules cover PowerShell behavior that differs from what the code appears to
 
 ### 2. Write LF text for files other systems read
 
-- **Rule:** Files consumed on Linux or macOS (checksum lists such as `SHA256SUMS`, shell scripts, generated YAML) are written with LF and UTF-8 without BOM: `[IO.File]::WriteAllText($path, ($lines -join "`n") + "`n", [Text.UTF8Encoding]::new($false))`. `Out-File` and `Set-Content` use CRLF on Windows.
-- **Check:** The generated file has no `\r` bytes; when it is a checksum list, `sha256sum -c` passes on Linux.
-- **Why:** A checksum list written with `Out-File` had CRLF line endings that break verification on Linux.
+- **Rule:** Files read on Linux or macOS (`SHA256SUMS`, shell scripts, generated YAML) are written with LF and UTF-8 without BOM: `[IO.File]::WriteAllText($path, ($lines -join "`n") + "`n", [Text.UTF8Encoding]::new($false))`. `Out-File` and `Set-Content` write CRLF on Windows, and in Windows PowerShell 5.1 `Out-File` defaults to UTF-16LE and `Set-Content` to the ANSI code page.
+- **Check:** The file has no `\r` bytes; `sha256sum -c` passes on Linux for a checksum list.
+- **Why:** A checksum list written with `Out-File` had CRLF line endings that broke verification on Linux.
 
-### 3. Keep names consistent in verification snippets
+### 3. Resolve shims to the real executable
 
-- **Rule:** In a download-and-verify snippet, the file name the snippet saves to and the name it looks up in the checksum list are the same string, including version and architecture.
-- **Check:** Run the snippet against a real release asset.
-- **Why:** A README snippet saved a generic file name but searched for the versioned name, so the verification never matched.
+- **Rule:** Resolve a tool installed through mise, pyenv, or a similar manager with the manager (`mise which python`) or the tool itself (`python -c "import sys; print(sys.executable)"`), and fail clearly when it cannot be resolved. Do not accept or reject a path only because it is a shim.
+- **Check:** The script works where the tool is installed only through the manager.
+- **Why:** An install script stopped with "not a mise shim" on a machine where Python came only from mise.
 
-### 4. Resolve shims to the real executable
+### 4. Shape agent commands to match permission rules
 
-- **Rule:** When a script needs the real path of a tool installed through mise, pyenv, or a similar manager, resolve it with the manager (`mise which python`) or by asking the tool (`python -c "import sys; print(sys.executable)"`), and fail with a clear message when it cannot be resolved. Do not reject or accept a path only because it is a shim.
-- **Check:** The script works on a machine where the tool is installed only through the manager.
-- **Why:** An install script stopped with "not a mise shim" on a machine where Python was provided only by mise, and a global setting pointing at the wrong interpreter had to be fixed as well.
+- **Rule:** Permission allow rules match the start of a command. Start each command with the program name and absolute paths; put no variable assignment, `cd`, or other command in front; keep authenticated `git` and `gh` calls as separate commands; move multi-step logic into a script file. Use the agent's dedicated file read and search tools instead of shell `cat`, `grep`, or `find`, and give subagents absolute paths they can read. Propose allow-list changes to the user and wait for approval before editing settings.
+- **Check:** The first word of each command is the program its allow rule names.
+- **Why:** Commands that started with a variable assignment or `cd`, or searched through the shell, did not match the allow rules and interrupted unattended work.
 
-### 5. Shape agent shell commands to match permission rules
+### 5. Classify native command failures before continuing
 
-- **Rule:** Permission allow rules match the beginning of a command. Start each command with the program name and absolute paths; do not put variable assignments, `cd`, or another command in front of it, and keep authenticated `git` and `gh` calls as separate commands. Move multi-step logic into a script file.
-- **Check:** The command's first word is the program that the allow rule names.
-- **Why:** Commands that started with a variable assignment did not match the allow rules, which interrupted unattended work.
-
-### 6. Classify native command failures before continuing
-
-- **Rule:** Capture `$LASTEXITCODE` immediately after a native call and fail on unhandled exit codes. Resolve the exact package or resource ID and its source or environment before making a change. Stop if a failed prerequisite makes the target set unreliable. Continue after an individual failure only when the operation's contract allows it, retain each failure in the summary, and follow the agreed exit-code policy.
-- **Check:** Mock a failed discovery or source refresh and assert that no item changes run. Mock an allowed item failure and assert that the next item is attempted and the failure appears in the final result. Check behavior on rerun after partial success and run the tests under the supported PowerShell versions, including Windows PowerShell 5.1 when supported.
-- **Why:** A batch needed to continue after one package update failed while still stopping when package discovery or source refresh failed.
+- **Rule:** Capture `$LASTEXITCODE` immediately after a native call and fail on unhandled codes. Resolve the exact package or resource ID and its source before changing anything. Stop when a failed prerequisite (discovery, source refresh) makes the target set unreliable; continue after an individual failure only when the contract allows it, and keep each failure in the summary and exit code.
+- **Check:** Mock a failed discovery (no item changes run) and an allowed item failure (the next item runs and the failure is reported). Test a rerun after partial success under each supported PowerShell version, including 5.1 when supported.
+- **Why:** A batch had to continue after one package update failed while still stopping when discovery or source refresh failed.
 
 ## Done checklist
 
 - [ ] Filtered results used with `.Count` or `[0]` are wrapped in `@()` and tested with one item.
 - [ ] Cross-platform text files are LF and UTF-8 without BOM.
-- [ ] Snippet file names match the names they verify.
 - [ ] Tool discovery works through version-manager shims.
-- [ ] Agent commands start with the program and use absolute paths.
-- [ ] Native exit codes, exact targets, partial failures, and failed prerequisites are covered on the supported shells.
+- [ ] Agent commands start with the program, use absolute paths, and searches use dedicated tools.
+- [ ] Native exit codes, exact targets, partial failures, and failed prerequisites are covered.
 - [ ] Native calls with JSON, queries, or pipes follow `windows-shell-safety`.
