@@ -18,7 +18,7 @@ Apply these rules when the corresponding behavior is in scope. Add focused tests
 ### 1. Never await a request on the same connection inside a notification handler
 
 - **Rule:** A handler called on a connection's read loop must not send a request over that same connection and await its response. Queue the follow-up elsewhere. Handle exceptions, including cancellation, so they do not terminate the read loop unexpectedly.
-- **Check:** An applicable integration test sends a notification whose handler makes a same-connection request and completes within a bounded timeout.
+- **Check:** An applicable integration test sends a notification whose handler schedules the same-connection request outside the read loop. Assert the response arrives within a bounded timeout while the read loop continues processing incoming messages.
 - **Why:** The response waited behind the parse loop blocked by the notification handler.
 
 ### 2. Process ordered notifications through one consumer

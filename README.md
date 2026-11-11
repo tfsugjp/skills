@@ -147,7 +147,7 @@ On Windows, run the same script with `python`.
 | [dotnet-macos-development](plugins/dotnet-azure-lessons/skills/dotnet-macos-development/SKILL.md) | Building, testing, packaging, or debugging .NET and Azure projects on macOS or Apple silicon |
 | [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | A command fails inside the agent session with a permission, sandbox, or credential error |
 
-Use `dotnet-lessons-reviewer` for an independent read-only review when appropriate. It covers the requested committed and working-tree changes, selects applicable checks, and separates actionable defects from missing verification evidence. Scenario evaluation checks its decisions; actual skill discovery in each client must be verified separately.
+Use `dotnet-lessons-reviewer` for an independent read-only review when appropriate. Supply the in-scope diff and verification report; the agent has read/search tools but no shell or Git-state access. It selects applicable checks and separates actionable defects from missing verification evidence. Actual skill discovery in each client must be verified separately.
 
 ## Project Documentation
 

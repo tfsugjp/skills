@@ -145,7 +145,7 @@ Windows では同じスクリプトを `python` で実行します。
 | [dotnet-macos-development](plugins/dotnet-azure-lessons/skills/dotnet-macos-development/SKILL.md) | macOS や Apple silicon で .NET / Azure プロジェクトをビルド、テスト、パッケージング、デバッグするとき |
 | [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | エージェントセッション内のコマンドが、権限、sandbox、資格情報のエラーで失敗したとき |
 
-独立した読み取り専用レビューが適切な場合は `dotnet-lessons-reviewer` を使います。依頼されたコミット済み変更と作業ツリーの変更から該当する確認方法を選び、修正可能な欠陥と検証証拠の不足を分けて報告します。シナリオ評価では判断を確認し、各クライアントで実際にスキルが選択されるかは別に検証します。
+独立した読み取り専用レビューが適切な場合は `dotnet-lessons-reviewer` を使います。対象の差分と検証報告を渡してください。エージェントは読み取りと検索のみ可能で、shell と Git の状態にはアクセスしません。該当する確認方法を選び、修正可能な欠陥と検証証拠の不足を分けて報告します。各クライアントでの実際のスキル選択は別途確認が必要です。
 
 ## プロジェクト文書管理
 
