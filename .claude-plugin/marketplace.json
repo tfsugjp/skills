@@ -123,7 +123,7 @@
     },
     {
       "name": "dotnet-azure-lessons",
-      "description": "Phase-specific rules for .NET, Azure, and PowerShell work, learned from past corrections, with a read-only reviewer agent.",
+      "description": "Checkable rules for .NET, Azure, and PowerShell work by phase, plus macOS and agent-sandbox situations, learned from past corrections, with a read-only reviewer agent.",
       "version": "0.1.0",
       "source": "./plugins/dotnet-azure-lessons",
       "license": "MIT",

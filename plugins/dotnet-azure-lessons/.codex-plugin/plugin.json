@@ -1,7 +1,7 @@
 {
   "name": "dotnet-azure-lessons",
   "version": "0.1.0",
-  "description": "Phase-specific rules for .NET, Azure, and PowerShell work, learned from past corrections, with a read-only reviewer agent.",
+  "description": "Checkable rules for .NET, Azure, and PowerShell work by phase, plus macOS and agent-sandbox situations, learned from past corrections, with a read-only reviewer agent.",
   "author": {
     "name": "Team Foundation Users Japan"
   },
@@ -11,12 +11,12 @@
   "interface": {
     "displayName": ".NET / Azure Lessons",
     "shortDescription": "Recurrence-prevention rules for .NET, Azure, and PowerShell",
-    "longDescription": "Skills for design, coding, Visual Studio Remote UI, PowerShell, debugging, testing, documentation, CI/CD, and PR/issue handling, each with rules, checks, and a done checklist learned from past corrections, plus a read-only reviewer agent.",
+    "longDescription": "Skills for design, coding, Visual Studio Remote UI, PowerShell, debugging, testing, documentation, CI/CD, PR/issue handling, .NET development on macOS, and agent sandbox troubleshooting. Every rule has a check and a reason learned from past corrections. Includes a read-only reviewer agent.",
     "developerName": "Team Foundation Users Japan",
     "category": "Developer Tools",
     "capabilities": ["Read"],
     "defaultPrompt": [
-      "Review this .NET change against the lessons checklists before I report it done.",
+      "Review this .NET change against the lessons checks before I report it done.",
       "Check this GitHub Actions workflow for secrets exposed to pull requests.",
       "What must I verify before calling this Visual Studio extension change done?"
     ]

@@ -1,6 +1,6 @@
 ---
 name: vs-extension-remote-ui
-description: 'Rules for Visual Studio extensions built on VisualStudio.Extensibility Remote UI (RemoteUserControl, data contracts, XAML), learned from bindings that failed silently and layouts that broke only in the real IDE. Use while editing a Remote UI view model, adding [DataMember] properties or commands, updating an ObservableCollection bound to an ItemsSource or ComboBox, editing Remote UI XAML, adding a settings field, or verifying an extension change in the Experimental instance. Not for general C# rules (dotnet-coding).'
+description: 'Rules for Visual Studio extensions built on VisualStudio.Extensibility Remote UI (RemoteUserControl, data contracts, XAML), learned from bindings that failed silently and layouts that broke only in the real IDE. Use while editing a Remote UI view model, adding [DataMember] properties or commands, updating an ObservableCollection bound to an ItemsSource or ComboBox, editing Remote UI XAML, adding a settings field, or verifying an extension change in the Experimental instance.'
 ---
 
 # Visual Studio Extension Remote UI
@@ -52,15 +52,10 @@ Remote UI view models live in the extension process and are serialized to Visual
 
 ### 7. Verify in the Experimental instance, including visual states
 
-- **Rule:** After a Remote UI change, run the extension in the Experimental instance with the build just produced and apply `dotnet-testing` rule 2 there, adding the language setting when localization changed. In a narrow window, every choice and button that needs a response stays reachable.
+- **Rule:** After a Remote UI change, run the extension in the Experimental instance with the build just produced and judge it from screenshots (`dotnet-testing`, "Judge UI changes from screenshots"), adding the language setting when localization changed. In a narrow window, every choice and button that needs a response stays reachable.
+- **Check:** Experimental-instance screenshots cover states, colors, narrow width, and language, each with a verdict.
 - **Why:** A stop button that looked disabled, a white selection, truncated account information, choices cut off so the user could not answer, and an untranslated UI were found only in the real IDE after the build and tests passed.
 
-## Done checklist
+## Before reporting done
 
-- [ ] Every bound member has `[DataMember]`.
-- [ ] Bound collections are diff-merged and reordered with `Move`.
-- [ ] Selector `null` write-back is ignored only while the selection is valid.
-- [ ] XAML has no code-behind, events, merged dictionaries, or custom controls.
-- [ ] Wrapped text in lists has horizontal scrolling disabled.
-- [ ] Finite settings use selectors.
-- [ ] Experimental-instance screenshots cover states, colors, width, and language.
+Confirm each applicable Check above, or state which one was not done.

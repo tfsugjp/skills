@@ -15,7 +15,7 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `azure-managed-identity-review` | Azure のマネージド ID を読み取り専用でレビューします。同じ ID を共有するリソース・アプリ設定・コード・フェデレーション資格情報（FIC）をすべて洗い出し、各利用者の audience に対する権限漏れ、他の利用者への権限の漏洩、ID 選択の誤り、IaC とのドリフトを報告します（`msi_review.py`、規則 MIR000-MIR008） |
 | `windows-shell-safety` | Windows で Azure CLI・JSON・パイプを安全に実行するための規則、`cmd.exe` による引数欠落を実行前に検出する lint（`Test-NativeCommand.ps1`）、JSON を UTF-8 の `@<file>` で渡す PowerShell 7 ヘルパー |
 | `native-container-cli` | WindowsではWSL Containers、macOSではApple containerを優先。対応するDockerコマンドを変換し、ComposeやDocker API連携などでDockerへの切り替えが必要な場合は実行前に確認 |
-| `dotnet-azure-lessons` | スキル: .NET Architecture Design、.NET Coding、VS Extension Remote UI、PowerShell Scripting、.NET Debugging、.NET Testing、.NET Documentation、.NET CI/CD、PR and Issue Workflow。いずれも過去の訂正から得たルール、確認方法、完了チェックリストを持ちます。エージェント: .NET Lessons Reviewer（これらのチェックリストで差分を読み取り専用でレビュー） |
+| `dotnet-azure-lessons` | スキル: .NET Architecture Design、.NET Coding、VS Extension Remote UI、PowerShell Scripting、.NET Debugging、.NET Testing、.NET Documentation、.NET CI/CD、PR and Issue Workflow、.NET Development on macOS、Agent Sandbox Troubleshooting。いずれも過去の訂正から得たルール、確認方法、理由を持ちます。エージェント: .NET Lessons Reviewer（これらの確認方法で差分を読み取り専用でレビュー） |
 
 すべて MIT License で配布します。認証情報は含めず、MCP server も自動構成しません。Azure DevOps の認証と権限は利用者が設定してください。
 
@@ -129,7 +129,7 @@ Windows では同じスクリプトを `python` で実行します。
 
 ## .NET / Azure Lessons
 
-`dotnet-azure-lessons` は、過去のエージェントセッションでのやり直しの依頼、ユーザーの訂正、レビューの指摘からルールを集め、同じ誤りの再発を防ぎます。各スキルは作業の 1 つの工程で読み込まれ、ルールを確認方法と理由付きで示し、最後に完了チェックリストを置きます。既存スキル（`windows-shell-safety`、`github-pull-request`、`github-plan-issues`、`azure-devops-pipelines`、`project-documentation`、`nuget-validate`）が扱う手順は繰り返さず、引き渡し先として示します。
+`dotnet-azure-lessons` は、過去のエージェントセッションでのやり直しの依頼、ユーザーの訂正、レビューの指摘からルールを集め、同じ誤りの再発を防ぎます。各スキルは作業の 1 つの工程または状況で読み込まれ、すべてのルールに確認方法と理由を付けます。完了を報告する前に、この確認方法で作業を点検します。既存スキル（`windows-shell-safety`、`github-pull-request`、`github-plan-issues`、`azure-devops-pipelines`、`project-documentation`、`nuget-validate`）が扱う手順は繰り返さず、引き渡し先として示します。
 
 | スキル | 読み込まれる場面 |
 |---|---|
@@ -141,7 +141,9 @@ Windows では同じスクリプトを `python` で実行します。
 | [dotnet-testing](plugins/dotnet-azure-lessons/skills/dotnet-testing/SKILL.md) | テストを書くとき、または変更が検証済みかを判断するとき |
 | [dotnet-documentation](plugins/dotnet-azure-lessons/skills/dotnet-documentation/SKILL.md) | コードに合わせて README、セットアップ手順、XML ドキュメント、Wiki を編集するとき |
 | [dotnet-ci-cd](plugins/dotnet-azure-lessons/skills/dotnet-ci-cd/SKILL.md) | GitHub Actions や Azure Pipelines の定義とパッケージングを編集するとき |
-| [pr-issue-workflow](plugins/dotnet-azure-lessons/skills/pr-issue-workflow/SKILL.md) | レビュースレッド、コミット、マージ、Issue のクローズを扱うとき |
+| [pr-issue-workflow](plugins/dotnet-azure-lessons/skills/pr-issue-workflow/SKILL.md) | レビュースレッド、コミット、push、マージ、Issue のクローズを扱うとき |
+| [dotnet-macos-development](plugins/dotnet-azure-lessons/skills/dotnet-macos-development/SKILL.md) | macOS や Apple silicon で .NET / Azure プロジェクトをビルド、テスト、パッケージング、デバッグするとき |
+| [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | エージェントセッション内のコマンドが、権限、sandbox、資格情報のエラーで失敗したとき |
 
 変更を完了と報告する前に、`dotnet-lessons-reviewer` エージェントに差分を確認させてください。変更されたファイルに当てはまるスキルを選び、ルール・ファイル・行ごとに問題を報告します。ファイルは編集しません。
 

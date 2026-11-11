@@ -15,7 +15,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublis
 | `azure-managed-identity-review` | Read-only review of Azure managed identities: finds every resource, app setting, code path, and federated credential that shares an identity, and reports missing grants for each consumer's audience, grants leaked to other consumers, identity selection mistakes, and IaC drift (`msi_review.py`, rules MIR000-MIR008) |
 | `windows-shell-safety` | Windows-safe Azure CLI, JSON, and pipe execution: rules against `cmd.exe` argument loss, a pre-execution lint (`Test-NativeCommand.ps1`), and a PowerShell 7 helper that sends JSON through UTF-8 `@<file>` |
 | `native-container-cli` | Prefer WSL Containers on Windows and Apple container on macOS; translate supported Docker commands and ask before Docker fallback, including unsupported Compose or Docker API integrations |
-| `dotnet-azure-lessons` | Skills: .NET Architecture Design, .NET Coding, VS Extension Remote UI, PowerShell Scripting, .NET Debugging, .NET Testing, .NET Documentation, .NET CI/CD, PR and Issue Workflow, each with rules, checks, and a done checklist learned from past corrections. Agent: .NET Lessons Reviewer (read-only diff review against those checklists) |
+| `dotnet-azure-lessons` | Skills: .NET Architecture Design, .NET Coding, VS Extension Remote UI, PowerShell Scripting, .NET Debugging, .NET Testing, .NET Documentation, .NET CI/CD, PR and Issue Workflow, .NET Development on macOS, Agent Sandbox Troubleshooting, each with rules, checks, and reasons learned from past corrections. Agent: .NET Lessons Reviewer (read-only diff review against those checks) |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 
@@ -131,7 +131,7 @@ On Windows, run the same script with `python`.
 
 ## .NET / Azure Lessons
 
-`dotnet-azure-lessons` collects rules from redo requests, user corrections, and review findings in past agent sessions, so the same mistakes do not come back. Each skill loads in one phase of the work, lists the rules with a check and a reason, and ends with a done checklist. Each skill also names the existing skills it hands off to (`windows-shell-safety`, `github-pull-request`, `github-plan-issues`, `azure-devops-pipelines`, `project-documentation`, `nuget-validate`) instead of repeating their procedures.
+`dotnet-azure-lessons` collects rules from redo requests, user corrections, and review findings in past agent sessions, so the same mistakes do not come back. Each skill loads in one phase or situation of the work and gives every rule a check and a reason; the checks are what the work is confirmed against before it is reported as done. Each skill also names the existing skills it hands off to (`windows-shell-safety`, `github-pull-request`, `github-plan-issues`, `azure-devops-pipelines`, `project-documentation`, `nuget-validate`) instead of repeating their procedures.
 
 | Skill | Loads when |
 |---|---|
@@ -143,7 +143,9 @@ On Windows, run the same script with `python`.
 | [dotnet-testing](plugins/dotnet-azure-lessons/skills/dotnet-testing/SKILL.md) | Writing tests or deciding whether a change is verified |
 | [dotnet-documentation](plugins/dotnet-azure-lessons/skills/dotnet-documentation/SKILL.md) | Editing README, setup guides, XML docs, or Wiki content alongside code |
 | [dotnet-ci-cd](plugins/dotnet-azure-lessons/skills/dotnet-ci-cd/SKILL.md) | Editing GitHub Actions or Azure Pipelines definitions and packaging |
-| [pr-issue-workflow](plugins/dotnet-azure-lessons/skills/pr-issue-workflow/SKILL.md) | Handling review threads, commits, merges, and issue closure |
+| [pr-issue-workflow](plugins/dotnet-azure-lessons/skills/pr-issue-workflow/SKILL.md) | Handling review threads, commits, pushes, merges, and issue closure |
+| [dotnet-macos-development](plugins/dotnet-azure-lessons/skills/dotnet-macos-development/SKILL.md) | Building, testing, packaging, or debugging .NET and Azure projects on macOS or Apple silicon |
+| [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | A command fails inside the agent session with a permission, sandbox, or credential error |
 
 Before reporting a change as done, ask the `dotnet-lessons-reviewer` agent to check the diff. It picks the skills that apply to the changed files, reports problems by rule, file, and line, and never edits files.
 
