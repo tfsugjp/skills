@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, Windows shell-safe command execution, Azure managed identity review, and native container workflows on Windows and macOS (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
+Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, Windows shell-safe command execution, Azure managed identity review, native container workflows on Windows and macOS, and recurrence-prevention rules for .NET, Azure, and PowerShell work (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
 
 ## Plugins
 
@@ -15,6 +15,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublis
 | `azure-managed-identity-review` | Read-only review of Azure managed identities: finds every resource, app setting, code path, and federated credential that shares an identity, and reports missing grants for each consumer's audience, grants leaked to other consumers, identity selection mistakes, and IaC drift (`msi_review.py`, rules MIR000-MIR008) |
 | `windows-shell-safety` | Windows-safe Azure CLI, JSON, and pipe execution: rules against `cmd.exe` argument loss, a pre-execution lint (`Test-NativeCommand.ps1`), and a PowerShell 7 helper that sends JSON through UTF-8 `@<file>` |
 | `native-container-cli` | Prefer WSL Containers on Windows and Apple container on macOS; translate supported Docker commands and ask before Docker fallback, including unsupported Compose or Docker API integrations |
+| `dotnet-azure-lessons` | Skills: .NET Architecture Design, .NET Coding, VS Extension Remote UI, PowerShell Scripting, .NET Debugging, .NET Testing, .NET Documentation, .NET CI/CD, PR and Issue Workflow, .NET Development on macOS, Agent Sandbox Troubleshooting, each with rules, checks, and reasons learned from past corrections. Agent: .NET Lessons Reviewer (read-only diff review against those checks) |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 
@@ -33,6 +34,7 @@ claude plugin install repository-init@tfsugjp-agent-skills
 claude plugin install windows-shell-safety@tfsugjp-agent-skills
 claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
 claude plugin install native-container-cli@tfsugjp-agent-skills
+claude plugin install dotnet-azure-lessons@tfsugjp-agent-skills
 ```
 
 ## Install from the GitHub Copilot marketplace
@@ -50,6 +52,7 @@ copilot plugin install repository-init@tfsugjp-agent-skills
 copilot plugin install windows-shell-safety@tfsugjp-agent-skills
 copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
 copilot plugin install native-container-cli@tfsugjp-agent-skills
+copilot plugin install dotnet-azure-lessons@tfsugjp-agent-skills
 ```
 
 ## Install from the Codex repository-local marketplace
@@ -67,6 +70,7 @@ codex plugin add repository-init@tfsugjp-agent-skills
 codex plugin add windows-shell-safety@tfsugjp-agent-skills
 codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 codex plugin add native-container-cli@tfsugjp-agent-skills
+codex plugin add dotnet-azure-lessons@tfsugjp-agent-skills
 ```
 
 Use `repository-init` only with an explicit `$repository-init` request. It initializes missing governance files in a new or existing repository, records the resolved license and language profile in `.repository-init.json`, and leaves a completed repository unchanged on later invocations. It does not initialize Git, create remotes, create issues or work items, publish Wiki pages, commit, or push.
@@ -124,6 +128,26 @@ python3 "$skill/scripts/msi_review.py" static "$skill/tests/fixtures/terraform-c
 ```
 
 On Windows, run the same script with `python`.
+
+## .NET / Azure Lessons
+
+`dotnet-azure-lessons` provides eleven focused skills drawn from recurring corrections in agent sessions. Each non-obvious rule has a check and a reason. Apply only the rules relevant to the request; the skills do not grant permission for unrelated changes, external writes, installations, or settings changes. Shared procedures have one owner, with references to specialized skills when needed.
+
+| Skill | Loads when |
+|---|---|
+| [dotnet-architecture-design](plugins/dotnet-azure-lessons/skills/dotnet-architecture-design/SKILL.md) | Designing or revising .NET / Azure architecture, ADRs, or version support |
+| [dotnet-coding](plugins/dotnet-azure-lessons/skills/dotnet-coding/SKILL.md) | Writing C# for async RPC, notifications, collections, parsing, or CLIs |
+| [vs-extension-remote-ui](plugins/dotnet-azure-lessons/skills/vs-extension-remote-ui/SKILL.md) | Editing VisualStudio.Extensibility Remote UI view models or XAML |
+| [powershell-scripting](plugins/dotnet-azure-lessons/skills/powershell-scripting/SKILL.md) | Writing PowerShell scripts that filter, write files, or locate tools |
+| [dotnet-debugging](plugins/dotnet-azure-lessons/skills/dotnet-debugging/SKILL.md) | Investigating a failure, a CI break, or behavior that differs from tests |
+| [dotnet-testing](plugins/dotnet-azure-lessons/skills/dotnet-testing/SKILL.md) | Writing tests or deciding whether a change is verified |
+| [dotnet-documentation](plugins/dotnet-azure-lessons/skills/dotnet-documentation/SKILL.md) | Editing README, setup guides, XML docs, or Wiki content alongside code |
+| [dotnet-ci-cd](plugins/dotnet-azure-lessons/skills/dotnet-ci-cd/SKILL.md) | Editing GitHub Actions or Azure Pipelines definitions and packaging |
+| [pr-issue-workflow](plugins/dotnet-azure-lessons/skills/pr-issue-workflow/SKILL.md) | Handling review threads, commits, pushes, merges, and issue closure |
+| [dotnet-macos-development](plugins/dotnet-azure-lessons/skills/dotnet-macos-development/SKILL.md) | Building, testing, packaging, or debugging .NET and Azure projects on macOS or Apple silicon |
+| [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | A command fails inside the agent session with a permission, sandbox, or credential error |
+
+Use `dotnet-lessons-reviewer` for an independent read-only review when appropriate. Supply the in-scope diff and verification report; the agent has read/search tools but no shell or Git-state access. It selects applicable checks and separates actionable defects from missing verification evidence. Actual skill discovery in each client must be verified separately.
 
 ## Project Documentation
 
