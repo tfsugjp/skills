@@ -2,15 +2,18 @@
 
 ## Summary
 
-`dotnet-azure-lessons` turns recurring corrections from past agent sessions into checkable rules for .NET, Azure, and PowerShell work. Eleven skills and a read-only reviewer agent keep the same mistakes from coming back. Tracking: parent Issue #107 with sub-issues #108-#111.
+`dotnet-azure-lessons` turns demonstrated corrections from agent sessions into scoped, checkable guidance for .NET, Azure, and PowerShell. It contains eleven skills and one read-only reviewer. Tracking: parent Issue #107 and sub-issues #108–#111.
 
 ## Design
 
-- Source: redo requests, user corrections, and reviewer, Copilot, and Codex findings from agent sessions in 17 projects, about 70 cases after merging duplicates, then cross-checked against Claude Code and Codex sessions from a second workstation (13 projects), and against Claude Code sessions from a macOS workstation (about 115 sessions in 13 project directories; that machine's Codex history was not read). Each pass added missing lessons, corrected rules the history contradicted, and merged rules that overlapped between skills. Project names, host names, domains, and URLs are generalized and not published.
-- Nine skills load in one phase of the work; two load in a situation (work on macOS, and a command that fails because of the agent session). All use the same structure: when not to use, then rules. Every rule has a check and a reason, and each skill ends with one line that says to confirm the applicable checks before reporting done. There is no separate done checklist, because it restated the rules.
-- Rules that must hold for every command (for example the shape of commands under permission rules) cannot depend on a skill being triggered. `agent-sandbox-troubleshooting` covers the diagnosis after a failure; standing command rules belong in the user's or repository's agent instructions.
-- Skills hand off to existing skills instead of repeating them: `windows-shell-safety` for native command quoting, `github-pull-request` for PR bodies and closing keywords, `github-plan-issues` for issue hierarchies, `azure-devops-pipelines` for pipeline runs, `project-documentation` for ADR and architecture documents, `nuget-validate` for package versions, and `native-container-cli` for container commands. Cross-references between skills name the rule by title, not by number.
-- The `dotnet-lessons-reviewer` agent selects the skills that apply to a diff, tests the diff against each rule's check, and reports findings without editing files.
+- Select lessons from observed failures, user corrections, and review findings. Treat unexecuted proposals and static findings as such. Generalize private identifiers; never publish raw sessions, credentials, private paths, or project-specific assumptions.
+- Keep each description short and specific to its triggering task or symptom. Load only relevant rules and references. Preserve eleven entry points; do not create additional skills solely to categorize this history pass.
+- Retain a concise rule, observable check, and failure rationale for each non-obvious invariant. Remove repeated anecdotes, generic exhortations, duplicate closing checklists, and overlapping procedures. Give each shared invariant one owner and use named cross-references.
+- Express applicability and exceptions explicitly. A rule does not authorize external writes, installations, credential resets, settings changes, closing unrelated windows, or expanding the requested work. Reuse existing authorization and follow the current session's permission mechanism; distinguish an approval request from an explicit denial. Prefix-matching command advice applies only to environments with that policy.
+- Add missing evidence-backed checks: reassess findings against the current PR head before publication; separate CLI authentication from Git credential helpers; stage and validate environment/profile updates before switching, preserve unowned data, and define recovery after partial failure; distinguish PowerShell source encoding requirements from generated-file encoding.
+- Keep technical failure-prevention rules while narrowing overbroad mandates: migration of solution formats only within task scope; package installation and UI validation in an appropriate authorized environment; prerequisite failures distinguished from recoverable warnings; safe package builds distinguished from credentialed publication. Recheck technical claims against owning sources when changing their meaning.
+- The reviewer covers committed, staged, and unstaged changes, selects applicable checks, and reports actionable defects separately from missing evidence. It never treats an unavailable screenshot or unrun platform test as proof of a defect and never mutates external records.
+- Existing skills own their specialized procedures: `windows-shell-safety`, `github-pull-request`, `github-plan-issues`, `azure-devops-pipelines`, `project-documentation`, `nuget-validate`, and `native-container-cli`. Missing optional skills do not justify claiming their workflow ran.
 
 | Skill | Phase or situation |
 |---|---|
@@ -28,7 +31,7 @@
 
 ## Verification
 
-- `python scripts/validate_marketplaces.py` checks manifests, skill frontmatter, and relative links.
-- A search for URLs and private host names under the plugin directory finds nothing.
-- Each description names its phase or the symptoms that trigger it, and each when-not-to-use section names the neighboring skills, so one prompt does not load every skill.
-- Not verified: whether each skill loads only in its intended situation in real sessions.
+- Validate marketplace manifests, frontmatter, names, and local links; inspect the final diff and bilingual consistency.
+- Check the plugin for leaked source identifiers and secrets. Keep history evidence local rather than publishing source-session excerpts.
+- Use independent, read-only scenario evaluation for stale review heads, authentication failures, denied operations, staged changes, partial profile updates, and unavailable platform verification. Check decisions and side effects, not exact wording.
+- Separate static validation, simulated scenario outcomes, and actual skill selection in live clients. Do not claim live invocation or platform execution unless observed.

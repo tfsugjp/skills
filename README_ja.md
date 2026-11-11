@@ -129,7 +129,7 @@ Windows では同じスクリプトを `python` で実行します。
 
 ## .NET / Azure Lessons
 
-`dotnet-azure-lessons` は、過去のエージェントセッションでのやり直しの依頼、ユーザーの訂正、レビューの指摘からルールを集め、同じ誤りの再発を防ぎます。各スキルは作業の 1 つの工程または状況で読み込まれ、すべてのルールに確認方法と理由を付けます。完了を報告する前に、この確認方法で作業を点検します。既存スキル（`windows-shell-safety`、`github-pull-request`、`github-plan-issues`、`azure-devops-pipelines`、`project-documentation`、`nuget-validate`）が扱う手順は繰り返さず、引き渡し先として示します。
+`dotnet-azure-lessons` は、エージェントセッションで繰り返された訂正から、適用場面を絞った11個のスキルを提供します。自明でないルールには確認方法と理由を付けています。依頼に関係するルールだけを適用し、無関係な変更、外部更新、インストール、設定変更の許可として扱いません。共通手順の所有先は一つにし、必要に応じて専門スキルを参照します。
 
 | スキル | 読み込まれる場面 |
 |---|---|
@@ -145,7 +145,7 @@ Windows では同じスクリプトを `python` で実行します。
 | [dotnet-macos-development](plugins/dotnet-azure-lessons/skills/dotnet-macos-development/SKILL.md) | macOS や Apple silicon で .NET / Azure プロジェクトをビルド、テスト、パッケージング、デバッグするとき |
 | [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | エージェントセッション内のコマンドが、権限、sandbox、資格情報のエラーで失敗したとき |
 
-変更を完了と報告する前に、`dotnet-lessons-reviewer` エージェントに差分を確認させてください。変更されたファイルに当てはまるスキルを選び、ルール・ファイル・行ごとに問題を報告します。ファイルは編集しません。
+独立した読み取り専用レビューが適切な場合は `dotnet-lessons-reviewer` を使います。依頼されたコミット済み変更と作業ツリーの変更から該当する確認方法を選び、修正可能な欠陥と検証証拠の不足を分けて報告します。シナリオ評価では判断を確認し、各クライアントで実際にスキルが選択されるかは別に検証します。
 
 ## プロジェクト文書管理
 

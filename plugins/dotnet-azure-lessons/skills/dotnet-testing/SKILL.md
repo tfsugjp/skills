@@ -1,80 +1,76 @@
 ---
 name: dotnet-testing
-description: 'Verification rules for .NET, Azure, and PowerShell, learned from changes reported as done that failed in real use. Use while writing MSTest, xUnit, or NUnit tests, migrating between test frameworks, adding OS-specific tests, validating samples, packages, or release artifacts such as VSIX and NuGet, checking concurrency and serialization, judging a UI change, or deciding and reporting whether a change passed its acceptance gates.'
+description: 'Choose and report verification for .NET, Azure, and PowerShell changes, including tests, platform coverage, packages, concurrency, serialization, and UI.'
 ---
 
 # .NET Testing and Verification
 
-"Built successfully" and "unit tests pass" were reported as done many times before the user found the feature broken. Decide what proves the change works, run that, and report what was not run.
+Choose evidence that matches the changed behavior and the user's acceptance criteria. A build or unit test proves only what it exercises. Report required checks that could not run, separately from failures.
 
 ## When not to use
 
 - Finding the cause of a failure: `dotnet-debugging`.
-- CI triggers, matrices, platforms, or secrets: `dotnet-ci-cd`.
-- Integration tests against the Azure SQL Database container: `azuresql-db-testing`, when installed.
+- CI triggers, matrices, platforms, and secrets: `dotnet-ci-cd`.
+- Azure SQL container integration testing: `azuresql-db-testing`, when installed.
 
 ## Rules
 
 ### 1. Exercise the requested behavior where the user will use it
 
-- **Rule:** For any user-visible change, run the application on the instance and build the user uses (the CLI they installed, the Visual Studio Experimental instance, the desktop app on their OS) and repeat the user's exact command or UI path. A build or registration check proves only that the code compiles.
-- **Check:** The report names the instance, build, command or UI path, and observed result.
-- **Why:** A localization fix passed tests but the Experimental instance still showed the old language, and a fix reported as done still threw on the original command.
+- **Rule:** For a user-visible change, use the user's application instance, installed CLI, or IDE when available and appropriate. Repeat the reported command or UI path when it is part of acceptance. If that environment is unavailable, state the limitation and the best evidence collected.
+- **Check:** Report the instance or boundary tested, action performed, observed result, and material checks not run.
+- **Why:** Tests passed while an installed CLI still failed on the user's original command.
 
 ### 2. Judge UI changes from screenshots
 
-- **Rule:** Capture screenshots of the default, disabled, selected, and narrow-window states (plus theme or high contrast when colors changed), and state pass or fail per screenshot.
-- **Check:** The report lists each screenshot with its verdict.
-- **Why:** Truncated account details, a white selection, and a stop button that looked disabled were visible in screenshots and missed by tests.
+- **Rule:** Use screenshots to assess layout and visual states affected by a UI change. Check narrow layouts, themes, selection, or disabled states when relevant; do not require unrelated states.
+- **Check:** Report the applicable states inspected and what could not be observed.
+- **Why:** Truncation and weak selection contrast were visible in the UI but missed by logic tests.
 
 ### 3. Show the test fails without the fix, then re-check the neighbors
 
-- **Rule:** For a bug fix or an accepted review finding, run the new test against the unfixed code and see it fail. After the fix, rerun the tests and manual checks for existing paths the change touched (popups, choice prompts, selection, focus, sign-in, cancellation), not only the new test.
-- **Check:** The report states the failing-then-passing result and lists the regression paths checked.
-- **Why:** One fix stopped answer popups from appearing, another broke sign-in while fixing its message, and a focus fix was pushed before its test had been seen to fail.
+- **Rule:** For a regression test, show it fails on the unfixed behavior when practical, then passes after the fix. Recheck nearby paths that share the changed logic. If the original version or environment cannot be run, say so and use other evidence.
+- **Check:** Report the regression result and the affected neighboring paths checked; distinguish unavailable evidence from a failed check.
+- **Why:** Fixes to popups, sign-in, and focus caused regressions in adjacent paths.
 
 ### 4. Mark OS-specific tests
 
-- **Rule:** Tests that need Windows (Win32 packaging, registry, COM) or another OS carry an OS condition, for example `[OSCondition(OperatingSystems.Windows)]` in MSTest, and run in a CI job for that OS (`dotnet-ci-cd`, "Carry every platform through build, test, and artifacts").
-- **Check:** The suite passes on each OS the workflow uses, and skipped tests name their condition.
-- **Why:** Windows-only packaging tests failed on macOS and Linux runners.
+- **Rule:** Mark tests that require OS facilities and run them in an available job for that OS. Do not report an unrun platform check as passed.
+- **Check:** Identify platform-specific tests, condition or job, and outcome; report skipped or unavailable checks.
+- **Why:** Win32 packaging tests failed on non-Windows runners.
 
 ### 5. Re-check semantics when migrating test frameworks
 
-- **Rule:** A framework migration is not a rename. Compare assertion semantics (an equality assertion on collections may compare references; use the framework's collection or sequence assertion), async and fixture lifetimes, UI-thread or headless test attributes supplied by an adapter package, and analyzer suppressions the old framework's package provided (for example `CA2007` in test methods). Keep the test count and skip count equal before and after, or explain each difference.
-- **Check:** Before and after counts match; no assertion was weakened; new warnings are fixed or suppressed in the test project with a reason.
-- **Why:** A migration replaced a collection equality assertion with one that compares references, and new analyzer warnings appeared that the previous framework had suppressed.
+- **Rule:** Check assertion semantics, async/fixture lifetimes, adapters, and analyzer changes when migrating frameworks. Do not weaken assertions to make the new framework pass.
+- **Check:** Compare relevant tests and warnings; explain changes in test or skip coverage.
+- **Why:** A collection equality assertion changed from sequence comparison to reference comparison.
 
 ### 6. Validate samples and inspect artifacts
 
-- **Rule:** Validate each shipped sample with the product's own validator, keeping intentionally invalid samples in a clearly named folder. For release manifests, verify the digest of the actual asset for the version, OS, and architecture. For installable packages (VSIX, NuGet, MSIX, PKG), open the built file, confirm its type and manifest, and install it once before publishing.
-- **Check:** The report gives manifest validity, digest, package contents, and install result separately.
-- **Why:** A sample lacked a required field, a manifest listed the wrong digest, and a release uploaded an artifact that was not a VSIX and failed to install.
+- **Rule:** Validate samples with the product's validator. Check release manifest digests against the actual asset. Inspect installable package type and manifest; install only when needed to prove the requested behavior and in an authorized, suitable environment (prefer an isolated test environment). A package inspection or installation must not publish or change a user's environment without authorization.
+- **Check:** Report sample validity, digest, package contents, and installation outcome as separate observations; mark an unperformed install clearly.
+- **Why:** A release manifest used the wrong digest and an uploaded artifact was not a valid VSIX.
 
 ### 7. Pin serialization of external payloads
 
-- **Rule:** For external API requests, test the serialized payload per resource type and per create, update, and delete operation: every required field is present, and `null` and omitted values are emitted as the receiver expects.
-- **Check:** A payload test exists for each resource type and operation the change touches.
-- **Why:** A production request lacked required properties, and a delete failed on a `null` field the receiver required.
+- **Rule:** For resource types and operations changed, test the serialized request fields, including how omitted and `null` values are represented.
+- **Check:** Relevant payload tests cover the changed operation and API contract.
+- **Why:** A production request omitted required properties.
 
 ### 8. Test ordering and concurrency explicitly
 
-- **Rule:** When code depends on order or concurrency, test the relevant race: ordering (A, B, C), concurrent operations, re-initialization, an item added while an operation is pending, a selection switched before a result arrives, a retry started before the previous attempt's timer fires, and both response and notification orders when they can race.
-- **Check:** Each race the change can hit has a test that fails when the guard is removed.
-- **Why:** Reordered notifications, a single pending-operation slot, and cleared in-flight attachments reached review.
+- **Rule:** Where behavior depends on order or overlapping operations, test the races the change can reach: response/notification order, retry, reinitialization, target changes, and mutations during a pending send as applicable.
+- **Check:** Each material race has a test or an explicit reason it cannot be exercised; test evidence shows the guard matters where practical.
+- **Why:** Reordered notifications and a single pending-operation slot caused regressions.
 
 ### 9. Record test execution and acceptance gates separately
 
-- **Rule:** After the last code change, rerun the integrated gate on that commit. Record the commit or artifact, configuration, exact commands and environment variables, counts, and skip reasons, and compare them with the required gate even when the process exits successfully. Judge an acceptance criterion by the user's wording; do not add a stricter condition of your own. Attribute user acceptance to the person, target, and conditions verified, appended to the condition it satisfies without rewriting earlier skips or blocked gates. Name any required check that did not run (no local service, hosted CI unavailable) and where or by whom it can run.
-- **Check:** The report separates test results, gate status, acceptance evidence, and checks not run.
-- **Why:** A run passed with privilege-related skips while an evidence gate stayed blocked, "nothing left open" was reported before the final commit was tested, and the commands to rebuild a test container could not be recovered.
+- **Rule:** Run the relevant integrated gate on the final change when available. Record the revision, commands, configuration, outcome, skips, and acceptance evidence. Do not impose conditions beyond the user's criteria, and do not infer a pass from process exit alone when required jobs were skipped.
+- **Check:** State separately what passed, what met acceptance, and what required check did not run or remains open.
+- **Why:** A passing command hid skipped checks, and completion was reported before the final revision had run.
 
 ### 10. Clean up what testing created
 
-- **Rule:** Delete work items, issues, cloud resources, containers, worktrees, and scratch folders created for testing, using only targets the user approved, and report what was deleted or left.
-- **Check:** The report lists each created item and its final state.
-- **Why:** Test work items were left in a live project, and the user had to ask for unused worktrees and scratch folders to be removed.
-
-## Before reporting done
-
-Confirm each applicable Check above, and list what was not run.
+- **Rule:** Remove temporary resources created for testing when cleanup is safe and authorized. Preserve live or user-owned resources; report anything left behind.
+- **Check:** Report resources created for testing and their final state when applicable.
+- **Why:** Test work items and cloud resources were left behind.

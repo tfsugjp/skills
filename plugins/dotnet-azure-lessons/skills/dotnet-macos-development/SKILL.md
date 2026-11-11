@@ -1,65 +1,66 @@
 ---
 name: dotnet-macos-development
-description: 'Rules for building, testing, packaging, and debugging .NET and Azure projects on macOS, learned from failures that appeared only on a Mac. Use on macOS or Apple silicon when installing or selecting a .NET SDK (mise, Homebrew, DOTNET_ROOT), running SQL or other Linux containers, writing shell scripts or commands for zsh and the system bash, investigating a crash with native macOS frames (Avalonia, AppKit), building or inspecting a .pkg, using Keychain-backed sign-in (MSAL, az, gh, DefaultAzureCredential), publishing for osx-arm64, or verifying Windows or Linux behavior from a Mac.'
+description: 'Guidance for .NET and Azure work with macOS-specific toolchains or behavior. Use when selecting an SDK or runtime architecture, writing zsh or system-bash commands, investigating native macOS crashes, packaging for macOS, or checking platform behavior from a Mac.'
 ---
 
 # .NET Development on macOS
 
-Rules that hold on Windows and Linux runners fail in specific ways on a Mac. Apply these when the work runs on macOS; the other skills in this plugin still apply.
+Apply these only where macOS, Apple silicon, or its system tools affect the work. Other skills in this plugin still apply.
 
 ## When not to use
 
 - Permission or sandbox denials in an agent session: `agent-sandbox-troubleshooting`.
-- Choosing and translating container commands (Apple `container`, Docker fallback): `native-container-cli`.
-- The Azure SQL Database container itself: the `azuresql-db-*` skills, when installed.
-- Intune manifest fields for macOS apps: `relaypublisher-manifest`.
+- Choosing or translating container commands: `native-container-cli`.
+- Azure SQL Database container-specific setup: `azuresql-db-*`, when installed.
+- Intune manifest fields: `relaypublisher-manifest`.
+- General verification criteria: `dotnet-testing` and `dotnet-ci-cd`.
 
 ## Rules
 
-### 1. Select the SDK by architecture and verify with a build
+### 1. Select and verify the intended .NET architecture
 
-- **Rule:** On Apple silicon, point `DOTNET_ROOT` (and `DOTNET_ROOT_ARM64` when set) at the arm64 install; use `DOTNET_ROOT_X64` only for an x64 install. When a version manager (mise) owns the SDK, pin a major version, not `latest` or `lts`, and resolve the patch at install time. An SDK consolidation does not change any project's target framework or `global.json`. Verify with `dotnet build` and `dotnet test` of a real project, not `dotnet --info` alone, and do not hide a slow or broken environment by raising timeouts.
-- **Check:** `dotnet --info` shows the expected RID (`osx-arm64`) and base path, and a project builds and tests with that SDK.
-- **Why:** A consolidation plan pointed an x64 variable at an arm64 install and passed its check on `dotnet --info` alone; both were caught in plan review.
+- **Rule:** On Apple silicon, verify the architecture and install root of the `dotnet` process the project actually invokes. Set architecture-specific `DOTNET_ROOT_*` variables only when their target process needs them; they take precedence over `DOTNET_ROOT`. Select SDK versions from project requirements and the chosen tool's support policy. Do not change target frameworks or `global.json` as a side effect of installing an SDK.
+- **Check:** Report the invoked SDK, architecture, and install root; build and test a relevant project when the change requires it.
+- **Why:** An SDK migration pointed an x64 variable at an arm64 install, and an information-only check had not verified the project build.
 
-### 2. Run containers natively on arm64
+### 2. Write commands for the shell and system tools that run them
 
-- **Rule:** Let the runtime select the image's arm64 variant. Do not force `amd64` under Rosetta for a database engine unless the image has no arm64 build, and then say that emulation is in use. Give a SQL container enough memory (4 GB was needed). Libraries that need a Docker API endpoint (Testcontainers) do not work with a runtime that has none; start the container yourself and pass its connection string through the test's environment variable.
-- **Check:** The image inspection shows `arm64`; the integration tests name the connection-string variable they used.
-- **Why:** An Azure SQL image started as amd64 under Rosetta crashed later with a null-pointer fault and was stable when recreated as arm64.
+- **Rule:** Quote arguments that the active shell may expand (such as `?`, `*`, or `[` in zsh). Avoid Bash features newer than 3.2 in scripts that must run under macOS `/bin/bash`, and avoid GNU-only options when using BSD tools. Use a temporary path that is explicit and permitted by the current environment.
+- **Check:** Run the script with each declared shell/platform target, or identify which targets were inspected but unavailable.
+- **Why:** A zsh API command treated `?` as a glob, and a script using newer Bash and GNU grep features failed on macOS.
 
-### 3. Write shell for zsh and the system tools
+### 3. Run Linux containers with the native Mac architecture
 
-- **Rule:** Single-quote any argument that contains `?`, `*`, or `[` (API paths with query strings); zsh treats them as glob patterns and fails with `no matches found`. Single-quote values that contain `!` or `$` (passwords) in commands you run or document, or pass them through an environment variable. Scripts that may run under `/bin/bash` (3.2) do not use `mapfile`, associative arrays, or `grep -P`; use `while read` loops and `grep -E`. Pass `mktemp` an explicit template under `$TMPDIR` (`mktemp -d "$TMPDIR/work.XXXXXX"`) so the location does not depend on the platform's default. Do not rely on GNU-only options of `sed`, `date`, or `base64`.
-- **Check:** The script runs with `/bin/bash` on macOS and with bash on Linux; commands with query strings are quoted.
-- **Why:** A `gh api` path with `?sha=` failed with `no matches found`, a script using `mapfile` and `grep -P` failed on macOS, a documented `sqlcmd` command broke on a password ending in `!` (the exact mechanism was not confirmed), and a bare `mktemp -d` in an agent session created its directory outside the session's writable temporary directory.
+- **Rule:** On Apple silicon, use an image's arm64 variant when supported; use emulation only when the image lacks a compatible build and report that limitation. Check the service's actual memory requirement and whether the selected runtime supports the container API that the application or test library needs. Container command selection and fallback are covered by `native-container-cli`.
+- **Check:** Confirm the image architecture and runtime capabilities; identify any emulation and verify the configured memory against the service requirement.
+- **Why:** An amd64 database image crashed under Rosetta while its arm64 image was stable, and a test library requiring the Docker API could not use a runtime without that API.
 
-### 4. Locate a macOS-only crash by its native frames
+### 4. Locate macOS-only crashes from native evidence
 
-- **Rule:** When a crash happens only on macOS, read the crash report's native frames to find the layer (UI framework native code, AppKit, runtime) before changing application code. Search that dependency's release notes and issues for the symbol, and prefer a patch update over a workaround. Then repeat the user's exact UI path on the real screen with the updated build.
-- **Check:** The report names the faulting layer and symbol, the dependency version that fixes it, and the UI path that was repeated.
-- **Why:** An application crashed when a live-region text became empty; the fault was in the UI framework's macOS accessibility layer and a patch release fixed it with no application change.
+- **Rule:** When a crash is specific to macOS, inspect the native crash frames and identify the faulting layer before changing application code. Check relevant dependency release notes or issues, then verify the proposed fix on the affected path.
+- **Check:** Record the faulting layer and symbol, the evidence for the selected fix, and the affected path tested or left unverified.
+- **Why:** A live-region failure originated in the UI framework's native accessibility layer and was fixed by a patch release.
 
-### 5. Verify packages with native tools, and validate before the first side effect
+### 5. Compare package parsing with macOS tools
 
-- **Rule:** A `.pkg` is a xar archive. Verify what the code derives from it (bundle identifiers, versions, architectures, compression) against `pkgutil` and `xar` output for the same file, including a package with several bundles. Platform-specific properties are not interchangeable: validate everything the result or report needs before the first upload or API write, so that a missing macOS property cannot fail after the remote change succeeded. Keep API version choices (v1.0 or beta per resource type) identical in the code and the documentation table. Say in the install guide when a download is unsigned or not notarized and which install path avoids the Gatekeeper warning.
-- **Check:** Parser output matches `pkgutil --expand` or `xar -tf` for a single-bundle and a multi-bundle package; a publish with a missing property fails before any remote call.
-- **Why:** A TOC parser mishandled a compression format, a publish threw on a property macOS manifests do not have after the upload had succeeded, and a documented API version contradicted the code.
+- **Rule:** When parsing `.pkg` internals, compare derived bundle identifiers, versions, architectures, or compression details with `pkgutil` and `xar` output for the same package, including multi-bundle packages. Keep API-version tables aligned with the implementation (`dotnet-documentation`, "Make prose, tables, diagrams, XML docs, and help agree with the code"). Validate all input needed after a remote write before the first side effect (`dotnet-coding`, "Validate everything before the first side effect").
+- **Check:** Compare parser output for single-bundle and multi-bundle packages with native-tool output.
+- **Why:** A package parser mishandled a compression format; a separate publish path threw after upload because a platform-specific result property was absent.
 
-### 6. Expect Keychain-backed credentials, and pin the credential chain
+### 6. Verify the credential source and identity in use
 
-- **Rule:** MSAL token caches, `gh`, and the git credential helper use the Keychain on macOS; a first run can raise a Keychain prompt, and an agent session may be unable to answer it. `az` needs its configuration directory writable to refresh tokens. Do not delete Keychain items or token caches to "reset" sign-in without asking. Do not depend on the resolution order of `DefaultAzureCredential`: select the credential explicitly, or set `AZURE_TOKEN_CREDENTIALS`, and state which identity local runs use; a call that works as the signed-in developer proves nothing about the deployed identity.
-- **Check:** Setup documentation mentions the Keychain prompt; the design states the credential used locally and in the deployed environment.
-- **Why:** Sign-in checks stalled on a Keychain prompt, an expired `az` session file could not be refreshed from the agent session, and a design had to fix the credential chain because its order differs by environment.
+- **Rule:** Identify which credential store and identity the configured CLI or library uses; macOS Keychain integration and prompts depend on the tool and configuration. A session that cannot answer an interactive prompt may be blocked. Do not delete credential-store entries or token caches as a sign-in reset without authorization. For `DefaultAzureCredential`, select or configure the intended local credential and document how deployed identity differs.
+- **Check:** State the configured local identity and deployed identity; document an interactive setup requirement only when the selected provider uses it.
+- **Why:** An agent could not answer an interactive credential prompt, and the local and deployed credential chains resolved differently.
 
-### 7. Name where other-OS behavior is verified
+### 7. Name where non-macOS behavior is verified
 
-- **Rule:** Windows- and Linux-only behavior (cmd.exe quoting, Win32 packaging, case-sensitive paths, Linux containers in CI) cannot be confirmed on a Mac. Name the CI job that exercises it (`windows-latest`, `ubuntu-latest`), read that job's result, and record it in the PR. When publishing, build each runtime identifier the release lists (`osx-arm64` included) and run the published macOS binary once. macOS and Windows runners are billed at a higher rate in private repositories: when the user limits them, keep those jobs to the default branch or releases, and when hosted CI is unavailable run the workflow's steps locally and say which jobs did not run.
-- **Check:** The PR states, per OS, whether the behavior was observed locally, in a named CI job, or not at all.
-- **Why:** Windows behavior was verified only through a `windows-latest` job after local reproduction proved impossible, and the user asked to restrict macOS and Windows pull-request builds because of runner cost.
+- **Rule:** A Mac cannot establish Windows- or Linux-specific behavior such as Win32 packaging, case-sensitive paths, or Linux-only services. Use the relevant CI job or target environment where available; report the result and leave unavailable checks explicitly unverified. Build and run each macOS runtime identifier required by the release scope.
+- **Check:** For each affected platform, state where it was exercised or that it remains unverified.
+- **Why:** Windows packaging behavior was established only by a Windows CI job after it could not be reproduced locally.
 
-### 8. Judge desktop UI on the real macOS screen
+### 8. Verify native desktop interactions on macOS
 
-- **Rule:** For a desktop UI change (Avalonia, MAUI), headless tests cover logic only. Launch the Release build on macOS, follow the changed path, and judge focus, keyboard confirmation, and layout from screenshots (`dotnet-testing`, "Judge UI changes from screenshots"). Close unrelated windows that can intercept UI automation before a full UI test run.
-- **Check:** The report lists the build configuration, the path followed, and a pass or fail per screenshot.
-- **Why:** Focus did not return to the expected control after confirming with Enter, and another window on screen interfered with UI automation during a full test run.
+- **Rule:** For a macOS desktop change involving window focus, keyboard interaction, or layout, headless tests alone do not show the native window behavior. Exercise the changed interaction in the app and inspect a screenshot when visual layout or focus is part of the acceptance criteria. Use an isolated test session when other windows interfere with automation; change unrelated windows only when authorized.
+- **Check:** Record the build, interaction tested, and observed result; report unavailable visual checks separately.
+- **Why:** Keyboard confirmation left focus on the wrong control, and another window interfered with UI automation.

@@ -1,11 +1,11 @@
 ---
 name: vs-extension-remote-ui
-description: 'Rules for Visual Studio extensions built on VisualStudio.Extensibility Remote UI (RemoteUserControl, data contracts, XAML), learned from bindings that failed silently and layouts that broke only in the real IDE. Use while editing a Remote UI view model, adding [DataMember] properties or commands, updating an ObservableCollection bound to an ItemsSource or ComboBox, editing Remote UI XAML, adding a settings field, or verifying an extension change in the Experimental instance.'
+description: 'Prevent silent binding failures, selection races, and layout defects in VisualStudio.Extensibility Remote UI. Use for RemoteUserControl data contracts, bound collections, selectors, or Remote UI XAML; not ordinary WPF or Avalonia views.'
 ---
 
 # Visual Studio Extension Remote UI
 
-Remote UI view models live in the extension process and are serialized to Visual Studio. Many mistakes do not throw: the binding is simply empty, or a value is written back asynchronously. Unit tests and builds miss these; the Experimental instance does not.
+Remote UI serializes view models across processes. Validate serialization and asynchronous write-back as well as local property values.
 
 ## When not to use
 
@@ -18,13 +18,13 @@ Remote UI view models live in the extension process and are serialized to Visual
 
 - **Rule:** Every property and command that XAML binds to has `[DataMember]` on a `[DataContract]` view model and raises change notification.
 - **Check:** Search the XAML bindings and confirm each target has `[DataMember]`; confirm it appears in the running UI.
-- **Why:** Members without `[DataMember]` serialize as empty, and the binding fails silently. A profile list and its commands were unreachable from XAML until this was fixed.
+- **Why:** Missing data members made lists and commands unreachable from XAML without a binding exception.
 
 ### 2. Update ItemsSource collections by diff, not by rebuild
 
-- **Rule:** Merge a new list into a bound `ObservableCollection` with `Insert`, `Move`, and `RemoveAt`. Do not `Clear()` and re-add, and fix the order of existing items with `Move`.
+- **Rule:** When refreshing a bound list whose selection should survive, merge items by identity with `Insert`, `Move`, and `RemoveAt` rather than clearing and re-adding. Preserve existing item instances and update their order.
 - **Check:** A test merges a reordered list and asserts both contents and order; the selected item stays selected in the IDE.
-- **Why:** Clear-and-add made the IDE's `ComboBox` selection invalid, and the default model disappeared from the dropdown. The first diff fix still did not reorder existing items.
+- **Why:** Rebuilding invalidated selection; a partial diff fix retained the wrong order.
 
 ### 3. Guard null write-back from selectors conditionally
 
@@ -46,16 +46,12 @@ Remote UI view models live in the extension process and are serialized to Visual
 
 ### 6. Use a selector for settings with a finite set of values
 
-- **Rule:** When a setting accepts a known set of values (language, mode, tier), bind it to a `ComboBox` over that set, with a display name per value. Do not use free text.
-- **Check:** The settings UI lists every supported value.
+- **Rule:** For a closed set of setting values, use a selector with readable labels. Preserve editable input when custom values are part of the contract.
+- **Check:** Supported choices are discoverable and unsupported values cannot be submitted for a closed set.
 - **Why:** A free-text language field accepting `auto`, `ja`, or `en` was unclear to the user and was replaced by a selector.
 
 ### 7. Verify in the Experimental instance, including visual states
 
-- **Rule:** After a Remote UI change, run the extension in the Experimental instance with the build just produced and judge it from screenshots (`dotnet-testing`, "Judge UI changes from screenshots"), adding the language setting when localization changed. In a narrow window, every choice and button that needs a response stays reachable.
-- **Check:** Experimental-instance screenshots cover states, colors, narrow width, and language, each with a verdict.
-- **Why:** A stop button that looked disabled, a white selection, truncated account information, choices cut off so the user could not answer, and an untranslated UI were found only in the real IDE after the build and tests passed.
-
-## Before reporting done
-
-Confirm each applicable Check above, or state which one was not done.
+- **Rule:** Validate the changed path in the target Experimental instance using the new build (`dotnet-testing`, "Judge UI changes from screenshots"). Check affected selection, disabled, narrow-width, theme, or language states. If the IDE is unavailable, report that gap; local tests do not prove the remote UI works.
+- **Check:** Observed states have screenshot verdicts; required unobserved states remain explicit gaps. Response controls stay reachable at narrow widths.
+- **Why:** Compilation and local tests missed cut-off controls and incorrect visual states in the real IDE.

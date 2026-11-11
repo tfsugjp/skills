@@ -1,45 +1,41 @@
 ---
 name: powershell-scripting
-description: 'Rules for writing PowerShell scripts, learned from review findings and failed runs. Use when a script filters a pipeline and then reads Count or an index, writes text files that Linux or macOS will read (checksums, YAML, shell scripts), locates tools installed through mise, pyenv, or another shim manager, or runs batch changes through WinGet, az, or other native programs and must handle partial failure.'
+description: 'Guidance for PowerShell pipelines, file encoding, tool shims, and batch native commands. Use when a script depends on collection shape, writes files consumed by another OS or PowerShell version, resolves tools from version managers, or handles partial native-command failures.'
 ---
 
 # PowerShell Scripting
 
-These rules cover PowerShell behavior that differs from what the code appears to say.
+Apply these rules where PowerShell behavior or supported versions affect the result.
 
 ## When not to use
 
-- `az`, `gh`, or `.cmd` argument quoting, inline JSON, `cmd.exe` metacharacters, and console encoding: `windows-shell-safety`.
+- `az`, `gh`, or `.cmd` argument quoting and `cmd.exe` behavior: `windows-shell-safety`.
 - Azure DevOps REST writes: `azure-devops-foundation`.
-- The shape of commands an agent runs under permission rules or a sandbox: `agent-sandbox-troubleshooting`.
-- Scripts and executable examples in documentation: the `script-author` agent when available; snippet naming is in `dotnet-documentation`.
+- Agent-session permission and sandbox command failures: `agent-sandbox-troubleshooting`.
+- Scripts and executable examples in documentation: `script-author` when available.
 
 ## Rules
 
 ### 1. Wrap the whole pipeline in @() before using Count or an index
 
-- **Rule:** Write `$items = @(Get-Thing | Where-Object { ... })`. Wrapping only the input (`@($a) | Where-Object`) does not help: a single result is unwrapped to a scalar, so `.Count` and `[0]` change meaning (a string's `[0]` is its first character).
-- **Check:** A test runs the function with zero, one, and two matching items.
-- **Why:** Candidate selection collapsed to a string when exactly one path existed.
+- **Rule:** Assign filtered pipeline output as `$items = @(Get-Thing | Where-Object { ... })`. Wrapping only the input does not prevent a single result from becoming a scalar.
+- **Check:** Cover zero, one, and multiple results.
+- **Why:** A single matching path was unwrapped and its string index was mistaken for an item index.
 
-### 2. Write LF text for files other systems read
+### 2. Match file encoding to the reader
 
-- **Rule:** Files read on Linux or macOS (`SHA256SUMS`, shell scripts, generated YAML) are written with LF and UTF-8 without BOM: `[IO.File]::WriteAllText($path, ($lines -join "`n") + "`n", [Text.UTF8Encoding]::new($false))`. `Out-File` and `Set-Content` write CRLF on Windows, and in Windows PowerShell 5.1 `Out-File` defaults to UTF-16LE and `Set-Content` to the ANSI code page.
-- **Check:** The file has no `\r` bytes; `sha256sum -c` (or `shasum -a 256 -c` on macOS) passes for a checksum list.
-- **Why:** A checksum list written with `Out-File` had CRLF line endings that broke verification on Linux.
+- **Rule:** Choose line endings and encoding for the actual consumer. Windows PowerShell 5.1 reads BOM-less UTF-8 using the active code page, so a non-ASCII `.ps1` may require a UTF-8 BOM when it must run there or a repository analyzer requires it. Generated cross-platform text commonly needs UTF-8 without BOM and LF; set those explicitly. Do not assume PowerShell versions share defaults.
+- **Check:** Read the file back using each supported runtime or inspect its bytes, including non-ASCII content where present.
+- **Why:** A PowerShell script containing Japanese text needed a BOM for repository analysis, while generated checksum text needed BOM-less UTF-8 and LF for Unix tools.
 
 ### 3. Resolve shims to the real executable
 
-- **Rule:** Resolve a tool installed through mise, pyenv, or a similar manager with the manager (`mise which python`) or the tool itself (`python -c "import sys; print(sys.executable)"`), and fail clearly when it cannot be resolved. Do not accept or reject a path only because it is a shim.
-- **Check:** The script works where the tool is installed only through the manager.
-- **Why:** An install script stopped with "not a mise shim" on a machine where Python came only from mise.
+- **Rule:** When behavior depends on which tool runs, resolve it through its version manager (for example `mise which python`) or the tool itself (`python -c "import sys; print(sys.executable)"`). Do not accept or reject a path solely because it is a shim.
+- **Check:** Run where the tool is available only through its version manager.
+- **Why:** An install script rejected a valid Python command because its path was a mise shim.
 
-### 4. Classify native command failures before continuing
+### 4. Handle native command failures at the boundary
 
-- **Rule:** Capture `$LASTEXITCODE` immediately after a native call and fail on unhandled codes. Resolve the exact package or resource ID and its source before changing anything. Stop when a failed prerequisite (discovery, source refresh) makes the target set unreliable; continue after an individual failure only when the contract allows it, and keep each failure in the summary and exit code.
-- **Check:** Mock a failed discovery (no item changes run) and an allowed item failure (the next item runs and the failure is reported). Test a rerun after partial success under each supported PowerShell version, including 5.1 when supported.
-- **Why:** A batch had to continue after one package update failed while still stopping when discovery or source refresh failed.
-
-## Before reporting done
-
-Confirm each applicable Check above; native calls with JSON, queries, or pipes also follow `windows-shell-safety`.
+- **Rule:** Capture `$LASTEXITCODE` immediately after each native call and apply the operation's failure policy. Stop if discovery or source refresh fails and the target set is unreliable; continue after an item failure only when the contract allows it, while preserving failures in the summary and final exit code.
+- **Check:** Verify a discovery failure prevents changes and an allowed item failure is reported while subsequent items proceed. Cover partial-success reruns when supported.
+- **Why:** A package batch needed to continue past an individual failure but stop when it could not reliably identify targets.

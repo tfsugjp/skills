@@ -131,7 +131,7 @@ On Windows, run the same script with `python`.
 
 ## .NET / Azure Lessons
 
-`dotnet-azure-lessons` collects rules from redo requests, user corrections, and review findings in past agent sessions, so the same mistakes do not come back. Each skill loads in one phase or situation of the work and gives every rule a check and a reason; the checks are what the work is confirmed against before it is reported as done. Each skill also names the existing skills it hands off to (`windows-shell-safety`, `github-pull-request`, `github-plan-issues`, `azure-devops-pipelines`, `project-documentation`, `nuget-validate`) instead of repeating their procedures.
+`dotnet-azure-lessons` provides eleven focused skills drawn from recurring corrections in agent sessions. Each non-obvious rule has a check and a reason. Apply only the rules relevant to the request; the skills do not grant permission for unrelated changes, external writes, installations, or settings changes. Shared procedures have one owner, with references to specialized skills when needed.
 
 | Skill | Loads when |
 |---|---|
@@ -147,7 +147,7 @@ On Windows, run the same script with `python`.
 | [dotnet-macos-development](plugins/dotnet-azure-lessons/skills/dotnet-macos-development/SKILL.md) | Building, testing, packaging, or debugging .NET and Azure projects on macOS or Apple silicon |
 | [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | A command fails inside the agent session with a permission, sandbox, or credential error |
 
-Before reporting a change as done, ask the `dotnet-lessons-reviewer` agent to check the diff. It picks the skills that apply to the changed files, reports problems by rule, file, and line, and never edits files.
+Use `dotnet-lessons-reviewer` for an independent read-only review when appropriate. It covers the requested committed and working-tree changes, selects applicable checks, and separates actionable defects from missing verification evidence. Scenario evaluation checks its decisions; actual skill discovery in each client must be verified separately.
 
 ## Project Documentation
 

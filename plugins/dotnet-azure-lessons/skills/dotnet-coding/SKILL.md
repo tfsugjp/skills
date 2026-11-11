@@ -1,92 +1,88 @@
 ---
 name: dotnet-coding
-description: 'Implementation rules for C# and .NET code, learned from review findings and regressions. Use while writing or changing C# that handles JSON-RPC or WebSocket connections and notification handlers, Channel-based queues, methods that return a Task from inside a using block, ObservableCollection or list updates during an async send, enum or option parsing, duplicate detection keys, optional versus null configuration values, validation before an upload or API write, file paths, CLI exit codes and result messages, or localhost/loopback connections.'
+description: 'C#/.NET guidance for ordered notifications, async resource lifetimes, stale results, API payloads, parsing, identity keys, paths, and CLI outcomes.'
 ---
 
 # .NET Coding
 
-Each rule is a defect that shipped or reached review. Apply it while writing the code and add the test named in the check.
+Apply these rules when the corresponding behavior is in scope. Add focused tests for non-obvious concurrency, parsing, payload, and resource-lifetime invariants.
 
 ## When not to use
 
-- Remote UI view models, `[DataMember]`, and XAML: `vs-extension-remote-ui`.
-- State ownership and version gates: `dotnet-architecture-design`.
+- Visual Studio Remote UI view models and XAML: `vs-extension-remote-ui`.
+- State ownership, version support, and architecture: `dotnet-architecture-design`.
 - NuGet package versions: `nuget-validate`.
 
 ## Rules
 
 ### 1. Never await a request on the same connection inside a notification handler
 
-- **Rule:** A handler running on a connection's read loop must not send a request on that connection and await the response; queue the follow-up to another task or a channel. Keep the read loop alive: catch and log handler exceptions, including the handler's own `OperationCanceledException`.
-- **Check:** A test sends a notification whose handler issues a request over a real pipe or socket and completes within the timeout.
-- **Why:** A sign-in notification awaited an account read on the same JSON-RPC connection; the response sat behind the blocked parse loop until a 15-second timeout.
+- **Rule:** A handler called on a connection's read loop must not send a request over that same connection and await its response. Queue the follow-up elsewhere. Handle exceptions, including cancellation, so they do not terminate the read loop unexpectedly.
+- **Check:** An applicable integration test sends a notification whose handler makes a same-connection request and completes within a bounded timeout.
+- **Why:** The response waited behind the parse loop blocked by the notification handler.
 
 ### 2. Process ordered notifications through one consumer
 
-- **Rule:** Write notifications to a `Channel<T>` read by one consumer (`ReadAllAsync`), not a task per notification. The read loop must not block on the channel: use an unbounded channel, or a bounded one written with `TryWrite` and an explicit overflow policy (for example `DropOldest` for progress deltas, or fail the connection).
-- **Check:** A test sends A, B, C and observes A, B, C; a test fills the queue and the read loop still parses responses.
-- **Why:** Parallel handling reordered message deltas and turn completion and corrupted Busy/Ready transitions.
+- **Rule:** Use one consumer for ordered notifications. Ensure queue writes do not block the connection read loop; choose capacity and overflow behavior that preserve the message semantics. Dropping deltas is unsafe when later state depends on them.
+- **Check:** Relevant tests prove ordering and show the read loop still processes responses under queue pressure; overflow behavior matches the protocol.
+- **Why:** Concurrent notification handlers reordered message deltas and turn completion.
 
 ### 3. Await inside using; do not return the Task
 
-- **Rule:** A method that creates a disposable (`using var stream = …`) and calls an async operation on it is `async` and awaits that operation. Returning the `Task` without awaiting disposes the resource before the I/O completes.
-- **Check:** No non-async method returns a task that uses a local it disposes; a test with a delayed I/O double completes without `ObjectDisposedException`.
-- **Why:** A block-upload method returned its task from inside `using`, so the stream was disposed while the upload was still running.
+- **Rule:** Await asynchronous operations that use a local disposable before leaving its scope; do not return a task that outlives the resource.
+- **Check:** A relevant delayed-I/O test completes without premature disposal.
+- **Why:** A stream was disposed while its upload was still running.
 
 ### 4. Apply async results to the original target
 
-- **Rule:** Carry the target (and, when operations overlap, the operation ID) into success, failure, and notification handlers. Update the active view only when the target still matches, and keep caches for targets that are not selected current. After a successful send, remove only the items captured in the send snapshot, by reference or ID. A timer or continuation from an earlier attempt must not complete a later one.
-- **Check:** Tests add an item while the send is pending, switch targets before the response arrives, and restart an operation before its previous timer fires.
-- **Why:** Send cleanup deleted newly added attachments, a delayed result appeared in another view, a notification for an unselected project left its cache stale, and a previous sign-in's timer ended the retried sign-in.
+- **Rule:** Carry target and operation identity through callbacks. Before changing either cache or visible state, reject results from superseded operations or deleted/reinitialized target instances. Update valid targets' caches even when unselected; update the visible view only for the active target. After a send, remove only items captured in its snapshot.
+- **Check:** Tests cover the races the changed code permits, such as adding an item during send, switching or deleting a target, and starting a retry before an earlier callback completes.
+- **Why:** Delayed results updated the wrong view, cleanup removed new items, and an earlier timer completed a later operation.
 
 ### 5. Reject unknown enum and option values
 
-- **Rule:** When `Enum.TryParse` fails or a string is outside the known set, throw or report a validation error; never fall back to a default. When displaying data from a peer, show an unknown item type as an explicit fallback that names the type.
-- **Check:** A test passes an unknown value and expects the error, matching the XML documentation; a display test covers an unsupported item type.
-- **Why:** An unknown `Mode` silently became `include` and produced a wrong plan.
+- **Rule:** Reject unknown values rather than silently using defaults when the contract defines a closed set. `Enum.TryParse` alone can accept numeric values that are not declared enum members; validate membership or the domain-specific set. For peer data, show an explicit fallback that identifies an unsupported type.
+- **Check:** Applicable tests cover unknown names, undefined numeric enum values, and unsupported peer types.
+- **Why:** An unrecognized mode silently became `include` and produced a wrong plan.
 
 ### 6. Include every distinguishing field in uniqueness keys
 
-- **Rule:** Duplicate-detection keys include every field that changes meaning (mode, type, scope), not only target and group.
-- **Check:** The same target in include and exclude mode passes validation.
-- **Why:** Keying on `Target|GroupId` rejected a valid include/exclude pair.
+- **Rule:** A duplicate key includes every field that distinguishes valid entries, such as mode, type, or scope.
+- **Check:** Tests show entries that differ in a meaningful field are accepted, while true duplicates are rejected.
+- **Why:** A key that omitted mode rejected a valid include/exclude pair.
 
 ### 7. Keep omitted, null, and value distinct
 
-- **Rule:** Preserve the contract's distinctions between omitted, explicit `null`, empty, and other values, using a presence flag when omission and `null` differ. When merging into an existing settings file, handle each shape it contains (arrays, metadata maps) and preserve data the merge does not own.
-- **Check:** Round-trip tests cover each supported state; merge tests show existing metadata survives.
-- **Why:** An explicit `null` meaning "any app" was treated as omitted, and a merge processed a metadata map as an array.
+- **Rule:** Preserve the external contract's distinction between omission, explicit `null`, empty, and concrete values. When merging settings, preserve data the change does not own and handle the actual container shape.
+- **Check:** Relevant round-trip and merge tests cover supported states and retain unrelated metadata.
+- **Why:** Explicit `null` was treated as omission, and a metadata map was processed as an array.
 
 ### 8. Validate everything before the first side effect
 
-- **Rule:** Validate the whole request, including values needed only for the final result or report and properties that exist on one platform but not another, before the first upload, API write, or file change. Code that runs after a remote change succeeded must not be able to throw on input.
-- **Check:** A test with a missing platform-specific value fails before the fake remote records any call.
-- **Why:** A publish succeeded remotely and then threw while building its result, because the result required a property that one platform's manifest does not have.
+- **Rule:** Validate all inputs needed to complete and report a requested operation before its first upload, API write, or file mutation. Do not allow post-write result construction to fail on unvalidated input.
+- **Check:** An applicable test confirms invalid input causes no remote call or file change.
+- **Why:** A publish succeeded remotely, then failed while building a result from a missing platform-specific property.
 
 ### 9. Use Path APIs for paths
 
-- **Rule:** Use `Path.GetFileName`, `Path.Combine`, and related APIs; never split on `\` or `/`.
-- **Check:** A test runs the helper with both separators, or CI runs it on Windows and a non-Windows OS.
-- **Why:** A naming helper split on a hard-coded separator and broke on another OS.
+- **Rule:** Use `Path` APIs for paths belonging to the current platform. If parsing paths authored for another platform or a protocol, use that format's defined separator rules rather than assuming the host's `Path` behavior.
+- **Check:** Relevant tests cover the path formats the feature promises on the platforms it supports.
+- **Why:** Splitting a local path on a hard-coded separator failed on another OS.
 
 ### 10. Make result messages agree with the exit code
 
-- **Rule:** Derive the final message from the same counts that decide the exit code. When any item failed, print no success or dry-run-complete message.
-- **Check:** A test with one failure asserts a non-zero exit code and a failure summary.
-- **Why:** A CLI printed "Dry run: no changes were applied." even when items failed.
+- **Rule:** Derive the final message and exit code from the same outcomes. Report failure when any item failed; do not print a success message for a partial failure.
+- **Check:** A relevant CLI test covers mixed success and failure and asserts both summary and exit code.
+- **Why:** A CLI printed that no changes were applied even when items failed.
 
 ### 11. Try every loopback address
 
-- **Rule:** When connecting to `localhost`, try each resolved loopback address (`::1` and `127.0.0.1`) until one connects.
-- **Check:** A server listening only on IPv6 loopback is reachable.
-- **Why:** A client that pinned IPv4 could not reach a server listening only on `::1`.
+- **Rule:** If the client promises to connect to `localhost`, support the loopback addresses returned by resolution instead of pinning IPv4.
+- **Check:** When the implementation supports it, a test reaches a server listening only on IPv6 loopback.
+- **Why:** An IPv4-only client could not reach a server listening on `::1`.
 
 ### 12. Parse every input shape the user named
 
-- **Rule:** Test each requested input shape before implementing a parser or recognizer. For a parsing bug, keep the exact failing input, including markup and line boundaries; normalize only what recognition needs and preserve exclusions such as fenced code. Verify a binary or archive parser against the platform's own tool for the same file.
-- **Check:** Tests cover each requested shape, the original failing input, and a similar input that must stay excluded.
-- **Why:** A choice recognizer missed requested shapes, emphasis after a question mark hid a valid question, and an archive parser mishandled a compression format the native tool read correctly.
-
-## Before reporting done
-
-Confirm each applicable Check above, or state which test was not written and why.
+- **Rule:** Preserve a parser's failing input when diagnosing a parsing bug. Test the requested shapes and nearby exclusions, including markup and line boundaries where they affect recognition. Compare archive parsing with a platform tool when that format is in scope.
+- **Check:** Tests cover relevant requested shapes, the original failure, and a similar input that must remain excluded.
+- **Why:** Recognition missed valid formats, and an archive parser disagreed with the native tool.

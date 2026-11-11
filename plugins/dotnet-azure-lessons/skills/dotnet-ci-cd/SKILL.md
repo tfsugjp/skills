@@ -1,6 +1,6 @@
 ---
 name: dotnet-ci-cd
-description: 'Rules for GitHub Actions and Azure Pipelines definitions and packaging of .NET projects, learned from leaked-secret risks, duplicate runs, and missing platforms found in review. Use while editing workflow or pipeline YAML, triggers, fork pull-request handling, permissions, secrets, variable groups, OIDC federation, build matrices and runner choice, release and tag workflows, rulesets, dotnet pack or VSIX or NuGet packaging, ARM64 builds, solution files, or NuGet audit warnings.'
+description: 'Guidance for .NET CI workflows, build matrices, packaging, and releases. Use when editing GitHub Actions or Azure Pipelines, triggers, permissions, fork handling, runner choice, release and tag workflows, .NET packaging, solution selection, or NuGet audit policy.'
 ---
 
 # .NET CI/CD
@@ -14,66 +14,62 @@ description: 'Rules for GitHub Actions and Azure Pipelines definitions and packa
 
 ## Rules
 
-### 1. Keep secrets, OIDC, and fork code apart
+### 1. Keep untrusted pull-request code away from privileged credentials
 
-- **Rule:** Jobs that run for pull requests receive no secrets, personal access tokens, secret variable groups, or `id-token: write`; gate release and packaging jobs with `if: github.event_name != 'pull_request'` or an Azure Pipelines condition on `Build.Reason`. Skip CI for pull requests from forks when the user asks (for example `if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository`, which keeps push and tag runs), and never use `pull_request_target` to build fork code.
-- **Check:** For each job with secrets or OIDC, the trigger and condition exclude pull requests; fork pull requests start only the jobs the user allows.
-- **Why:** A pull-request job had `id-token: write` and a release token, and a pull-request pipeline referenced a variable group.
+- **Rule:** Do not expose secrets, personal access tokens, protected variable groups, or OIDC write permissions to jobs that execute untrusted pull-request code. Fork behavior and available protections differ by platform; verify the repository's trigger and permissions. Unprivileged build, test, or package-validation jobs may run on pull requests. Keep credentialed publish, deploy, and release steps behind an appropriate trusted event and environment gate.
+- **Check:** Trace each job that executes pull-request code and each privileged step; confirm the event and permissions cannot expose credentials to untrusted code.
+- **Why:** Pull-request jobs were found with release credentials or OIDC permissions, while ordinary validation does not require those privileges.
 
-### 2. Keep sample workflows out of the active workflow folder
+### 2. Keep sample workflows outside the active workflow folder
 
-- **Rule:** Example workflows for users go outside `.github/workflows/` (for example `workflows/github-actions/`) so GitHub does not run them.
-- **Check:** Every file under `.github/workflows/` is meant to run in this repository.
-- **Why:** Example workflows were nearly added where they would run.
+- **Rule:** Store examples outside `.github/workflows/` so GitHub does not execute them.
+- **Check:** Every file under `.github/workflows/` is intended to run in this repository.
+- **Why:** A user-facing example was nearly added to the active workflow folder.
 
-### 3. Run each check once, on runners the user is willing to pay for
+### 3. Avoid duplicate runs and match runner cost to the request
 
-- **Rule:** One change runs each check once: for example CI on `pull_request` plus `push` to the default branch, and release on tag push only, with branch filters that keep CI from also running for the tag. Use `concurrency` to cancel superseded runs. macOS and Windows runners cost more than Linux in private repositories; when the user limits cost, run those OS jobs only for the default branch or releases and keep pull-request checks on Linux.
-- **Check:** A push to a PR branch, and a tag push, each start one run per check; the matrix per trigger matches what the user asked for.
-- **Why:** CI ran twice for every push to a PR branch, a tag push started both release and CI, and the user asked to restrict macOS and Windows builds after the minutes ran out.
+- **Rule:** Review overlapping `pull_request`, branch `push`, and tag triggers so the same change does not run redundant full checks. Use concurrency cancellation when superseded work has no required side effects. When the user limits runner cost, place expensive OS jobs on the branches or releases needed to preserve the stated coverage.
+- **Check:** Inspect representative PR-branch, default-branch, and tag events; confirm the jobs and cost match repository policy.
+- **Why:** Push and pull-request triggers duplicated runs, and macOS/Windows runner usage exhausted the available budget.
 
 ### 4. Allow Windows targeting on non-Windows runners
 
-- **Rule:** When Windows-targeted projects (`net*-windows`, WPF, WinForms, VSIX) are restored, built, or packed on Linux or macOS, set `<EnableWindowsTargeting>true</EnableWindowsTargeting>` in `Directory.Build.props`, or exclude them from that job.
-- **Check:** The non-Windows job restores and packs without a targeting error.
-- **Why:** A NuGet submission job failed on a non-Windows runner while packing a Windows-targeted project.
+- **Rule:** When restoring, building, or packing Windows-targeted projects (`net*-windows`, WPF, WinForms, VSIX) on Linux or macOS, set `<EnableWindowsTargeting>true</EnableWindowsTargeting>` or exclude those projects from that job.
+- **Check:** The job restores and packs without a targeting error.
+- **Why:** Packing a Windows-targeted project failed on a non-Windows runner.
 
-### 5. Carry every platform through build, test, and artifacts
+### 5. Align build, test, and release matrices with supported platforms
 
-- **Rule:** Each supported platform (x64, ARM64, each OS and runtime identifier) appears in the build matrix, the test matrix, and the published artifacts and checksums. Run tests natively on ARM64 when a runner exists, not only an x64 cross-compile.
-- **Check:** The release lists one artifact per platform, and each has a test job.
-- **Why:** ARM64 was missing from the build and release notes, and ARM64 tests ran only on x64.
+- **Rule:** Build and publish the operating systems and runtime identifiers the project supports and release scope promises. Run platform-sensitive tests on the matching native runner when required and available; do not claim an x64 cross-build establishes ARM64 runtime behavior.
+- **Check:** Each released artifact maps to its target OS/RID, with a relevant test or an explicit verification gap.
+- **Why:** ARM64 was missing from the release, and an x64 run was mistakenly treated as ARM64 test coverage.
 
-### 6. Build every solution and project
+### 6. Build the intended solutions and projects
 
-- **Rule:** CI builds every solution, and every project, including tests, belongs to one. Pipelines reference the `.slnx` path (`dotnet-architecture-design`, "Use .slnx as the solution format") with an SDK that supports it.
-- **Check:** `dotnet sln <solution>.slnx list` matches the project files; no workflow names an `.sln`.
-- **Why:** CI validated one of two solutions, and the other had unregistered projects.
+- **Rule:** Include each solution and project required by the repository's build contract. Use the chosen solution format consistently in CI, scripts, and documentation (`dotnet-architecture-design`, "Prefer .slnx for new supported solutions").
+- **Check:** Compare the project set in the workflow with the repository's intended solutions and projects.
+- **Why:** CI built one of two solutions while the other contained unregistered projects.
 
-### 7. Fix NuGet audit warnings instead of suppressing them
+### 7. Assess NuGet audit findings and record justified exceptions
 
-- **Rule:** For `NU1901`–`NU1904` on a direct or transitive package, update to a patched version within the supported major (add a direct reference for a transitive package when needed). Do not add `NoWarn` or disable auditing.
-- **Check:** The build has no audit warnings and no new suppression.
-- **Why:** A vulnerable transitive cryptography package was fixed by pinning a patched version.
+- **Rule:** For `NU1901`–`NU1904`, identify whether the vulnerable package is direct or transitive and check supported patched versions. Prefer upgrading within the supported range; add a direct reference for a vulnerable transitive dependency when appropriate. Suppress an audit warning only when a documented, reviewed exception is justified by the actual exposure and mitigation.
+- **Check:** Each finding is fixed or has a scoped rationale; no blanket suppression hides unrelated warnings.
+- **Why:** A vulnerable transitive cryptography dependency was resolved with a patched compatible version.
 
-### 8. Pin actions and check every runner OS before pushing
+### 8. Pin third-party actions and verify target platforms
 
-- **Rule:** Pin third-party actions to a full commit SHA with a version comment, and compare generated YAML with every explicit requirement in the approved plan. Before pushing a .NET change, build on each OS the workflow uses, or use a draft PR run and read its result.
-- **Check:** `uses:` lines are SHA-pinned; each OS job's result was read.
-- **Why:** Generated workflows were not pinned although the plan required it, and a change that built on Windows failed in the Linux job.
+- **Rule:** Follow repository or user policy for pinning third-party actions; when full commit pinning is required, include a version comment. Verify platform jobs through the configured CI or the corresponding local environment; a push is not evidence that jobs passed.
+- **Check:** Action references satisfy the applicable policy, and each required platform result is read or marked unverified.
+- **Why:** An approved plan required pinned actions, and a workflow that passed on Windows failed on Linux.
 
-### 9. Configure releases and protection as requested
+### 9. Match release state, assets, and tag protections to the requested policy
 
-- **Rule:** Create releases in the state the user chose (for example a draft that is promoted by hand, so a failed release is undone by deleting the draft), attach the installable artifacts, and create tag protection as a ruleset that targets tags, not branches.
-- **Check:** A test tag produces a release in the expected state with the expected assets, and the ruleset target is `tag`.
-- **Why:** Releases had to be changed to drafts, and a tag rule created under branch rulesets did not protect tags.
+- **Rule:** Configure draft or published release state and tag protection as the user and repository require. Validate release automation with a safe pre-release or draft workflow where available; do not create a public release or tag unless authorized.
+- **Check:** Confirm the resulting release state, expected assets, and that any tag ruleset targets tags.
+- **Why:** A release needed to remain a draft for manual promotion, and a branch ruleset did not protect tags.
 
-### 10. State where local-only gaps are verified
+### 10. State where local verification gaps are covered
 
-- **Rule:** When a test needs a service unavailable locally (a database container, a signed-in account), name the CI job that runs it and say it did not run locally. When hosted CI is unavailable, run the workflow's steps locally in the same order and say which jobs could not be reproduced.
-- **Check:** The report names the job or local command that covered each gap.
-- **Why:** SQL container tests could not run locally and were moved to the Linux CI job, and a repository with hosted CI disabled needed its checks run locally before merge.
-
-## Before reporting done
-
-Confirm each applicable Check above, or state which one was not done.
+- **Rule:** When a test requires a service, identity, or platform unavailable locally, identify the CI job or environment that can run it and state whether it actually ran. If hosted CI is unavailable and the user requests verification, run feasible workflow steps locally and list what remains unverified.
+- **Check:** Each unavailable local check is linked to an observed external result or clearly marked not run.
+- **Why:** Database-container tests were moved to Linux CI when the required service could not run locally.
