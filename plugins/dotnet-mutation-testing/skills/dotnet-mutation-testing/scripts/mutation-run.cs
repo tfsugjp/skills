@@ -347,9 +347,8 @@ async Task<int> RunAsync(ParsedOptions opt)
             log.WriteLine(rawLine);
         }
 
-        foreach (var segment in ansiPattern.Replace(rawLine, string.Empty).Split('\r'))
+        foreach (var line in ansiPattern.Replace(rawLine, string.Empty).Split('\r').Select(segment => segment.Trim()))
         {
-            var line = segment.Trim();
             if (line.Length == 0)
             {
                 continue;
@@ -809,12 +808,13 @@ ReportSummary LoadSummary(string reportPath, string? repoRoot)
     if (root.TryGetProperty("thresholds", out var thresholdElement) && thresholdElement.ValueKind == JsonValueKind.Object)
     {
         thresholds = [];
-        foreach (var property in thresholdElement.EnumerateObject())
+        var parsedThresholds = thresholdElement.EnumerateObject()
+            .Where(property => property.Value.ValueKind == JsonValueKind.Number)
+            .Select(property => (property.Name, Ok: property.Value.TryGetInt32(out var value), Value: value))
+            .Where(parsed => parsed.Ok);
+        foreach (var (name, _, value) in parsedThresholds)
         {
-            if (property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out var value))
-            {
-                thresholds[property.Name] = value;
-            }
+            thresholds[name] = value;
         }
     }
 
