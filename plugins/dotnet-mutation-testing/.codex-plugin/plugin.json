@@ -1,0 +1,24 @@
+{
+  "name": "dotnet-mutation-testing",
+  "version": "0.1.0",
+  "description": "Run Stryker.NET mutation testing on MSTest unit tests once before opening a pull request, limited to code changed against the base branch.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["dotnet", "testing", "mstest", "mutation-testing", "stryker"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": ".NET Mutation Testing",
+    "shortDescription": "Pre-PR Stryker.NET mutation testing",
+    "longDescription": "A skills-only plugin that runs Stryker.NET mutation testing against existing MSTest unit tests once before a pull request, limits mutation to changed code, stops when diff mode falls back to a full run, and summarizes surviving mutants.",
+    "developerName": "Team Foundation Users Japan",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Run mutation testing before I open this PR.",
+      "Which mutants survived in my changes?",
+      "Set up Stryker.NET for this MSTest project."
+    ]
+  }
+}

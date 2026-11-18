@@ -12,6 +12,7 @@ Choose evidence that matches the changed behavior and the user's acceptance crit
 - Finding the cause of a failure: `dotnet-debugging`.
 - CI triggers, matrices, platforms, and secrets: `dotnet-ci-cd`.
 - Azure SQL container integration testing: `azuresql-db-testing`, when installed.
+- Measuring unit test strength with mutation testing, once before opening a PR: `dotnet-mutation-testing`, when installed.
 
 ## Rules
 

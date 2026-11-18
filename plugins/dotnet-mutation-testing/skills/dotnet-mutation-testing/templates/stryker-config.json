@@ -1,0 +1,19 @@
+{
+  "stryker-config": {
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 50
+    },
+    "since": {
+      "ignore-changes-in": [
+        "**/stryker-config.json"
+      ]
+    },
+    "mutate": [
+      "!**/*.Designer.cs",
+      "!**/Migrations/**/*.cs",
+      "!**/*.g.cs"
+    ]
+  }
+}

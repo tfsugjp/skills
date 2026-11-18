@@ -16,6 +16,7 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `windows-shell-safety` | Windows で Azure CLI・JSON・パイプを安全に実行するための規則、`cmd.exe` による引数欠落を実行前に検出する lint（`Test-NativeCommand.ps1`）、JSON を UTF-8 の `@<file>` で渡す PowerShell 7 ヘルパー |
 | `native-container-cli` | WindowsではWSL Containers、macOSではApple containerを優先。対応するDockerコマンドを変換し、ComposeやDocker API連携などでDockerへの切り替えが必要な場合は実行前に確認 |
 | `dotnet-azure-lessons` | スキル: .NET Architecture Design、.NET Coding、VS Extension Remote UI、PowerShell Scripting、.NET Debugging、.NET Testing、.NET Documentation、.NET CI/CD、PR and Issue Workflow、.NET Development on macOS、Agent Sandbox Troubleshooting。いずれも過去の訂正から得たルール、確認方法、理由を持ちます。エージェント: .NET Lessons Reviewer（これらの確認方法で差分を読み取り専用でレビュー） |
+| `dotnet-mutation-testing` | MSTest の単体テストに対する Stryker.NET のミューテーションテスト。PR を作成する前に 1 回だけ、ベースブランチからの変更コードに限って実行し、差分モードが全件実行に切り替わったときは停止して、生存ミュータントを要約（`mutation-run.cs`）。任意の GitHub Actions と Azure Pipelines のテンプレート付き |
 
 すべて MIT License で配布します。認証情報は含めず、MCP server も自動構成しません。Azure DevOps の認証と権限は利用者が設定してください。
 
@@ -33,6 +34,7 @@ claude plugin install windows-shell-safety@tfsugjp-agent-skills
 claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
 claude plugin install native-container-cli@tfsugjp-agent-skills
 claude plugin install dotnet-azure-lessons@tfsugjp-agent-skills
+claude plugin install dotnet-mutation-testing@tfsugjp-agent-skills
 ```
 
 ## GitHub Copilot からインストール
@@ -51,6 +53,7 @@ copilot plugin install windows-shell-safety@tfsugjp-agent-skills
 copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
 copilot plugin install native-container-cli@tfsugjp-agent-skills
 copilot plugin install dotnet-azure-lessons@tfsugjp-agent-skills
+copilot plugin install dotnet-mutation-testing@tfsugjp-agent-skills
 ```
 
 ## Codex の repository-local marketplace からインストール
@@ -69,6 +72,7 @@ codex plugin add windows-shell-safety@tfsugjp-agent-skills
 codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 codex plugin add native-container-cli@tfsugjp-agent-skills
 codex plugin add dotnet-azure-lessons@tfsugjp-agent-skills
+codex plugin add dotnet-mutation-testing@tfsugjp-agent-skills
 ```
 
 Codex の local marketplace は開発・チーム配布用です。公開 listing への申請は、検証完了後の別リリース作業とします。
@@ -146,6 +150,19 @@ Windows では同じスクリプトを `python` で実行します。
 | [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | エージェントセッション内のコマンドが、権限、sandbox、資格情報のエラーで失敗したとき |
 
 独立した読み取り専用レビューが適切な場合は `dotnet-lessons-reviewer` を使います。対象の差分と検証報告を渡してください。エージェントは読み取りと検索のみ可能で、shell と Git の状態にはアクセスしません。該当する確認方法を選び、修正可能な欠陥と検証証拠の不足を分けて報告します。各クライアントでの実際のスキル選択は別途確認が必要です。
+
+## .NET Mutation Testing
+
+[dotnet-mutation-testing](plugins/dotnet-mutation-testing/skills/dotnet-mutation-testing/SKILL.md) は、既存の MSTest 単体テストに対して Stryker.NET を実行し、振る舞いの変化を見逃すアサーションを見つけます。ミューテーションテストは `dotnet test` よりはるかに遅いため、プルリクエストを作成する直前に 1 回だけ、PR のベースブランチからの変更コードに限って実行します。通常の単体テストの実行は変えず、`dotnet test`、pre-commit フック、毎回のビルドを行う CI には組み込みません。
+
+- セットアップ（リポジトリを変更する前に確認します）: `dotnet-stryker` をローカルツールとして固定し、同梱の `stryker-config.json`（しきい値と生成コードの除外）をコピーして、`StrykerOutput/` を無視対象にします。
+- 実行: `mutation-run.cs run --base <branch>` は VSTest か Microsoft.Testing.Platform かを判定し、`--since:origin/<branch>` を付けて Stryker を実行します。差分モードが全件実行に切り替わったときや実行時間の上限を超えたときは停止し、生存ミュータントをファイル・行・変異の種類・置換内容とともに一覧にします。
+- 任意の CI: GitHub Actions（ドラフトでない PR の作成時または ready for review への変更時に 1 回、または手動実行）と Azure Pipelines（手動実行）のテンプレート。
+
+```text
+git fetch origin main
+dotnet run <skill-dir>/scripts/mutation-run.cs -- run --base main
+```
 
 ## プロジェクト文書管理
 

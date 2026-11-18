@@ -2,6 +2,8 @@
 
 ## 未リリース
 
+- `dotnet-mutation-testing` プラグインを追加しました。このスキルは、既存の MSTest 単体テストに対する Stryker.NET のミューテーションテストを、プルリクエストを作成する直前に 1 回だけ、PR のベースブランチからの変更コードに限って（`--since:origin/<base>`）実行します。通常の `dotnet test`、pre-commit フック、毎回のビルドを行う CI は変更しません。単一ファイルの C# 補助ツール `mutation-run.cs` は、VSTest か Microsoft.Testing.Platform かを判定し、差分モードが全件実行に切り替わったとき（テストプロジェクト内の C# 以外のファイルの変更）や実行時間の上限を超えたときに停止し、生存ミュータントとテストが届いていないミュータントを要約します。同梱のテンプレートとして、`stryker-config.json` と、任意の GitHub Actions（ドラフトでない PR の作成時または ready for review への変更時に 1 回、または手動実行）および Azure Pipelines（手動実行）のワークフローを提供します。Stryker.NET 5.1.0、MSTest 4、.NET SDK 11 で検証しました。
+- `dotnet-azure-lessons` を 0.1.1 に更新しました。`dotnet-testing` と `pr-issue-workflow` から、インストールされている場合に `dotnet-mutation-testing` を案内します。
 - `dotnet-azure-lessons` を追加しました。.NET・Azure・PowerShell・macOS・エージェントセッションの障害切り分け向けに、適用場面を絞った11個のスキルと読み取り専用レビュアーを提供します。各ルールには観測可能な確認方法と簡潔な失敗理由を残しました。複数PCの履歴を基に、古い非同期結果、投稿前のPR差分再確認、環境更新のステージング、認証の切り分け、ソースファイルのエンコーディングへの対策を盛り込みました。重複チェックリストを削除し、無関係な移行・インストール・外部更新や不要な承認待ちにつながるルールを限定しました。レビュアーの権限は読み取り・検索のみです。呼び出し側から差分と検証報告を渡し、欠陥と証拠不足を区別します。
 - `github-plan-wiki` を 0.2.1、`azure-devops-toolkit` を 0.3.2 に更新しました。GitHub PR と Azure DevOps Repos の手順は、先に PR を作成してリンクしてから、証拠のある受け入れ基準を更新します（Issue 本文は書き込み直前に再読込し、チェックボックスのない Work Item ではコメントで進捗を記録）。PR の追跡リンクも確認し、未完了の基準を保持し、追跡項目自体のクローズは別に扱います。
 - `github-issue-artifacts` スキル（`github-plan-wiki`）を追加しました。`gh issue artifact` で長い補足資料やリッチな記録を扱い、Artifact が使えない場合は内容を捨てずに Wiki 登録へ回し、未完了として報告します。

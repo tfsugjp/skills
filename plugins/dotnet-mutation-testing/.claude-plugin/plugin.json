@@ -1,0 +1,11 @@
+{
+  "name": "dotnet-mutation-testing",
+  "version": "0.1.0",
+  "description": "Run Stryker.NET mutation testing on MSTest unit tests once before opening a pull request, limited to code changed against the base branch.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["dotnet", "testing", "mstest", "mutation-testing", "stryker"],
+  "skills": "./skills/"
+}

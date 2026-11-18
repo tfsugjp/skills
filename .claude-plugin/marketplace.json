@@ -124,10 +124,19 @@
     {
       "name": "dotnet-azure-lessons",
       "description": "Checkable rules for .NET, Azure, and PowerShell work by phase, plus macOS and agent-sandbox situations, learned from past corrections, with a read-only reviewer agent.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "source": "./plugins/dotnet-azure-lessons",
       "license": "MIT",
       "keywords": ["dotnet", "azure", "powershell", "review", "lessons-learned"],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "dotnet-mutation-testing",
+      "description": "Run Stryker.NET mutation testing on MSTest unit tests once before opening a pull request, limited to code changed against the base branch.",
+      "version": "0.1.0",
+      "source": "./plugins/dotnet-mutation-testing",
+      "license": "MIT",
+      "keywords": ["dotnet", "testing", "mstest", "mutation-testing", "stryker"],
       "category": "Developer Tools"
     }
   ]

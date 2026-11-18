@@ -14,6 +14,7 @@ Use these checks for the requested part of a pull request or issue lifecycle. Ex
 - Azure Repos threads and votes: `azure-devops-repos`.
 - Dependabot PRs: `dependabot-safe-merge`.
 - Stacked-PR commands: `gh-stack`, when installed.
+- Running mutation testing on MSTest unit tests once before opening a .NET PR: `dotnet-mutation-testing`, when installed and when the user or repository workflow asks for it.
 
 ## Rules
 

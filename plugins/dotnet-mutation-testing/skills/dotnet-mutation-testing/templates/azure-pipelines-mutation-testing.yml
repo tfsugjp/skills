@@ -1,0 +1,67 @@
+# Optional: run Stryker.NET mutation testing once per pull request.
+# Create a separate pipeline from this file in the consumer repository and run it manually
+# for the PR's source branch, setting "base" to the PR's target branch on every run.
+# It is never triggered by pushes and is not part of the regular build pipeline.
+# Prerequisites in the consumer repository:
+#   - Copy the skill's scripts/mutation-run.cs helper to eng/mutation-run.cs. The pipeline runs the helper
+#     instead of Stryker directly, so the full-run fallback stop, the timeout, and test-runner
+#     (Microsoft.Testing.Platform) detection apply in CI as they do locally.
+#   - The helper is a file-based app, so CI needs the .NET SDK 10 or later (pinned through global.json).
+#   - dotnet-stryker is installed as a local tool (dotnet-tools.json).
+trigger: none
+pr: none
+
+parameters:
+  - name: base
+    displayName: Base branch to compare against
+    type: string
+    default: main
+
+pool:
+  vmImage: ubuntu-latest
+
+jobs:
+  - job: mutation
+    timeoutInMinutes: 60
+    steps:
+      - checkout: self
+        # Diff mode needs the base branch history.
+        fetchDepth: 0
+        # Keeps the job token available so the explicit base-branch fetch works for private repositories.
+        persistCredentials: true
+
+      - task: UseDotNet@2
+        inputs:
+          useGlobalJson: true
+
+      # The base parameter reaches scripts only through BASE_BRANCH; never interpolate it into script text.
+      - bash: |
+          set -euo pipefail
+          # Reject names git would not accept as a branch, and names it would rewrite (for example @{-1}).
+          if ! normalized="$(git check-ref-format --branch "$BASE_BRANCH")" || [ "$normalized" != "$BASE_BRANCH" ]; then
+            echo "##vso[task.logissue type=error]Invalid base branch name."
+            exit 1
+          fi
+          git fetch --no-tags origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+        displayName: Validate and fetch base branch
+        env:
+          BASE_BRANCH: ${{ parameters.base }}
+
+      - bash: |
+          set -euo pipefail
+          dotnet tool restore
+        displayName: Restore local tools
+
+      # Keep --timeout-minutes below the job timeout so the helper stops Stryker and reports first.
+      - bash: |
+          set -euo pipefail
+          dotnet run eng/mutation-run.cs -- run --base "$BASE_BRANCH" --timeout-minutes 45
+        displayName: Run mutation testing on changed code
+        env:
+          BASE_BRANCH: ${{ parameters.base }}
+
+      - task: PublishPipelineArtifact@1
+        condition: always()
+        inputs:
+          targetPath: StrykerOutput/pre-pr/reports
+          artifact: mutation-report
