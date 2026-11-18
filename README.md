@@ -158,13 +158,15 @@ Use `dotnet-lessons-reviewer` for an independent read-only review when appropria
 [dotnet-mutation-testing](plugins/dotnet-mutation-testing/skills/dotnet-mutation-testing/SKILL.md) runs Stryker.NET against existing MSTest unit tests to find assertions that miss behavior changes. A mutation run is much slower than `dotnet test`, so the skill runs it once, right before a pull request is opened, and only on code changed against the PR base branch. The regular unit test run stays unchanged; nothing is added to `dotnet test`, pre-commit hooks, or every-build CI.
 
 - Setup (asked before changing the repository): pin `dotnet-stryker` as a local tool, copy the bundled `stryker-config.json` (thresholds, generated-code excludes), and ignore `StrykerOutput/`.
-- Run: `mutation-run.cs run --base <branch>` detects the VSTest or Microsoft.Testing.Platform runner, runs Stryker with `--since:origin/<branch>`, stops when diff mode falls back to testing every mutant or the time budget expires, and lists surviving mutants with file, line, mutator, and replacement.
+- Run: `mutation-run.cs run --repo <repo> --base <branch>` detects the VSTest or Microsoft.Testing.Platform runner, runs Stryker with `--since:origin/<branch>`, stops when diff mode falls back to testing every mutant or the time budget expires, and lists surviving mutants with file, line, mutator, and replacement.
 - Optional CI: GitHub Actions (once when a non-draft PR is opened or marked ready, or manual) and Azure Pipelines (manual) templates.
 
 ```text
-git fetch origin main
-dotnet run <skill-dir>/scripts/mutation-run.cs -- run --base main
+git -C <repo> fetch origin main
+dotnet run <skill-dir>/scripts/mutation-run.cs -- run --repo <repo> --base main
 ```
+
+All commands take absolute paths (`<repo>`, `<skill-dir>`); the skill never changes the current directory with `cd`, `env -C`, or similar wrappers.
 
 ## Project Documentation
 

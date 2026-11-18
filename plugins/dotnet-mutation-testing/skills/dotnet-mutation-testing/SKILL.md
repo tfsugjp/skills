@@ -23,13 +23,28 @@ The bundled helper [scripts/mutation-run.cs](scripts/mutation-run.cs) is a singl
 - MSTest test projects. Verified with MSTest 4 in both VSTest and Microsoft.Testing.Platform (MTP) modes, targeting net11.0.
 - A Git repository whose PR base branch exists as `origin/<base>`.
 
+## Command paths: never change the current directory
+
+Several tools here resolve state from the current directory (`dotnet tool run` finds the tool manifest there, `global.json` is resolved from it, and Stryker runs in it). Do not work around that by changing directory: no `cd`, `Push-Location`/`Set-Location`, `env -C`/`env --chdir`, `pushd`, or `sh -c 'cd ...'`. A command that starts with such a wrapper also misses the user's permission rules. Every command in this skill takes absolute paths instead:
+
+| Need | Use |
+|---|---|
+| Create the tool manifest | `dotnet new tool-manifest -o <repo>` |
+| Install or update a local tool | `dotnet tool install <id> --version <v> --tool-manifest <manifest-path>` |
+| Git in the repository | `git -C <repo> ...` |
+| Run mutation testing | `dotnet run <skill-dir>/scripts/mutation-run.cs -- run --repo <repo> ...` (the helper sets Stryker's working directory itself) |
+| Summarize a report | `... summarize --report <repo>/StrykerOutput/pre-pr/reports/mutation-report.json` |
+| Build or test | `dotnet build <repo>/<solution-or-project>`, `dotnet test <repo>/<solution-or-project>` |
+
+`<repo>` is the absolute repository root and `<skill-dir>` the absolute path of this skill. If a step genuinely needs a different current directory, stop and ask the user instead of choosing a workaround. When delegating to a subagent, state this rule in the request; subagents do not read memory.
+
 ## Workflow
 
 ### 1. Inspect the repository
 
-From the repository root, identify the solution, the MSTest test projects, and the test runner mode:
+Identify the solution, the MSTest test projects, and the test runner mode by reading files under the repository root:
 
-- `global.json` with `"test": { "runner": "Microsoft.Testing.Platform" }` means MTP mode; otherwise VSTest mode. `global.json` is resolved from the current directory, so check the repository root.
+- `<repo>/global.json` with `"test": { "runner": "Microsoft.Testing.Platform" }` means MTP mode; otherwise VSTest mode. `dotnet` resolves `global.json` from the current directory, which is why the helper checks the repository root itself.
 - MSTest test projects reference the `MSTest` package (or `MSTest.TestFramework`).
 - Existing local tool manifest: `.config/dotnet-tools.json` or `dotnet-tools.json`.
 
@@ -41,11 +56,11 @@ These changes are committed to the consumer repository, so describe them and get
 2. Pin it as a local tool. Reuse an existing manifest; never install globally.
 
    ```bash
-   dotnet new tool-manifest
-   dotnet tool install dotnet-stryker --version 5.1.0
+   dotnet new tool-manifest -o <repo>
+   dotnet tool install dotnet-stryker --version 5.1.0 --tool-manifest <repo>/dotnet-tools.json
    ```
 
-   Run these in the repository root. Skip `dotnet new tool-manifest` when a manifest already exists.
+   Skip `dotnet new tool-manifest` when a manifest already exists, and pass that manifest (for example `<repo>/.config/dotnet-tools.json`) to `--tool-manifest`.
 3. Copy [templates/stryker-config.json](templates/stryker-config.json) to the repository root and adjust `thresholds` and `mutate` excludes. Do not put the base branch in the file; it changes per PR and is passed on the command line.
 4. Add `StrykerOutput/` to `.gitignore`.
 
@@ -53,11 +68,11 @@ Land the setup on the base branch (merge it first) before relying on diff mode. 
 
 ### 3. Run once before opening the PR
 
-Fetch the base branch, then run the helper from the repository root. Always pass `--base` with the PR's actual base branch; the default (`origin/HEAD`) may point at another branch.
+Fetch the base branch, then run the helper with `--repo`. Always pass `--base` with the PR's actual base branch; the default (`origin/HEAD`) may point at another branch.
 
 ```bash
-git fetch origin main
-dotnet run <skill-dir>/scripts/mutation-run.cs -- run --base main
+git -C <repo> fetch origin main
+dotnet run <skill-dir>/scripts/mutation-run.cs -- run --repo <repo> --base main
 ```
 
 The helper:
@@ -83,7 +98,7 @@ Other Stryker exit codes are passed through. When the diff has no mutable C# cha
 Pass extra Stryker options after `--`. Options the helper owns (`--since`, `--with-baseline`, `--output`/`-O`, `--reporter`/`-r`, `--test-runner`/`-t`, `--solution`/`-s`) are rejected with exit code 1; use the helper's own `--base`, `--output`, `--test-runner`, and `--solution` instead. Stryker requires `break <= low <= high`, so raising `--break-at` above the configured `low` also needs `--threshold-low` (and `--threshold-high`); otherwise Stryker rejects the options with exit code 1:
 
 ```bash
-dotnet run <skill-dir>/scripts/mutation-run.cs -- run --base main -- --threshold-high 95 --threshold-low 90 --break-at 90
+dotnet run <skill-dir>/scripts/mutation-run.cs -- run --repo <repo> --base main -- --threshold-high 95 --threshold-low 90 --break-at 90
 ```
 
 Use `--json` for machine-readable output (Stryker's own log goes to stderr).
@@ -93,7 +108,7 @@ Use `--json` for machine-readable output (Stryker's own log goes to stderr).
 Summarize an existing report at any time:
 
 ```bash
-dotnet run <skill-dir>/scripts/mutation-run.cs -- summarize --report StrykerOutput/pre-pr/reports/mutation-report.json
+dotnet run <skill-dir>/scripts/mutation-run.cs -- summarize --report <repo>/StrykerOutput/pre-pr/reports/mutation-report.json
 ```
 
 For each `Survived` or `NoCoverage` mutant, read the original code at the reported line and the replacement:
@@ -115,7 +130,7 @@ When the user wants the same check in CI, offer one of these templates. They run
 - GitHub Actions: [templates/github-actions-mutation-testing.yml](templates/github-actions-mutation-testing.yml) (`pull_request: types: [opened, reopened, ready_for_review]` for non-draft PRs, plus `workflow_dispatch` for manual reruns; `fetch-depth: 0`).
 - Azure Pipelines: [templates/azure-pipelines-mutation-testing.yml](templates/azure-pipelines-mutation-testing.yml) (manual run; set the `base` parameter to the PR's target branch on every run; `fetchDepth: 0`).
 
-Both templates call the helper, so the full-run fallback stop, the time budget, and runner detection also apply in CI. Copy [scripts/mutation-run.cs](scripts/mutation-run.cs) to `eng/mutation-run.cs` in the consumer repository; CI needs .NET SDK 10 or later. The base branch name is passed through an environment variable and validated with `git check-ref-format`, never interpolated into script text; give the bare branch name (`main`), not `origin/main`. A helper copied into the repository builds with that repository's `Directory.Build.props` and `global.json`; strict analyzer or `TreatWarningsAsErrors` settings there can break its build, so run it once locally from `eng/` before adding the workflow. Adding a workflow and the helper copy are repository changes; ask first.
+Both templates call the helper, so the full-run fallback stop, the time budget, and runner detection also apply in CI. Copy [scripts/mutation-run.cs](scripts/mutation-run.cs) to `eng/mutation-run.cs` in the consumer repository; CI needs .NET SDK 10 or later. The base branch name is passed through an environment variable and validated with `git check-ref-format`, never interpolated into script text; give the bare branch name (`main`), not `origin/main`. A helper copied into the repository builds with that repository's `Directory.Build.props` and `global.json`; strict analyzer or `TreatWarningsAsErrors` settings there can break its build, so run the copy once locally (`dotnet run <repo>/eng/mutation-run.cs -- run --repo <repo> --base main`) before adding the workflow. Adding a workflow and the helper copy are repository changes; ask first.
 
 ## Gotchas
 
@@ -123,7 +138,7 @@ Both templates call the helper, so the full-run fallback stop, the time budget, 
 - **The fallback is detected late.** The trigger line appears only after the build, the initial test run, and coverage capture (about a minute in a small sample), so exit code 4 comes after that time, not at startup.
 - **Uncommitted changes count.** `--since` compares the working tree with the target, so uncommitted edits are included in the diff.
 - **Stryker defaults to the VSTest runner.** In MTP mode, pass `--test-runner mtp` (the helper does this). MSTest 4 projects keep working under the VSTest runner as well.
-- **`dotnet test --solution` is MTP-only.** In VSTest mode, pass the solution path positionally: `dotnet test Sample.slnx`.
-- **SDK 11 `dotnet new tool-manifest` writes `dotnet-tools.json` at the root**, not `.config/dotnet-tools.json`. Both locations are found by `dotnet tool run`.
-- **Local tools resolve from the current directory.** Run `dotnet tool run dotnet-stryker` from the repository root.
+- **`dotnet test --solution` is MTP-only.** In VSTest mode, pass the solution path positionally: `dotnet test <repo>/Sample.slnx`. MTP mode also reads `global.json` from the current directory, so `dotnet test --solution` from another directory runs in VSTest mode and fails with `MSB1001`.
+- **SDK 11 `dotnet new tool-manifest -o <repo>` writes `<repo>/dotnet-tools.json`**, not `.config/dotnet-tools.json`. Both locations are found by `dotnet tool run`.
+- **Local tools resolve from the current directory.** Do not run `dotnet tool run dotnet-stryker` yourself and do not change directory to make it work; the helper starts Stryker with the repository root as its working directory when given `--repo`.
 - **The ClearText reporter truncates columns in narrow terminals.** Use the JSON report (the helper's summary) for file-level numbers.

@@ -156,13 +156,15 @@ Windows では同じスクリプトを `python` で実行します。
 [dotnet-mutation-testing](plugins/dotnet-mutation-testing/skills/dotnet-mutation-testing/SKILL.md) は、既存の MSTest 単体テストに対して Stryker.NET を実行し、振る舞いの変化を見逃すアサーションを見つけます。ミューテーションテストは `dotnet test` よりはるかに遅いため、プルリクエストを作成する直前に 1 回だけ、PR のベースブランチからの変更コードに限って実行します。通常の単体テストの実行は変えず、`dotnet test`、pre-commit フック、毎回のビルドを行う CI には組み込みません。
 
 - セットアップ（リポジトリを変更する前に確認します）: `dotnet-stryker` をローカルツールとして固定し、同梱の `stryker-config.json`（しきい値と生成コードの除外）をコピーして、`StrykerOutput/` を無視対象にします。
-- 実行: `mutation-run.cs run --base <branch>` は VSTest か Microsoft.Testing.Platform かを判定し、`--since:origin/<branch>` を付けて Stryker を実行します。差分モードが全件実行に切り替わったときや実行時間の上限を超えたときは停止し、生存ミュータントをファイル・行・変異の種類・置換内容とともに一覧にします。
+- 実行: `mutation-run.cs run --repo <repo> --base <branch>` は VSTest か Microsoft.Testing.Platform かを判定し、`--since:origin/<branch>` を付けて Stryker を実行します。差分モードが全件実行に切り替わったときや実行時間の上限を超えたときは停止し、生存ミュータントをファイル・行・変異の種類・置換内容とともに一覧にします。
 - 任意の CI: GitHub Actions（ドラフトでない PR の作成時または ready for review への変更時に 1 回、または手動実行）と Azure Pipelines（手動実行）のテンプレート。
 
 ```text
-git fetch origin main
-dotnet run <skill-dir>/scripts/mutation-run.cs -- run --base main
+git -C <repo> fetch origin main
+dotnet run <skill-dir>/scripts/mutation-run.cs -- run --repo <repo> --base main
 ```
+
+コマンドはすべて絶対パス（`<repo>`、`<skill-dir>`）で指定します。このスキルは `cd` や `env -C` などでカレントディレクトリを変えません。
 
 ## プロジェクト文書管理
 
