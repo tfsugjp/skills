@@ -30,14 +30,26 @@ const int ExitTimeout = 5;
 const int DefaultTimeoutMinutes = 30;
 // One day; keeps the timer well inside Task.Delay and TimeSpan limits.
 const int MaxTimeoutMinutes = 1440;
-// How long to wait for the process and its output pipes after a kill before reporting the stop as unconfirmed.
+// How long to wait for the process exit and EOF on its output pipes (after a kill or a normal exit) before
+// reporting the stop as unconfirmed or the output as not fully checked.
 const int KillWaitSeconds = 30;
 const string FallbackMarker = "Non-CSharp";
 const string TestedBecauseMarker = "will be tested because:";
 // Reasons Stryker's diff mode gives when it is limiting the run to changed code.
 string[] knownDiffReasons = ["Mutant changed compared to target commit", "One or more covering tests changed"];
 
-string[] statusOrder = ["Killed", "Survived", "NoCoverage", "Timeout", "CompileError", "RuntimeError", "Ignored", "Pending"];
+// Stryker options the helper sets itself; extra arguments after "--" may not override them.
+ReservedOption[] reservedStrykerOptions =
+[
+    new("--since", null, false, "use the helper option --base <branch> instead."),
+    new("--with-baseline", null, false, "use the helper option --base <branch> instead (baseline mode is not supported)."),
+    new("--output", "-O", true, "use the helper option --output <dir> instead."),
+    new("--reporter", "-r", false, "the helper always uses the Progress, Html, and Json reporters; this is not configurable."),
+    new("--test-runner", "-t", false, "use the helper option --test-runner auto|vstest|mtp instead."),
+    new("--solution", "-s", false, "use the helper option --solution <path> instead.")
+];
+
+string[] statusOrder =["Killed", "Survived", "NoCoverage", "Timeout", "CompileError", "RuntimeError", "Ignored", "Pending"];
 var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 var ansiPattern = new Regex(@"\x1B\[[0-9;?]*[ -/]*[@-~]", RegexOptions.Compiled);
 
@@ -106,6 +118,17 @@ ParsedOptions ParseOptions(string commandName, List<string> rest, List<string> e
         throw new UsageException("summarize does not accept extra Stryker arguments after '--'.");
     }
 
+    // Extra Stryker arguments must not override the options the helper owns (diff base, output, reporters,
+    // test runner, solution). Checked here so a rejected argument fails before any git or Stryker work.
+    foreach (var argument in extra)
+    {
+        if (FindReservedStrykerOption(argument) is { } reserved)
+        {
+            throw new UsageException(
+                $"Extra Stryker argument '{argument}' overrides the helper-owned option {reserved.Option}; {reserved.Instead}");
+        }
+    }
+
     for (var i = 0; i < rest.Count; i++)
     {
         var name = rest[i];
@@ -161,6 +184,40 @@ ParsedOptions ParseOptions(string commandName, List<string> rest, List<string> e
     }
 
     return parsed;
+}
+
+ReservedOption? FindReservedStrykerOption(string argument)
+{
+    foreach (var reserved in reservedStrykerOptions)
+    {
+        // Long names are matched case-insensitively as "--opt", "--opt:value", or "--opt=value".
+        if (MatchesWithDelimiter(argument, reserved.Long, StringComparison.OrdinalIgnoreCase))
+        {
+            return reserved;
+        }
+
+        if (reserved.Short is not { } shortName)
+        {
+            continue;
+        }
+
+        // Short names are case-sensitive ("-o" is --open-report) and matched exactly or with ":"/"=", so that
+        // multi-letter short names such as "-tp" (--test-project) stay allowed. "-O" also rejects "-Ovalue".
+        if (MatchesWithDelimiter(argument, shortName, StringComparison.Ordinal) ||
+            (reserved.AllowAttachedShortValue && argument.Length > shortName.Length &&
+             argument.StartsWith(shortName, StringComparison.Ordinal)))
+        {
+            return reserved;
+        }
+    }
+
+    return null;
+
+    static bool MatchesWithDelimiter(string argument, string name, StringComparison comparison) =>
+        argument.Equals(name, comparison) ||
+        (argument.Length > name.Length &&
+         argument.StartsWith(name, comparison) &&
+         argument[name.Length] is ':' or '=');
 }
 
 async Task<int> RunAsync(ParsedOptions opt)
@@ -346,8 +403,22 @@ async Task<int> RunAsync(ParsedOptions opt)
         }
     }
 
-    process.OutputDataReceived += (_, e) => HandleLine(e.Data);
-    process.ErrorDataReceived += (_, e) => HandleLine(e.Data);
+    // Reads one redirected stream line by line. It never faults: after a kill or disposal the stream may throw,
+    // and the bounded drain below reports whether the output was fully read.
+    async Task PumpAsync(StreamReader reader)
+    {
+        try
+        {
+            while (await reader.ReadLineAsync() is { } line)
+            {
+                HandleLine(line);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            // The stream was closed underneath the reader.
+        }
+    }
 
     // The helper owns the output directory: remove reports from earlier runs so that only a report written
     // by this run can be summarized.
@@ -372,10 +443,13 @@ async Task<int> RunAsync(ParsedOptions opt)
         return Fail(opt.Json, ExitPrecondition, "Failed to start 'dotnet tool run dotnet-stryker'.");
     }
 
-    process.BeginOutputReadLine();
-    process.BeginErrorReadLine();
+    // Each stream gets its own reader task; Task.Run keeps a buffered stream from delaying the other reader
+    // and the timeout timer.
+    var readersTask = Task.WhenAll(
+        Task.Run(() => PumpAsync(process.StandardOutput)),
+        Task.Run(() => PumpAsync(process.StandardError)));
 
-    // WaitForExitAsync completes only after the process exits and both redirected streams reach EOF.
+    // Without event-based reading, WaitForExitAsync completes on process exit only, not on pipe EOF.
     var exitTask = process.WaitForExitAsync();
     var timedOut = false;
     using (var timeoutCts = new CancellationTokenSource())
@@ -390,13 +464,24 @@ async Task<int> RunAsync(ParsedOptions opt)
         }
     }
 
+    // Drain both readers before deciding the result so that fallback detection has seen every line. Never wait
+    // indefinitely: a surviving descendant can keep the output pipes open.
+    var drainTask = Task.WhenAll(exitTask, readersTask);
+    await Task.WhenAny(drainTask, Task.Delay(TimeSpan.FromSeconds(KillWaitSeconds)));
+    var drained = drainTask.IsCompletedSuccessfully;
+
     var stopped = timedOut || Volatile.Read(ref fallbackDetected) == 1;
-    var killConfirmed = true;
-    if (stopped)
+    // After a stop, confirmation requires both the process exit and EOF on its output pipes.
+    var killConfirmed = !stopped || drained;
+    if (!stopped && !drained)
     {
-        // Never wait indefinitely after a kill: a surviving descendant can keep the output pipes open.
-        await Task.WhenAny(exitTask, Task.Delay(TimeSpan.FromSeconds(KillWaitSeconds)));
-        killConfirmed = exitTask.IsCompletedSuccessfully;
+        var warning = $"Stryker's output did not close within {KillWaitSeconds} seconds after it exited; trailing output " +
+                      "was not checked for a full-run fallback.";
+        lock (changedLock)
+        {
+            warnings.Add(warning);
+            Console.Error.WriteLine($"Warning: {warning}");
+        }
     }
 
     var killStateMessage = killConfirmed
@@ -549,7 +634,7 @@ async Task<int> RunAsync(ParsedOptions opt)
 
         if (warnings.Count > 0)
         {
-            Console.Error.WriteLine($"Warnings ({warnings.Count}): diff mode may not have limited this run; review the lines above.");
+            Console.Error.WriteLine($"Warnings ({warnings.Count}): review the warning lines above before trusting this result.");
         }
     }
 
@@ -1065,6 +1150,13 @@ void PrintUsage(TextWriter writer)
       --timeout-minutes  Stop Stryker after this many minutes (1-1440, default: 30).
       --allow-full-run   Continue when Stryker's diff mode falls back to testing all mutants.
       --test-runner      auto (default; mtp when global.json test.runner is Microsoft.Testing.Platform), vstest, mtp.
+      -- <args>          Extra arguments passed to Stryker unchanged, except helper-owned options, which are
+                         rejected (exit 1) in any form (--opt value, --opt:value, --opt=value):
+                           --since, --with-baseline   use --base
+                           --output, -O               use --output
+                           --reporter, -r             fixed to Progress, Html, Json
+                           --test-runner, -t          use --test-runner
+                           --solution, -s             use --solution
 
     Exit codes:
       0 success
@@ -1098,6 +1190,11 @@ public sealed class ParsedOptions
 }
 
 public sealed class UsageException(string message) : Exception(message);
+
+public sealed record ReservedOption(string Long, string? Short, bool AllowAttachedShortValue, string Instead)
+{
+    public string Option => Short is null ? Long : $"{Long} ({Short})";
+}
 
 public sealed record CaptureResult(int ExitCode, string Stdout, string Stderr);
 

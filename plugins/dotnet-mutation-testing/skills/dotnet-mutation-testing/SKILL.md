@@ -80,7 +80,7 @@ The helper:
 
 Other Stryker exit codes are passed through. When the diff has no mutable C# changes (and no non-C# change that triggers the full-run fallback), Stryker ignores every mutant and exits 0; the helper prints that no mutants were tested and the score is `n/a`. Report that nothing was tested rather than a pass. Relative `--output` and `--solution` paths are resolved against the repository root.
 
-Pass extra Stryker options after `--`. Stryker requires `break <= low <= high`, so raising `--break-at` above the configured `low` also needs `--threshold-low` (and `--threshold-high`); otherwise Stryker rejects the options with exit code 1:
+Pass extra Stryker options after `--`. Options the helper owns (`--since`, `--with-baseline`, `--output`/`-O`, `--reporter`/`-r`, `--test-runner`/`-t`, `--solution`/`-s`) are rejected with exit code 1; use the helper's own `--base`, `--output`, `--test-runner`, and `--solution` instead. Stryker requires `break <= low <= high`, so raising `--break-at` above the configured `low` also needs `--threshold-low` (and `--threshold-high`); otherwise Stryker rejects the options with exit code 1:
 
 ```bash
 dotnet run <skill-dir>/scripts/mutation-run.cs -- run --base main -- --threshold-high 95 --threshold-low 90 --break-at 90
