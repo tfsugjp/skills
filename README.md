@@ -16,6 +16,7 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublis
 | `windows-shell-safety` | Windows-safe Azure CLI, JSON, and pipe execution: rules against `cmd.exe` argument loss, a pre-execution lint (`Test-NativeCommand.ps1`), and a PowerShell 7 helper that sends JSON through UTF-8 `@<file>` |
 | `native-container-cli` | Prefer WSL Containers on Windows and Apple container on macOS; translate supported Docker commands and ask before Docker fallback, including unsupported Compose or Docker API integrations |
 | `dotnet-azure-lessons` | Skills: .NET Architecture Design, .NET Coding, VS Extension Remote UI, PowerShell Scripting, .NET Debugging, .NET Testing, .NET Documentation, .NET CI/CD, PR and Issue Workflow, .NET Development on macOS, Agent Sandbox Troubleshooting, each with rules, checks, and reasons learned from past corrections. Agent: .NET Lessons Reviewer (read-only diff review against those checks) |
+| `dotnet-mutation-testing` | Stryker.NET mutation testing for MSTest unit tests, run once before opening a PR and limited to code changed against the base branch; stops when diff mode falls back to a full run and summarizes surviving mutants (`mutation-run.cs`), with optional GitHub Actions and Azure Pipelines templates |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 
@@ -35,6 +36,7 @@ claude plugin install windows-shell-safety@tfsugjp-agent-skills
 claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
 claude plugin install native-container-cli@tfsugjp-agent-skills
 claude plugin install dotnet-azure-lessons@tfsugjp-agent-skills
+claude plugin install dotnet-mutation-testing@tfsugjp-agent-skills
 ```
 
 ## Install from the GitHub Copilot marketplace
@@ -53,6 +55,7 @@ copilot plugin install windows-shell-safety@tfsugjp-agent-skills
 copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
 copilot plugin install native-container-cli@tfsugjp-agent-skills
 copilot plugin install dotnet-azure-lessons@tfsugjp-agent-skills
+copilot plugin install dotnet-mutation-testing@tfsugjp-agent-skills
 ```
 
 ## Install from the Codex repository-local marketplace
@@ -71,6 +74,7 @@ codex plugin add windows-shell-safety@tfsugjp-agent-skills
 codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 codex plugin add native-container-cli@tfsugjp-agent-skills
 codex plugin add dotnet-azure-lessons@tfsugjp-agent-skills
+codex plugin add dotnet-mutation-testing@tfsugjp-agent-skills
 ```
 
 Use `repository-init` only with an explicit `$repository-init` request. It initializes missing governance files in a new or existing repository, records the resolved license and language profile in `.repository-init.json`, and leaves a completed repository unchanged on later invocations. It does not initialize Git, create remotes, create issues or work items, publish Wiki pages, commit, or push.
@@ -148,6 +152,21 @@ On Windows, run the same script with `python`.
 | [agent-sandbox-troubleshooting](plugins/dotnet-azure-lessons/skills/agent-sandbox-troubleshooting/SKILL.md) | A command fails inside the agent session with a permission, sandbox, or credential error |
 
 Use `dotnet-lessons-reviewer` for an independent read-only review when appropriate. Supply the in-scope diff and verification report; the agent has read/search tools but no shell or Git-state access. It selects applicable checks and separates actionable defects from missing verification evidence. Actual skill discovery in each client must be verified separately.
+
+## .NET Mutation Testing
+
+[dotnet-mutation-testing](plugins/dotnet-mutation-testing/skills/dotnet-mutation-testing/SKILL.md) runs Stryker.NET against existing MSTest unit tests to find assertions that miss behavior changes. A mutation run is much slower than `dotnet test`, so the skill runs it once, right before a pull request is opened, and only on code changed against the PR base branch. The regular unit test run stays unchanged; nothing is added to `dotnet test`, pre-commit hooks, or every-build CI.
+
+- Setup (asked before changing the repository): pin `dotnet-stryker` as a local tool, copy the bundled `stryker-config.json` (thresholds, generated-code excludes), and ignore `StrykerOutput/`.
+- Run: `mutation-run.cs run --repo <repo> --base <branch>` detects the VSTest or Microsoft.Testing.Platform runner, runs Stryker with `--since:origin/<branch>`, stops when diff mode falls back to testing every mutant or the time budget expires, and lists surviving mutants with file, line, mutator, and replacement.
+- Optional CI: GitHub Actions (once when a non-draft PR is opened or marked ready, or manual) and Azure Pipelines (manual) templates.
+
+```text
+git -C <repo> fetch origin main
+dotnet run <skill-dir>/scripts/mutation-run.cs -- run --repo <repo> --base main
+```
+
+All commands take absolute paths (`<repo>`, `<skill-dir>`); the skill never changes the current directory with `cd`, `env -C`, or similar wrappers.
 
 ## Project Documentation
 
