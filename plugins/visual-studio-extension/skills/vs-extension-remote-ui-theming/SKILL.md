@@ -28,9 +28,9 @@ Rules for making Remote UI XAML look native in every Visual Studio theme. Rules 
 
 ### 3. Always use DynamicResource for theme keys
 
-- **Rule:** Reference theme colors and Visual Studio styles with `DynamicResource`, never `StaticResource` or an `x:Static` brush value.
-- **Check:** A search of the XAML finds no `StaticResource` that targets a theme color key.
-- **Why:** Only `DynamicResource` re-resolves when the user switches theme or edits theme color tokens while the window is open (Microsoft Learn).
+- **Rule:** Reference theme colors with `DynamicResource`, never `StaticResource` or an `x:Static` brush value, and assign Visual Studio styles to a control's `Style` property with `DynamicResource`. The one exception is `Style.BasedOn`, which is not a dependency property and must use `StaticResource` (for example `BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ButtonStyleKey}}"`).
+- **Check:** A search of the XAML finds no `StaticResource` that targets a theme color key, and `StaticResource` appears only in `BasedOn`.
+- **Why:** Only `DynamicResource` re-resolves when the user switches theme or edits theme color tokens while the window is open (Microsoft Learn). `BasedOn` cannot take a `DynamicResource`, so the XAML fails to load if it is used there.
 
 ### 4. Pair foreground and background for every state
 

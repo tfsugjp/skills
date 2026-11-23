@@ -72,7 +72,7 @@ Rules for structuring and building a `Microsoft.VisualStudio.Extensibility` exte
 
 ### 10. Embed Remote UI XAML instead of compiling it
 
-- **Rule:** For each Remote UI XAML file and resource dictionary, add `<Page Remove="..."/>` and `<EmbeddedResource Include="..."/>`, and set a `LogicalName` when the default resource name is not what the `RemoteUserControl` loads. The XAML root is a `DataTemplate` without `x:Class`.
+- **Rule:** For each Remote UI XAML file and resource dictionary, add `<Page Remove="..."/>` and `<EmbeddedResource Include="..."/>`, and set a `LogicalName` when the default resource name is not what the `RemoteUserControl` loads. A control's XAML root is a `DataTemplate` without `x:Class`; a shared dictionary registered with `ResourceDictionaries.AddEmbeddedResource` has a `ResourceDictionary` root.
 - **Check:** The built assembly contains the XAML under the expected resource name; the project builds with `UseWPF` without MC3050 errors.
 - **Why:** Microsoft Learn documents the `EmbeddedResource` and `Page Remove` pair. Observed in practice: compiling the XAML as a page tried to resolve Visual Studio Shell types that are not in the extension's compile graph and failed with MC3050.
 

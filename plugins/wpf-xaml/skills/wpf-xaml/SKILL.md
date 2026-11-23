@@ -59,8 +59,8 @@ Rules for WPF views and view models, and for Remote UI XAML, which Visual Studio
 
 ### 8. Choose StaticResource and DynamicResource by whether the value changes
 
-- **Rule:** In plain WPF, use `StaticResource` for values fixed after load and `DynamicResource` for theme colors, system colors, and runtime-swapped values. Never make a forward `StaticResource` reference. In Remote UI, reference your own resource dictionaries and all theme keys with `DynamicResource`.
-- **Check:** Every theme or system color uses `DynamicResource`; no `StaticResource` refers to a key defined later.
+- **Rule:** In plain WPF, use `StaticResource` for values fixed after load and `DynamicResource` for theme colors, system colors, and runtime-swapped values. Never make a forward `StaticResource` reference. In Remote UI, reference resources from your own dictionaries and all theme keys with `DynamicResource`, except `Style.BasedOn`, which is not a dependency property and requires `StaticResource`.
+- **Check:** Every theme or system color uses `DynamicResource`; no `StaticResource` refers to a key defined later; in Remote UI XAML, `StaticResource` appears only in `BasedOn`.
 - **Why:** `StaticResource` snapshots the value at load and does not follow theme changes (Microsoft Learn). Remote UI documents `DynamicResource` for resources added with `ResourceDictionaries.AddEmbeddedResource`.
 
 ### 9. Share styles through resource dictionaries the platform supports
