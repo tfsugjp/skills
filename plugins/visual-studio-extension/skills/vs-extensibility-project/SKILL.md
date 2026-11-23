@@ -102,6 +102,6 @@ Rules for structuring and building a `Microsoft.VisualStudio.Extensibility` exte
 
 ### 15. Build the VSIX manifest for both architectures
 
-- **Rule:** When the repository authors manifest content, list `amd64` and `arm64` `ProductArchitecture` entries for each installation target, and mark pre-release builds as preview.
-- **Check:** The packaged `extension.vsixmanifest` lists both architectures.
+- **Rule:** When the repository authors manifest content, define one `InstallationTarget` per architecture, each with a single `ProductArchitecture` (`amd64` and `arm64`) and the same product ID and version range, and mark pre-release builds as preview.
+- **Check:** The packaged `extension.vsixmanifest` has an `InstallationTarget` for each architecture, each containing exactly one `ProductArchitecture`.
 - **Why:** Visual Studio also runs natively on Arm64; a manifest that lists only `amd64` excludes those installations.

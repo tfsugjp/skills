@@ -72,6 +72,6 @@ Remote UI serializes view models across processes. Validate serialization and as
 
 ### 10. Validate every data-context binding, and only those
 
-- **Rule:** Validation of XAML bindings against `[DataMember]` covers every ordinary `{Binding ...}` path that resolves against the data context, including nested view models, and excludes only bindings that target the WPF tree (`RelativeSource`, `ElementName`, `TemplateBinding`). Keep nested view models when they serialize and notify correctly; do not flatten them into the root without evidence.
-- **Check:** A test parses the embedded XAML, resolves each data-context binding root, and asserts it is a `[DataMember]`; a nested `PropertyChanged` and collection Reset/Add are verified before blaming rendering.
+- **Rule:** Validation of XAML bindings against `[DataMember]` covers every binding path that reaches the Remote UI data context, including nested view models and paths that select an element through `RelativeSource` or `ElementName` and then read its `DataContext` (for example `DataContext.RemoveCommand`). Exclude only bindings that stay in the WPF tree, such as `TemplateBinding` or a `RelativeSource` path to an element property like `IsSelected`. Keep nested view models when they serialize and notify correctly; do not flatten them into the root without evidence.
+- **Check:** A test parses the embedded XAML, resolves each binding that reaches the data context (directly or through an element's `DataContext`), and asserts its root is a `[DataMember]`; a nested `PropertyChanged` and collection Reset/Add are verified before blaming rendering.
 - **Why:** Excluding too much hides missing data members, and excluding too little fails on tree-relative bindings that never touch the data context.

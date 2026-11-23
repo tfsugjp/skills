@@ -17,7 +17,7 @@ Rules for WPF views and view models, and for Remote UI XAML, which Visual Studio
 
 ### 1. Confirm WPF from the project, not from the XAML
 
-- **Rule:** Before applying any rule here, confirm WPF from project evidence: `<UseWPF>true</UseWPF>`, references to `PresentationFramework`, `PresentationCore`, or `WindowsBase`, or a Remote UI `DataTemplate` in a VisualStudio.Extensibility project. If the project file does not decide it, ask.
+- **Rule:** Before applying any rule here, confirm WPF from project evidence: `<UseWPF>true</UseWPF>`, a `Microsoft.WindowsDesktop.App.WPF` framework reference, a .NET Framework reference to `PresentationFramework` or `PresentationCore`, or a Remote UI `DataTemplate` in a VisualStudio.Extensibility project. A `WindowsBase` reference alone is not evidence, because the base .NET reference pack also contains it. If the project file does not decide it, ask.
 - **Check:** The answer names the project property or reference that proves WPF.
 - **Why:** WPF and WinUI 3 share the default XAML namespace, and Dispatcher, `Freezable`, virtualization, and `DynamicResource` advice is wrong or different elsewhere.
 

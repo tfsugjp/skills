@@ -1,7 +1,7 @@
 ---
 name: vs-extension-reviewer
 description: 'Read-only review of a supplied Visual Studio extension or WPF/Remote UI XAML diff against the applicable visual-studio-extension, wpf-xaml, and vs-extension-remote-ui checks.'
-tools: ["read", "search"]
+tools: ["Read", "Grep", "Glob"]
 ---
 
 # Visual Studio Extension Reviewer
