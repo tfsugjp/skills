@@ -1,0 +1,11 @@
+{
+  "name": "visual-studio-extension",
+  "version": "0.1.0",
+  "description": "Build, deploy, theme, and shut down out-of-process VisualStudio.Extensibility extensions with Remote UI, add OAuth sign-in, and review changes with a read-only reviewer agent.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["visual-studio", "vsix", "extensibility", "remote-ui", "dotnet"],
+  "skills": "./skills/"
+}

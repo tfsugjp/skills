@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行、Azure マネージド ID レビュー、Windows と macOS のネイティブコンテナー操作、.NET・Azure・PowerShell 開発の再発防止ルールのワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
+Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublisher、Windows での安全なコマンド実行、Azure マネージド ID レビュー、Windows と macOS のネイティブコンテナー操作、.NET・Azure・PowerShell 開発の再発防止ルール、Visual Studio 拡張機能開発、WPF XAML のワークフロー向け plugin（skills + agents）です。Claude Code、GitHub Copilot、Codex で同じ plugin 内容を検証・利用できる構成にしています。
 
 ## Plugin
 
@@ -17,6 +17,8 @@ Azure DevOps、GitHub、.NET のパッケージメンテナンス、Relaypublish
 | `native-container-cli` | WindowsではWSL Containers、macOSではApple containerを優先。対応するDockerコマンドを変換し、ComposeやDocker API連携などでDockerへの切り替えが必要な場合は実行前に確認 |
 | `dotnet-azure-lessons` | スキル: .NET Architecture Design、.NET Coding、VS Extension Remote UI、PowerShell Scripting、.NET Debugging、.NET Testing、.NET Documentation、.NET CI/CD、PR and Issue Workflow、.NET Development on macOS、Agent Sandbox Troubleshooting。いずれも過去の訂正から得たルール、確認方法、理由を持ちます。エージェント: .NET Lessons Reviewer（これらの確認方法で差分を読み取り専用でレビュー） |
 | `dotnet-mutation-testing` | MSTest の単体テストに対する Stryker.NET のミューテーションテスト。PR を作成する前に 1 回だけ、ベースブランチからの変更コードに限って実行し、差分モードが全件実行に切り替わったときは停止して、生存ミュータントを要約（`mutation-run.cs`）。任意の GitHub Actions と Azure Pipelines のテンプレート付き |
+| `visual-studio-extension` | スキル: VisualStudio.Extensibility Project、Deployment、Lifecycle、Remote UI Theming、OAuth。out-of-process の Visual Studio 拡張機能向け。エージェント: VS Extension Reviewer（これらの確認方法で差分を読み取り専用でレビュー） |
+| `wpf-xaml` | MVVM、バインド、スレッド、仮想化、リソース、テーマカラー、アクセシビリティについての WPF と Visual Studio Remote UI XAML の規則。Remote UI での例外を明記 |
 
 すべて MIT License で配布します。認証情報は含めず、MCP server も自動構成しません。Azure DevOps の認証と権限は利用者が設定してください。
 
@@ -35,6 +37,8 @@ claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
 claude plugin install native-container-cli@tfsugjp-agent-skills
 claude plugin install dotnet-azure-lessons@tfsugjp-agent-skills
 claude plugin install dotnet-mutation-testing@tfsugjp-agent-skills
+claude plugin install visual-studio-extension@tfsugjp-agent-skills
+claude plugin install wpf-xaml@tfsugjp-agent-skills
 ```
 
 ## GitHub Copilot からインストール
@@ -54,6 +58,8 @@ copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
 copilot plugin install native-container-cli@tfsugjp-agent-skills
 copilot plugin install dotnet-azure-lessons@tfsugjp-agent-skills
 copilot plugin install dotnet-mutation-testing@tfsugjp-agent-skills
+copilot plugin install visual-studio-extension@tfsugjp-agent-skills
+copilot plugin install wpf-xaml@tfsugjp-agent-skills
 ```
 
 ## Codex の repository-local marketplace からインストール
@@ -73,6 +79,8 @@ codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 codex plugin add native-container-cli@tfsugjp-agent-skills
 codex plugin add dotnet-azure-lessons@tfsugjp-agent-skills
 codex plugin add dotnet-mutation-testing@tfsugjp-agent-skills
+codex plugin add visual-studio-extension@tfsugjp-agent-skills
+codex plugin add wpf-xaml@tfsugjp-agent-skills
 ```
 
 Codex の local marketplace は開発・チーム配布用です。公開 listing への申請は、検証完了後の別リリース作業とします。
@@ -165,6 +173,22 @@ dotnet run <skill-dir>/scripts/mutation-run.cs -- run --repo <repo> --base main
 ```
 
 コマンドはすべて絶対パス（`<repo>`、`<skill-dir>`）で指定します。このスキルは `cd` や `env -C` などでカレントディレクトリを変えません。
+
+## Visual Studio 拡張機能と WPF XAML
+
+`visual-studio-extension` は、VisualStudio.Extensibility と Remote UI で作る out-of-process の拡張機能の規則をまとめたものです。Microsoft Learn に記載のない規則には「observed in practice」と付けており、リポジトリが固定している SDK バージョンで改めて確認できます。
+
+| スキル | 読み込まれる場面 |
+|---|---|
+| [vs-extensibility-project](plugins/visual-studio-extension/skills/vs-extensibility-project/SKILL.md) | プロジェクト、`Extension` クラス、コマンド、設定を構成するとき、または Extensibility SDK のビルドエラーを直すとき |
+| [vs-extension-deployment](plugins/visual-studio-extension/skills/vs-extension-deployment/SKILL.md) | F5 でデプロイされない、Experimental Instance で古いコードが動く、または変更を End-to-End で検証するとき |
+| [vs-extension-lifecycle](plugins/visual-studio-extension/skills/vs-extension-lifecycle/SKILL.md) | 終了時に例外が出るとき、またはワーカープロセスを起動・停止するコードを書くとき |
+| [vs-extension-remote-ui-theming](plugins/visual-studio-extension/skills/vs-extension-remote-ui-theming/SKILL.md) | Remote UI の色、スタイル、ホバーや選択の状態、ハイコントラストを扱うとき |
+| [vs-extension-oauth](plugins/visual-studio-extension/skills/vs-extension-oauth/SKILL.md) | 拡張機能がユーザーをサインインさせる、または保護された API を呼ぶとき |
+
+テーマ対応は Visual Studio 2026 の `ShellColors` トークンに従い、旧来の `EnvironmentColors` はサポート対象に古いバージョンが含まれる場合だけ残します。Experimental Instance に残った古い ID の掃除には対象を特定したうえでの承認が必要で、全体のリセットにはさらに別の承認が必要です。読み取り専用のレビューには `vs-extension-reviewer` を使います。他のプラグインのスキルが導入されていなければ、そのことを報告します。
+
+[wpf-xaml](plugins/wpf-xaml/skills/wpf-xaml/SKILL.md) は、WPF だけのプロジェクトでも単体で導入できるよう別プラグインにしています。まずプロジェクトが WPF であること（.NET MAUI、WinUI 3、UWP ではないこと）を確認し、MVVM、スレッド、仮想化、リソース、テーマカラー、アクセシビリティの規則を、それぞれの Remote UI での例外とあわせて適用します。Remote UI のバインドとシリアライズの規則は `vs-extension-remote-ui`（`dotnet-azure-lessons`）に残しています。
 
 ## プロジェクト文書管理
 

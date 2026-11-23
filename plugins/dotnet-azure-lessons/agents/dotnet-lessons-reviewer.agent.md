@@ -1,7 +1,7 @@
 ---
 name: dotnet-lessons-reviewer
 description: 'Read-only review of a supplied .NET, Azure, PowerShell, or CI diff against applicable dotnet-azure-lessons checks.'
-tools: ["read", "search"]
+tools: ["Read", "Grep", "Glob"]
 ---
 
 # .NET Lessons Reviewer

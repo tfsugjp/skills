@@ -135,6 +135,30 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Developer Tools"
+    },
+    {
+      "name": "visual-studio-extension",
+      "source": {
+        "source": "local",
+        "path": "./plugins/visual-studio-extension"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "wpf-xaml",
+      "source": {
+        "source": "local",
+        "path": "./plugins/wpf-xaml"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     }
   ]
 }

@@ -1,0 +1,24 @@
+{
+  "name": "visual-studio-extension",
+  "version": "0.1.0",
+  "description": "Build, deploy, theme, and shut down out-of-process VisualStudio.Extensibility extensions with Remote UI, add OAuth sign-in, and review changes with a read-only reviewer agent.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["visual-studio", "vsix", "extensibility", "remote-ui", "dotnet"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Visual Studio Extension",
+    "shortDescription": "Out-of-process Visual Studio extension lessons",
+    "longDescription": "Skills for VisualStudio.Extensibility extensions: project setup and Extensibility SDK build errors, SDK-managed F5 and Experimental Instance cleanup with approval gates, packaged-VSIX validation, clean shutdown, Remote UI theming with Visual Studio color tokens, and public-client OAuth sign-in. Includes a read-only reviewer agent.",
+    "developerName": "Team Foundation Users Japan",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Why does my out-of-process extension fail with CEE0028?",
+      "The Experimental Instance still runs my old command.",
+      "Make this Remote UI tool window follow the Visual Studio theme."
+    ]
+  }
+}

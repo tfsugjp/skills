@@ -4,7 +4,7 @@
     "name": "Team Foundation Users Japan"
   },
   "metadata": {
-    "description": "Skills and plugins for Azure DevOps, GitHub, .NET, NuGet, and Relaypublisher workflows.",
+    "description": "Skills and plugins for Azure DevOps, GitHub, .NET, NuGet, Visual Studio extension, WPF, and Relaypublisher workflows.",
     "version": "0.5.0"
   },
   "plugins": [
@@ -124,7 +124,7 @@
     {
       "name": "dotnet-azure-lessons",
       "description": "Checkable rules for .NET, Azure, and PowerShell work by phase, plus macOS and agent-sandbox situations, learned from past corrections, with a read-only reviewer agent.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "source": "./plugins/dotnet-azure-lessons",
       "license": "MIT",
       "keywords": ["dotnet", "azure", "powershell", "review", "lessons-learned"],
@@ -137,6 +137,24 @@
       "source": "./plugins/dotnet-mutation-testing",
       "license": "MIT",
       "keywords": ["dotnet", "testing", "mstest", "mutation-testing", "stryker"],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "visual-studio-extension",
+      "description": "Build, deploy, theme, and shut down out-of-process VisualStudio.Extensibility extensions with Remote UI, add OAuth sign-in, and review changes with a read-only reviewer agent.",
+      "version": "0.1.0",
+      "source": "./plugins/visual-studio-extension",
+      "license": "MIT",
+      "keywords": ["visual-studio", "vsix", "extensibility", "remote-ui", "dotnet"],
+      "category": "Developer Tools"
+    },
+    {
+      "name": "wpf-xaml",
+      "description": "WPF and Visual Studio Remote UI XAML rules for MVVM, binding, threading, virtualization, resources, theme colors, and accessibility, with explicit Remote UI exceptions.",
+      "version": "0.1.0",
+      "source": "./plugins/wpf-xaml",
+      "license": "MIT",
+      "keywords": ["wpf", "xaml", "mvvm", "dotnet", "accessibility"],
       "category": "Developer Tools"
     }
   ]

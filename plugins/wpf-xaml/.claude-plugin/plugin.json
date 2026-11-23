@@ -1,0 +1,11 @@
+{
+  "name": "wpf-xaml",
+  "version": "0.1.0",
+  "description": "WPF and Visual Studio Remote UI XAML rules for MVVM, binding, threading, virtualization, resources, theme colors, and accessibility, with explicit Remote UI exceptions.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["wpf", "xaml", "mvvm", "dotnet", "accessibility"],
+  "skills": "./skills/"
+}

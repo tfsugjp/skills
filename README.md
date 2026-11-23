@@ -1,6 +1,6 @@
 # TFSUG.JP Agent Skills
 
-Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, Windows shell-safe command execution, Azure managed identity review, native container workflows on Windows and macOS, and recurrence-prevention rules for .NET, Azure, and PowerShell work (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
+Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublisher, Windows shell-safe command execution, Azure managed identity review, native container workflows on Windows and macOS, recurrence-prevention rules for .NET, Azure, and PowerShell work, Visual Studio extension development, and WPF XAML (skills + agents). The repository is structured so the same plugin content can be tested with Claude Code, GitHub Copilot, and Codex.
 
 ## Plugins
 
@@ -17,6 +17,8 @@ Personal plugins for Azure DevOps, GitHub, .NET package maintenance, Relaypublis
 | `native-container-cli` | Prefer WSL Containers on Windows and Apple container on macOS; translate supported Docker commands and ask before Docker fallback, including unsupported Compose or Docker API integrations |
 | `dotnet-azure-lessons` | Skills: .NET Architecture Design, .NET Coding, VS Extension Remote UI, PowerShell Scripting, .NET Debugging, .NET Testing, .NET Documentation, .NET CI/CD, PR and Issue Workflow, .NET Development on macOS, Agent Sandbox Troubleshooting, each with rules, checks, and reasons learned from past corrections. Agent: .NET Lessons Reviewer (read-only diff review against those checks) |
 | `dotnet-mutation-testing` | Stryker.NET mutation testing for MSTest unit tests, run once before opening a PR and limited to code changed against the base branch; stops when diff mode falls back to a full run and summarizes surviving mutants (`mutation-run.cs`), with optional GitHub Actions and Azure Pipelines templates |
+| `visual-studio-extension` | Skills: VisualStudio.Extensibility Project, Deployment, Lifecycle, Remote UI Theming, OAuth, for out-of-process Visual Studio extensions. Agent: VS Extension Reviewer (read-only diff review against those checks) |
+| `wpf-xaml` | WPF and Visual Studio Remote UI XAML rules for MVVM, binding, threading, virtualization, resources, theme colors, and accessibility, with explicit Remote UI exceptions |
 
 All plugins are distributed under the MIT License. The plugin bundles contain no credentials and do not configure an MCP server automatically. Azure DevOps authentication and permissions remain the responsibility of the user.
 
@@ -37,6 +39,8 @@ claude plugin install azure-managed-identity-review@tfsugjp-agent-skills
 claude plugin install native-container-cli@tfsugjp-agent-skills
 claude plugin install dotnet-azure-lessons@tfsugjp-agent-skills
 claude plugin install dotnet-mutation-testing@tfsugjp-agent-skills
+claude plugin install visual-studio-extension@tfsugjp-agent-skills
+claude plugin install wpf-xaml@tfsugjp-agent-skills
 ```
 
 ## Install from the GitHub Copilot marketplace
@@ -56,6 +60,8 @@ copilot plugin install azure-managed-identity-review@tfsugjp-agent-skills
 copilot plugin install native-container-cli@tfsugjp-agent-skills
 copilot plugin install dotnet-azure-lessons@tfsugjp-agent-skills
 copilot plugin install dotnet-mutation-testing@tfsugjp-agent-skills
+copilot plugin install visual-studio-extension@tfsugjp-agent-skills
+copilot plugin install wpf-xaml@tfsugjp-agent-skills
 ```
 
 ## Install from the Codex repository-local marketplace
@@ -75,6 +81,8 @@ codex plugin add azure-managed-identity-review@tfsugjp-agent-skills
 codex plugin add native-container-cli@tfsugjp-agent-skills
 codex plugin add dotnet-azure-lessons@tfsugjp-agent-skills
 codex plugin add dotnet-mutation-testing@tfsugjp-agent-skills
+codex plugin add visual-studio-extension@tfsugjp-agent-skills
+codex plugin add wpf-xaml@tfsugjp-agent-skills
 ```
 
 Use `repository-init` only with an explicit `$repository-init` request. It initializes missing governance files in a new or existing repository, records the resolved license and language profile in `.repository-init.json`, and leaves a completed repository unchanged on later invocations. It does not initialize Git, create remotes, create issues or work items, publish Wiki pages, commit, or push.
@@ -167,6 +175,22 @@ dotnet run <skill-dir>/scripts/mutation-run.cs -- run --repo <repo> --base main
 ```
 
 All commands take absolute paths (`<repo>`, `<skill-dir>`); the skill never changes the current directory with `cd`, `env -C`, or similar wrappers.
+
+## Visual Studio Extension and WPF XAML
+
+`visual-studio-extension` collects rules for out-of-process extensions built with VisualStudio.Extensibility and Remote UI. Rules that Microsoft Learn does not document are tagged "observed in practice" so they can be rechecked against the SDK version a repository pins.
+
+| Skill | Loads when |
+|---|---|
+| [vs-extensibility-project](plugins/visual-studio-extension/skills/vs-extensibility-project/SKILL.md) | Configuring the project, `Extension` class, commands, or settings, or fixing Extensibility SDK build errors |
+| [vs-extension-deployment](plugins/visual-studio-extension/skills/vs-extension-deployment/SKILL.md) | F5 does not deploy, the Experimental Instance runs old code, or a change needs end-to-end validation |
+| [vs-extension-lifecycle](plugins/visual-studio-extension/skills/vs-extension-lifecycle/SKILL.md) | Exceptions at shutdown, or code that starts and stops worker processes |
+| [vs-extension-remote-ui-theming](plugins/visual-studio-extension/skills/vs-extension-remote-ui-theming/SKILL.md) | Remote UI colors, styles, hover and selection states, or High Contrast |
+| [vs-extension-oauth](plugins/visual-studio-extension/skills/vs-extension-oauth/SKILL.md) | The extension signs users in or calls a protected API |
+
+Theming follows the Visual Studio 2026 `ShellColors` tokens and keeps legacy `EnvironmentColors` only for older supported versions. Cleaning up a stale Experimental Instance identity requires approval for the exact targets, and a full reset requires separate approval. Use `vs-extension-reviewer` for a read-only review; it names any referenced skill from another plugin that is not installed.
+
+[wpf-xaml](plugins/wpf-xaml/skills/wpf-xaml/SKILL.md) is a separate plugin so WPF-only projects can install it alone. It first confirms that the project is WPF (not .NET MAUI, WinUI 3, or UWP) and then applies MVVM, threading, virtualization, resource, theme color, and accessibility rules, each with its Remote UI exception. Remote UI binding and serialization rules stay in `vs-extension-remote-ui` (`dotnet-azure-lessons`).
 
 ## Project Documentation
 
