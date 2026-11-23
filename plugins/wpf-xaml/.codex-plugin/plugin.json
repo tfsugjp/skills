@@ -1,0 +1,24 @@
+{
+  "name": "wpf-xaml",
+  "version": "0.1.0",
+  "description": "WPF and Visual Studio Remote UI XAML rules for MVVM, binding, threading, virtualization, resources, theme colors, and accessibility, with explicit Remote UI exceptions.",
+  "author": {
+    "name": "Team Foundation Users Japan"
+  },
+  "license": "MIT",
+  "keywords": ["wpf", "xaml", "mvvm", "dotnet", "accessibility"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "WPF XAML",
+    "shortDescription": "WPF and Remote UI XAML rules",
+    "longDescription": "A skills-only plugin with checkable WPF rules for MVVM, CommunityToolkit.Mvvm, Dispatcher threading, UI virtualization, freezables, resources, theme colors, and accessibility. Each rule states how it changes for Visual Studio Remote UI XAML.",
+    "developerName": "Team Foundation Users Japan",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Review this WPF view for binding and threading problems.",
+      "Why does my ListBox scroll slowly with many items?",
+      "Can I use [RelayCommand] in a Remote UI view model?"
+    ]
+  }
+}
