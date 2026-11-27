@@ -1,0 +1,54 @@
+# Everything plan_transitions.py needs for one issue: the repository's statuses,
+# the issue itself, its direct sub-issues, open blockers, and its ancestor chain.
+# GitHub nests sub-issues up to eight levels, so the parent chain goes seven levels up.
+fragment Node on Issue {
+  id
+  number
+  title
+  state
+  stateReason
+  repository { nameWithOwner }
+  status { id name category { key } }
+}
+
+fragment ParentNode on Issue {
+  ...Node
+  subIssuesSummary { total completed }
+  subIssues(first: 100) { nodes { ...Node } }
+}
+
+query ($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    planningStatuses(first: 50) {
+      nodes { id name category { key name state stateReason } }
+    }
+    issue(number: $number) {
+      ...Node
+      viewerCanSetStatus
+      assignees(first: 10) { nodes { login } }
+      milestone { title }
+      blockedBy(first: 50) { nodes { number title state repository { nameWithOwner } } }
+      subIssuesSummary { total completed }
+      subIssues(first: 100) { nodes { ...Node } }
+      parent {
+        ...ParentNode
+        parent {
+          ...ParentNode
+          parent {
+            ...ParentNode
+            parent {
+              ...ParentNode
+              parent {
+                ...ParentNode
+                parent {
+                  ...ParentNode
+                  parent { ...ParentNode }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
