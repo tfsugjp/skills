@@ -180,9 +180,21 @@ class CompleteTests(unittest.TestCase):
     def test_all_children_not_planned_is_left_to_the_user(self):
         target = issue(3, "Todo")
         target["parent"] = parent_of(2, "In progress", [issue(4, "Not planned"), target])
-        plan = run(context(target), "set", "--status", "Not planned")
-        self.assertEqual([(3, "Not planned")], moves(plan.proposals))
+        plan = run(context(target), "set", "--status", "Not planned", "--confirm-close", "3")
+        self.assertEqual([(3, "Not planned")], moves(plan.changes))
         self.assertTrue(any("without completion" in w for w in plan.warnings))
+
+    def test_unconfirmed_child_closure_does_not_close_parent(self):
+        # Only the parent is confirmed; the child's own closure stays a proposal.
+        target = issue(3, "In progress")
+        target["parent"] = parent_of(2, "In progress", [issue(4, "Done"), target])
+        plan = run(context(target), "complete", "--confirm-close", "2")
+        self.assertEqual([(3, "Done")], moves(plan.proposals))
+        self.assertEqual([], [c for c in plan.changes if c.number == 2])
+        self.assertTrue(any("#2" in f for f in plan.follow_up))
+        plan = run(context(target), "set", "--status", "Not planned", "--confirm-close", "2")
+        self.assertEqual([(3, "Not planned")], moves(plan.proposals))
+        self.assertEqual([], plan.changes)
 
 
 class ReviewRegressionTests(unittest.TestCase):

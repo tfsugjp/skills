@@ -223,13 +223,22 @@ class Planner:
                 continue
             self.promote(ancestor, in_progress, reason)
 
-    def sync_parent_completion(self, *, completed: bool) -> None:
+    def sync_parent_completion(self) -> None:
         """Propose Done for the parent once this issue's closure leaves no open sub-issue."""
-        number = self.issue["number"]
-        closed_numbers = {number}
-        completed_numbers = {number} if completed else set()
         parent = self.issue.get("parent")
         if not parent or parent.get("state") == "CLOSED":
+            return
+        # Count this issue as closed only if it already is, or its closure is a confirmed change.
+        # An unconfirmed closure stays a proposal, so the parent must not be closed on its account.
+        closure = next((c for c in self.plan.changes if c.issue_id == self.issue["id"] and c.closes), None)
+        if closure:
+            final_key = self.statuses.by_id[closure.status_id]["category"]["key"]
+        elif category(self.issue) in CLOSED_KEYS:
+            final_key = category(self.issue)
+        else:
+            self.plan.follow_up.append(
+                f"After {self.label(self.issue)} is confirmed closed, re-run the event to check {self.label(parent)}"
+            )
             return
         children = nodes(parent.get("subIssues"))
         total = (parent.get("subIssuesSummary") or {}).get("total", len(children))
@@ -239,17 +248,13 @@ class Planner:
             )
             return
 
-        def done(child: dict[str, Any]) -> bool:
-            if child.get("id") == self.issue["id"]:
-                return child["number"] in closed_numbers
-            return category(child) in CLOSED_KEYS
+        def final_category(child: dict[str, Any]) -> str | None:
+            # This issue's status in the parent's list is stale; use the event's outcome instead.
+            return final_key if child.get("id") == self.issue["id"] else category(child)
 
-        if children and all(done(c) for c in children):
+        if children and all(final_category(c) in CLOSED_KEYS for c in children):
             def completed_child(child: dict[str, Any]) -> bool:
-                # This issue's status in the parent's list is stale; use the event's outcome instead.
-                if child.get("id") == self.issue["id"]:
-                    return child["number"] in completed_numbers
-                return category(child) == "completed"
+                return final_category(child) == "completed"
 
             if not any(completed_child(c) for c in children):
                 self.plan.warnings.append(
@@ -339,7 +344,7 @@ class Planner:
         if category(self.issue) != "completed":
             self.add(self.issue, self.statuses.pick("completed"), "work completed")
         self.promote_ancestors(f"sub-issue {self.label(self.issue)} completed", reopen_completed=False)
-        self.sync_parent_completion(completed=True)
+        self.sync_parent_completion()
 
     def event_set(self) -> None:
         if not self.args.status:
@@ -359,9 +364,9 @@ class Planner:
             self.promote_ancestors(f"sub-issue {self.label(self.issue)} started", reopen_completed=True)
         elif key == "completed":
             self.promote_ancestors(f"sub-issue {self.label(self.issue)} completed", reopen_completed=False)
-            self.sync_parent_completion(completed=True)
+            self.sync_parent_completion()
         elif key in ("not_planned", "duplicate"):
-            self.sync_parent_completion(completed=False)
+            self.sync_parent_completion()
         elif change and change.reopens:
             self.promote_ancestors(f"sub-issue {self.label(self.issue)} reopened", reopen_completed=True)
 
