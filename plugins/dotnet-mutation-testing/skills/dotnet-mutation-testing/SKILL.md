@@ -57,7 +57,7 @@ These changes are committed to the consumer repository, so describe them and get
 
    ```bash
    dotnet new tool-manifest -o <repo>
-   dotnet tool install dotnet-stryker --version 5.1.0 --tool-manifest <repo>/dotnet-tools.json
+   dotnet tool install dotnet-stryker --version <validated-version> --tool-manifest <repo>/dotnet-tools.json
    ```
 
    Skip `dotnet new tool-manifest` when a manifest already exists, and pass that manifest (for example `<repo>/.config/dotnet-tools.json`) to `--tool-manifest`.

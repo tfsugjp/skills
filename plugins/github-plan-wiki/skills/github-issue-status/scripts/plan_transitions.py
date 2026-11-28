@@ -342,8 +342,14 @@ class Planner:
                 self.plan.warnings.append(
                     f"{self.label(self.issue)} is blocked by open {self.label(blocker)} ({blocker.get('title', '')})"
                 )
+        if in_progress is None:
+            reason = "work started on a closed issue; reopened" if self.issue.get("state") == "CLOSED" else "work started"
+            self.add(self.issue, in_progress, reason)
+            return
         if self.issue.get("state") == "CLOSED":
-            self.add(self.issue, in_progress, "work started on a closed issue; reopened")
+            change = self.add(self.issue, in_progress, "work started on a closed issue; reopened")
+            if change is None:
+                return
         elif rank(self.issue) == 3:
             self.plan.warnings.append(f"{self.label(self.issue)} is already In review; it was not moved back")
         else:
@@ -354,7 +360,9 @@ class Planner:
     def event_reopen(self) -> None:
         todo = self.statuses.pick("planned")
         if self.issue.get("state") == "CLOSED":
-            self.add(self.issue, todo, "issue reopened")
+            change = self.add(self.issue, todo, "issue reopened")
+            if change is None:
+                return
         else:
             # Reopening on GitHub resets the status to Backlog; a reopened issue is still planned work.
             self.promote(self.issue, todo, "issue reopened")

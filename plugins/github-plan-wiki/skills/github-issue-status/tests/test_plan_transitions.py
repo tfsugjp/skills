@@ -274,9 +274,18 @@ class ReviewRegressionTests(unittest.TestCase):
 
 
 class CopilotReviewTests(unittest.TestCase):
-    def test_review_only_started_status_is_not_used_for_start(self):
+    def test_review_only_started_status_does_not_start_parent_or_children(self):
         custom = [s for s in STATUSES if s["name"] != "In progress"]
-        plan = run(context(issue(3, "Todo"), statuses=custom), "start")
+        target = issue(3, "Done", subIssues={"nodes": [issue(4, "Backlog")]})
+        plan = run(context(target, statuses=custom), "start")
+        self.assertEqual([], plan.changes)
+        self.assertTrue(any("no status fits" in w for w in plan.warnings))
+
+    def test_reopen_without_todo_does_not_reopen_completed_ancestors(self):
+        custom = [s for s in STATUSES if s["category"]["key"] != "planned"]
+        target = issue(3, "Done")
+        target["parent"] = parent_of(2, "Done", [target])
+        plan = run(context(target, statuses=custom), "reopen")
         self.assertEqual([], plan.changes)
         self.assertTrue(any("no status fits" in w for w in plan.warnings))
 
