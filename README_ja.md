@@ -97,6 +97,8 @@ GitHub と Azure Repos の PR 作成・更新時には、関連する受け入�
 
 GitHub Issue の詳細が長い場合や、よりリッチな記録が必要な場合、[github-issue-artifacts](plugins/github-plan-wiki/skills/github-issue-artifacts/SKILL.md) は補足資料を Issue Artifact に記録し、要約と受け入れ基準を Issue 本文に残します。承認済みの Wiki 計画も従来どおり登録します。Artifact 機能はパブリックプレビュー中のため、作成や検証ができない場合は未完了の作業として報告します。
 
+[github-issue-status](plugins/github-plan-wiki/skills/github-issue-status/SKILL.md) は、GitHub Issue の計画ステータスを GraphQL の `setIssueStatus` API で最新に保ちます。`gh` にはステータスのフラグがないためです。新しい Issue は、担当者またはマイルストーンがある場合や承認済み plan から作る場合は `Todo`、それ以外は `Backlog` のままにします。着手すると `In progress` にして、すべての親 Issue を昇格します。親に着手すると、`Backlog` のサブ Issue を `Todo` にします。サブ Issue を再オープンすると、完了済みの親を `In progress` に戻します。最後のサブ Issue が完了すると、親を `Done` にすることを提案します。Issue をクローズするステータスは確認を得てから設定し、ステータスは実行時にカテゴリで解決します。Issue ステータスはパブリックプレビュー中のため、利用できない場合はその手順を省略したことを報告します。
+
 ## Windows Shell Safety
 
 `windows-shell-safety` は、Windows で Azure CLI などのネイティブコマンドを実行するエージェント（と人）のためのプラグインです。`az` の実体はバッチファイル `az.cmd` のため、引数は PowerShell の後に `cmd.exe` でも解釈されます。その結果、引用符外の `|`、`&`、`<`、`>`、`^` が消費され、`%VAR%` が展開され、インライン JSON の二重引用符が失われます。エスケープを変えて再試行するのではなく、スキルが定める一つの安全な手順に従います。

@@ -51,8 +51,8 @@
     },
     {
       "name": "github-plan-wiki",
-      "description": "Create template-aware GitHub issues and pull requests with per-issue closing keywords, and publish approved plans to the GitHub wiki in English and Japanese.",
-      "version": "0.2.1",
+      "description": "Create template-aware GitHub issues and pull requests with per-issue closing keywords, keep issue planning statuses in sync across parent and sub-issues, and publish approved plans to the GitHub wiki in English and Japanese.",
+      "version": "0.3.0",
       "source": "./plugins/github-plan-wiki",
       "license": "MIT",
       "keywords": [
@@ -60,7 +60,8 @@
         "issues",
         "sub-issues",
         "wiki",
-        "planning"
+        "planning",
+        "issue-status"
       ],
       "category": "Developer Tools"
     },

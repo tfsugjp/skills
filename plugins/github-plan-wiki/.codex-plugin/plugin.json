@@ -1,22 +1,23 @@
 {
   "name": "github-plan-wiki",
-  "version": "0.2.1",
-  "description": "Create template-aware GitHub issues and pull requests with per-issue closing keywords, and publish approved plans to the GitHub wiki in English and Japanese.",
+  "version": "0.3.0",
+  "description": "Create template-aware GitHub issues and pull requests with per-issue closing keywords, keep issue planning statuses in sync across parent and sub-issues, and publish approved plans to the GitHub wiki in English and Japanese.",
   "author": {
     "name": "Team Foundation Users Japan"
   },
   "license": "MIT",
-  "keywords": ["github", "issues", "sub-issues", "wiki", "planning", "pull-requests", "templates"],
+  "keywords": ["github", "issues", "sub-issues", "issue-status", "wiki", "planning", "pull-requests", "templates"],
   "skills": "./skills/",
   "interface": {
     "displayName": "GitHub Plan & Wiki",
-    "shortDescription": "Template-aware issues, PR closure, and wiki plans",
-    "longDescription": "Turns approved plans into template-aware GitHub issue hierarchies and bilingual wiki pages, and creates or updates PRs with evidence-based acceptance tracking, repository templates, issue links, and readback.",
+    "shortDescription": "Template-aware issues, statuses, PR closure, and wiki plans",
+    "longDescription": "Turns approved plans into template-aware GitHub issue hierarchies and bilingual wiki pages, keeps issue planning statuses in sync across parent and sub-issues, and creates or updates PRs with evidence-based acceptance tracking, repository templates, issue links, and readback.",
     "developerName": "Team Foundation Users Japan",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Write"],
     "defaultPrompt": [
       "Break this approved plan into a parent issue and sub-issues with $github-plan-issues.",
+      "Start work on this issue and update its status and its parent's with $github-issue-status.",
       "Publish this approved plan to the GitHub wiki with $github-wiki-plan.",
       "Create a template-aware PR with per-issue closing keywords using $github-pull-request."
     ]

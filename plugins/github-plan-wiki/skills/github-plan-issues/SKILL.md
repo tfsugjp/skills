@@ -1,6 +1,6 @@
 ---
 name: github-plan-issues
-description: 'Break an approved implementation plan into a GitHub issue hierarchy — one parent issue plus sub-issues — using the gh CLI''s native sub-issue support, instead of a pile of unrelated flat issues. Use when a plan has been approved and needs tracking issues, when a single feature needs multiple issues (always parent + sub-issues, never flat), when a task has 3+ subtasks or touches 5+ files, or when the user asks to "create issues for this plan", "break this down into issues", "issueを作って", "サブイシューに分割して". Hands off to github-wiki-plan for feature/refactor/perf work once issues exist.'
+description: 'Break an approved implementation plan into a GitHub issue hierarchy — one parent issue plus sub-issues — using the gh CLI''s native sub-issue support, instead of a pile of unrelated flat issues, and set their initial planning status through github-issue-status. Use when a plan has been approved and needs tracking issues, when a single feature needs multiple issues (always parent + sub-issues, never flat), when a task has 3+ subtasks or touches 5+ files, or when the user asks to "create issues for this plan", "break this down into issues", "issueを作って", "サブイシューに分割して". Hands off to github-wiki-plan for feature/refactor/perf work once issues exist.'
 ---
 
 # GitHub Plan Issues
@@ -114,6 +114,12 @@ gh issue create --repo <owner>/<repo> --parent <parent-number> \
   gh issue view <parent> --repo <owner>/<repo> --json subIssues,subIssuesSummary
   ```
   Confirm `subIssuesSummary.total` matches the number of sub-issues you created.
+
+## Phase 3b — Initial statuses
+
+Issues created from an approved plan are planned work. New issues start in `Backlog`, so load [github-issue-status](../github-issue-status/SKILL.md) and run its `create` event with `--from-plan` for the parent and every sub-issue. Report each issue's final status. If issue statuses are unavailable for the repository, that skill skips the step and says so; continue with Phase 4.
+
+When work on one of these issues starts, use that skill's `start` event instead of setting statuses by hand. The event also promotes the parent.
 
 ## Phase 4 — Branch and wiki handoff
 
