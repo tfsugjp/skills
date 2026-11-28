@@ -273,6 +273,60 @@ class ReviewRegressionTests(unittest.TestCase):
         self.assertIn('duplicateIssueId: "I_9"', planner.mutation_text(plan.changes))
 
 
+class CopilotReviewTests(unittest.TestCase):
+    def test_review_only_started_status_is_not_used_for_start(self):
+        custom = [s for s in STATUSES if s["name"] != "In progress"]
+        plan = run(context(issue(3, "Todo"), statuses=custom), "start")
+        self.assertEqual([], plan.changes)
+        self.assertTrue(any("no status fits" in w for w in plan.warnings))
+
+    def test_reclassifying_within_a_closed_category_needs_confirmation(self):
+        custom = STATUSES + [{"id": "S_shipped", "name": "Shipped", "category": {"key": "completed"}}]
+        plan = run(context(issue(3, "Done"), statuses=custom), "set", "--status", "Shipped")
+        self.assertEqual([(3, "Shipped")], moves(plan.proposals))
+        self.assertEqual([], plan.changes)
+
+    def test_create_reopens_every_completed_ancestor_only(self):
+        great = parent_of(1, "Todo", [])
+        grand = parent_of(2, "Done", [], parent=great)
+        target = issue(4)
+        target["parent"] = parent_of(3, "Done", [target], parent=grand)
+        plan = run(context(target), "create", "--from-plan")
+        self.assertEqual([(4, "Todo"), (3, "In progress"), (2, "In progress")], moves(plan.changes))
+
+    def test_reopen_leaves_open_ancestors_alone(self):
+        grand = parent_of(1, "Done", [])
+        target = issue(3, "Done")
+        target["parent"] = parent_of(2, "Todo", [target], parent=grand)
+        plan = run(context(target), "reopen")
+        self.assertEqual([(3, "Todo"), (1, "In progress")], moves(plan.changes))
+        plan = run(context(target), "set", "--status", "Backlog")
+        self.assertEqual([(3, "Backlog"), (1, "In progress")], moves(plan.changes))
+
+    def test_set_in_progress_on_parent_promotes_backlog_children(self):
+        children = [issue(11, "Backlog"), issue(12, "In progress")]
+        plan = run(context(issue(10, "Todo", subIssues={"nodes": children})), "set", "--status", "In progress")
+        self.assertEqual([(10, "In progress"), (11, "Todo")], moves(plan.changes))
+        plan = run(context(issue(10, "Todo", subIssues={"nodes": children})), "set", "--status", "In review")
+        self.assertEqual([(10, "In review"), (11, "Todo")], moves(plan.changes))
+
+    def test_missing_status_fields_on_server_mean_unavailable(self):
+        missing = {"errors": [{"message": "Field 'planningStatuses' doesn't exist on type 'Repository'",
+                               "extensions": {"code": "undefinedField", "fieldName": "planningStatuses"}}]}
+        other = {"errors": [{"message": "Could not resolve to a Repository", "type": "NOT_FOUND"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            for payload, ok in ((missing, True), (other, False)):
+                ctx_file = Path(tmp, "ctx.json")
+                ctx_file.write_text(json.dumps(payload), encoding="utf-8")
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--context", str(ctx_file), "--event", "start"],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(0 if ok else 1, result.returncode)
+                if ok:
+                    self.assertFalse(json.loads(result.stdout)["available"])
+
+
 class ReopenAndSetTests(unittest.TestCase):
     def test_reopen_child_returns_completed_parent_to_in_progress(self):
         target = issue(3, "Done")

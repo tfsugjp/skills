@@ -75,7 +75,9 @@ class Statuses:
             if review:
                 return (reviewish or candidates[-1:])[0]
             progress = [n for n in working if n["name"].lower() == "in progress"]
-            return (progress or working or candidates)[0]
+            # Never fall back to a review status for ordinary work; let the caller warn instead.
+            choices = progress or working
+            return choices[0] if choices else None
         return candidates[0]
 
     def by_name(self, name: str) -> dict[str, Any] | None:
@@ -166,8 +168,9 @@ class Planner:
 
     def make_change(self, issue: dict[str, Any], target: dict[str, Any], reason: str) -> Change:
         current = issue.get("status")
-        # Moving into a closing category, including reclassifying a closed issue, needs confirmation.
-        closes = target["category"]["key"] in CLOSED_KEYS and category(issue) != target["category"]["key"]
+        # Any move into a closing status needs confirmation, including reclassifying a closed issue.
+        # add() has already skipped a no-op to the identical status.
+        closes = target["category"]["key"] in CLOSED_KEYS
         reopens = target["category"]["key"] in OPEN_KEYS and issue.get("state") == "CLOSED"
         return Change(
             number=issue["number"],
@@ -192,7 +195,8 @@ class Planner:
         if issue is not self.issue and owner_of(issue) and owner_of(issue) != self.owner:
             self.plan.warnings.append(
                 f"{self.label(issue)} is in {issue['repository']['nameWithOwner']}; the status ID comes from this"
-                " repository, so if the mutation rejects it, re-run the event from that repository"
+                f" repository, so if the mutation rejects it, read that repository's statuses and set"
+                f" '{target['name']}' (category {target['category']['key']}) on it with that repository's ID"
             )
         change = self.make_change(issue, target, reason)
         if change.closes and self.key(issue) not in self.confirmed:
@@ -222,6 +226,33 @@ class Planner:
                     self.add(ancestor, in_progress, f"{reason}; reopened because a sub-issue has open work")
                 continue
             self.promote(ancestor, in_progress, reason)
+
+    def reopen_completed_ancestors(self, reason: str) -> None:
+        """Return completed ancestors to In progress without promoting open ones; work has not started."""
+        in_progress = self.statuses.pick("started")
+        for ancestor in ancestors(self.issue):
+            key = category(ancestor)
+            if key in ("not_planned", "duplicate"):
+                self.plan.warnings.append(
+                    f"{self.label(ancestor)} is closed as {ancestor['status']['name'] if ancestor.get('status') else key};"
+                    " it was left unchanged and propagation stopped there"
+                )
+                return
+            if key == "completed":
+                self.add(ancestor, in_progress, f"{reason}; reopened because a sub-issue has open work")
+
+    def promote_backlog_children(self) -> None:
+        """A started parent moves its Backlog sub-issues to Todo; they have not started themselves."""
+        todo = self.statuses.pick("planned")
+        children = nodes(self.issue.get("subIssues"))
+        total = (self.issue.get("subIssuesSummary") or {}).get("total", len(children))
+        if len(children) < total:
+            self.plan.warnings.append(
+                f"{self.label(self.issue)} has {total} sub-issues; only the first {len(children)} were checked for Backlog"
+            )
+        for child in children:
+            if child.get("state") == "OPEN" and rank(child) == 0:
+                self.promote(child, todo, f"parent {self.label(self.issue)} started")
 
     def sync_parent_completion(self) -> None:
         """Propose Done for the parent once this issue's closure leaves no open sub-issue."""
@@ -302,9 +333,7 @@ class Planner:
             self.add(self.issue, target, reason)
         else:
             self.promote(self.issue, target, reason)
-        parent = self.issue.get("parent")
-        if parent and category(parent) == "completed":
-            self.add(parent, self.statuses.pick("started"), "a new open sub-issue was added; reopened")
+        self.reopen_completed_ancestors(f"new sub-issue {self.label(self.issue)} was added")
 
     def event_start(self) -> None:
         in_progress = self.statuses.pick("started")
@@ -320,16 +349,7 @@ class Planner:
         else:
             self.promote(self.issue, in_progress, "work started")
         self.promote_ancestors(f"sub-issue {self.label(self.issue)} started", reopen_completed=True)
-        todo = self.statuses.pick("planned")
-        children = nodes(self.issue.get("subIssues"))
-        total = (self.issue.get("subIssuesSummary") or {}).get("total", len(children))
-        if len(children) < total:
-            self.plan.warnings.append(
-                f"{self.label(self.issue)} has {total} sub-issues; only the first {len(children)} were checked for Backlog"
-            )
-        for child in children:
-            if child.get("state") == "OPEN" and rank(child) == 0:
-                self.promote(child, todo, f"parent {self.label(self.issue)} started")
+        self.promote_backlog_children()
 
     def event_reopen(self) -> None:
         todo = self.statuses.pick("planned")
@@ -338,7 +358,7 @@ class Planner:
         else:
             # Reopening on GitHub resets the status to Backlog; a reopened issue is still planned work.
             self.promote(self.issue, todo, "issue reopened")
-        self.promote_ancestors(f"sub-issue {self.label(self.issue)} reopened", reopen_completed=True)
+        self.reopen_completed_ancestors(f"sub-issue {self.label(self.issue)} reopened")
 
     def event_complete(self) -> None:
         if category(self.issue) != "completed":
@@ -362,13 +382,14 @@ class Planner:
                 change.duplicate_issue_id = self.args.duplicate_of
         if key == "started":
             self.promote_ancestors(f"sub-issue {self.label(self.issue)} started", reopen_completed=True)
+            self.promote_backlog_children()
         elif key == "completed":
             self.promote_ancestors(f"sub-issue {self.label(self.issue)} completed", reopen_completed=False)
             self.sync_parent_completion()
         elif key in ("not_planned", "duplicate"):
             self.sync_parent_completion()
         elif change and change.reopens:
-            self.promote_ancestors(f"sub-issue {self.label(self.issue)} reopened", reopen_completed=True)
+            self.reopen_completed_ancestors(f"sub-issue {self.label(self.issue)} reopened")
 
 
 def mutation_text(changes: list[Change]) -> str:
@@ -405,13 +426,30 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+STATUS_FIELDS = {"planningStatuses", "status", "viewerCanSetStatus"}
+
+
+def is_missing_status_field(error: dict[str, Any]) -> bool:
+    """True for a GraphQL 'field does not exist' error on one of the issue-status fields."""
+    extensions = error.get("extensions") or {}
+    if extensions.get("code") == "undefinedField":
+        return extensions.get("fieldName") in STATUS_FIELDS
+    match = re.match(r"Field '(\w+)' doesn't exist on type '(Repository|Issue)'", error.get("message", ""))
+    return bool(match and match.group(1) in STATUS_FIELDS)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     raw = sys.stdin.read() if args.context == "-" else Path(args.context).read_text(encoding="utf-8")
     context = json.loads(raw)
-    if context.get("errors") or not (context.get("data") or {}).get("repository", {}).get("issue"):
-        raise SystemExit(f"The context JSON has no issue: {json.dumps(context.get('errors'))}")
-    plan = Planner(context, args).run()
+    errors = context.get("errors") or []
+    if errors and all(is_missing_status_field(e) for e in errors):
+        # A GitHub server without the issue-status schema rejects the fields instead of returning null.
+        plan = Plan(available=False, skip_reason="this GitHub server does not support issue statuses")
+    elif errors or not ((context.get("data") or {}).get("repository") or {}).get("issue"):
+        raise SystemExit(f"The context JSON has no issue: {json.dumps(errors)}")
+    else:
+        plan = Planner(context, args).run()
     if args.mutation_out:
         out = Path(args.mutation_out)
         if plan.changes:
