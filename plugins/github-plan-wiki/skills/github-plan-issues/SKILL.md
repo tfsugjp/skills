@@ -1,6 +1,6 @@
 ---
 name: github-plan-issues
-description: 'Break an approved implementation plan into a GitHub issue hierarchy — one parent issue plus sub-issues — using the gh CLI''s native sub-issue support, instead of a pile of unrelated flat issues, and set their initial planning status through github-issue-status. Use when a plan has been approved and needs tracking issues, when a single feature needs multiple issues (always parent + sub-issues, never flat), when a task has 3+ subtasks or touches more than 5 files, or when the user asks to "create issues for this plan", "break this down into issues", "issueを作って", "サブイシューに分割して". Hands off to github-wiki-plan for feature/refactor/perf work, and for bug fixes that involve an architectural problem, once issues exist.'
+description: 'Break an approved implementation plan into a GitHub issue hierarchy — one parent issue plus sub-issues — using the gh CLI''s native sub-issue support, instead of a pile of unrelated flat issues, and set their initial planning status through github-issue-status. Use when a plan has been approved and needs tracking issues, when a single feature needs multiple issues (always parent + sub-issues, never flat), when a task has 3+ subtasks or touches 5+ files, or when the user asks to "create issues for this plan", "break this down into issues", "issueを作って", "サブイシューに分割して". Hands off to github-wiki-plan for feature/refactor/perf work, and for bug fixes that involve an architectural problem, once issues exist.'
 ---
 
 # GitHub Plan Issues
