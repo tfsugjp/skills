@@ -49,7 +49,7 @@ Add to your Claude Code settings — project-level `.claude/settings.json` (reco
 Replace `<REPO>` with the absolute path to your checkout of this skills repository, or copy `azure-guardrails-hook.ps1` into your project (e.g., `.claude/hooks/`) and point at that path. Windows example:
 
 ```json
-"command": "pwsh -NoProfile -File \"D:/GitHub/tfsug/skills/.github/skills/azure-guardrails/scripts/azure-guardrails-hook.ps1\""
+"command": "pwsh -NoProfile -File \"<DRIVE>:/<path-to-checkout>/.github/skills/azure-guardrails/scripts/azure-guardrails-hook.ps1\""
 ```
 
 macOS / Linux example:

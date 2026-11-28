@@ -62,7 +62,7 @@ Hosted endpoint, no installation: `https://mcp.dev.azure.com/{organization}` (st
 ```
 
 - Optional headers: `X-MCP-Toolsets` (`repos`, `wit`, `pipelines`, `wiki`, `work`, `testplan`), `X-MCP-Readonly: true`, `X-MCP-Tools` (explicit tool list), `X-MCP-Insiders: true`.
-- As of mid-2026 the remote server supports only Visual Studio and VS Code clients; other clients (Claude Code, Cursor, etc.) must use the local server.
+- The remote server's supported clients change during the preview. Confirm with `microsoft_docs_search("Azure DevOps remote MCP server supported clients")`; if the current client is not listed, use the local server.
 
 ## REST API fallback
 

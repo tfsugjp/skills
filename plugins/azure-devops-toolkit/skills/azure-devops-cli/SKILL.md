@@ -9,7 +9,9 @@ This Skill helps manage Azure DevOps resources using the Azure CLI with Azure De
 
 For Windows writes containing Japanese or other non-ASCII text, read [azure-devops-foundation](../azure-devops-foundation/SKILL.md) first. Prefer Azure DevOps MCP tools, then PowerShell 7 REST requests with a UTF-8 temporary body file. `az boards work-item create/update` has no file input for title or description; do not place such content in its command-line arguments. For Wiki pages, validate work item references as `#<id>` with [azure-devops-wiki](../azure-devops-wiki/SKILL.md), use the CLI's `--file-path` and `--encoding utf-8` options, and read the saved page back through REST/MCP before diagnosing garbled CLI output. The Bash examples below are for Linux/macOS.
 
-**CLI Version:** 2.81.0 (current as of 2025)
+The examples are syntax references. Before running one that deletes, uses `--yes` or `--destroy`, or loops over query results, list the resolved targets and get the user's confirmation, as the [Boards guardrails](../azure-devops-boards/SKILL.md#guardrails) require.
+
+**Examples verified with CLI version:** 2.81.0. Check the installed version with `az version`.
 
 ## Prerequisites
 
@@ -2010,8 +2012,9 @@ if [[ "$RESULT" != "succeeded" ]]; then
 
   az boards work-item create \
     --title "Build $BUILD_NUMBER failed" \
-    --type Bug \
-    --description "<p>Pipeline run $RUN_ID failed with result: $RESULT</p><p>Build: $ORG_URL/$PROJECT/_build/results?buildId=$RUN_ID</p>"
+    --type Bug
+  # Then write Repro Steps (run ID, result, build link) through MCP or REST,
+  # as described in "Create Work Item" above.
 fi
 ```
 

@@ -33,4 +33,4 @@ Review the supplied diff against only the lessons that apply. This profile has r
 ## Limits
 
 - Tool access is restricted to read and search; the profile has no shell, edit, or external-write tool.
-- Keep the review concise and under 400 words.
+- Keep the review concise: lead with defects, and give each one only the evidence needed to act on it.

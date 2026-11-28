@@ -57,8 +57,8 @@ Rules for getting the right build into the Experimental Instance and the VSIX, a
   2. Run all tests with `--no-build` against that output.
   3. Inspect the VSIX manifest, assembly, and embedded XAML.
   4. Compare the hashes of the built, packaged, and Experimental-deployed extension assemblies.
-  5. Confirm the command contribution is unique, then exercise keyboard, mouse, narrow width, theme, High Contrast, and high-DPI behavior.
-- **Check:** The report shows one build, matching hashes, and the UI states that were observed; unobserved states are listed as gaps.
+  5. Confirm the command contribution is unique. When the change touches UI, also exercise the affected keyboard, mouse, narrow width, theme, High Contrast, and high-DPI behavior; a change with no UI effect needs no UI-state checks.
+- **Check:** The report shows one build, matching hashes, and, for a UI change, the UI states that were observed; unobserved states are listed as gaps.
 - **Why:** Rebuilding between steps can test one binary and ship another.
 
 ### 7. Use ActivityLog.xml for load failures

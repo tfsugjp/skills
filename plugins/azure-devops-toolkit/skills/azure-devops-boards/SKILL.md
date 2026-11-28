@@ -184,9 +184,9 @@ curl -s -X POST -H "Authorization: Bearer ${ADO_TOKEN}" \
   "https://dev.azure.com/{org}/{project}/_apis/wit/workitems/\$Bug?api-version=7.1" \
   --data-binary "@$patch_file"
 
-# Close a work item (state transition + resolution comment)
-jq -n \
-  '[{"op":"add","path":"/fields/System.State","value":"Closed"},{"op":"add","path":"/fields/System.History","value":"Fixed by PR !123, verified in build 456."}]' \
+# Close a work item (state transition + resolution comment). <terminal-state> comes from get_type.
+jq -n --arg state "<terminal-state>" \
+  '[{"op":"add","path":"/fields/System.State","value":$state},{"op":"add","path":"/fields/System.History","value":"Fixed by PR !123, verified in build 456."}]' \
   >"$patch_file"
 curl -s -X PATCH -H "Authorization: Bearer ${ADO_TOKEN}" \
   -H "Content-Type: application/json-patch+json; charset=utf-8" \

@@ -29,20 +29,22 @@ The bundled validator is a single C# file-based app. It runs with `dotnet run <p
 
 ## Validator Commands
 
+`<skill-dir>` is the absolute path of this skill's directory; resolve the script from there, not from the consumer repository.
+
 ### PowerShell
 
 ```powershell
-dotnet run plugins\nuget-validate\skills\nuget-validate\scripts\nuget-validate.cs -- latest-safe Newtonsoft.Json
-dotnet run plugins\nuget-validate\skills\nuget-validate\scripts\nuget-validate.cs -- validate Newtonsoft.Json 13.0.3
-dotnet run plugins\nuget-validate\skills\nuget-validate\scripts\nuget-validate.cs -- audit-project .\src\MyProject\MyProject.csproj
+dotnet run <skill-dir>\scripts\nuget-validate.cs -- latest-safe Newtonsoft.Json
+dotnet run <skill-dir>\scripts\nuget-validate.cs -- validate Newtonsoft.Json 13.0.3
+dotnet run <skill-dir>\scripts\nuget-validate.cs -- audit-project .\src\MyProject\MyProject.csproj
 ```
 
 ### Bash
 
 ```bash
-dotnet run plugins/nuget-validate/skills/nuget-validate/scripts/nuget-validate.cs -- latest-safe Newtonsoft.Json
-dotnet run plugins/nuget-validate/skills/nuget-validate/scripts/nuget-validate.cs -- validate Newtonsoft.Json 13.0.3
-dotnet run plugins/nuget-validate/skills/nuget-validate/scripts/nuget-validate.cs -- audit-project ./src/MyProject/MyProject.csproj
+dotnet run <skill-dir>/scripts/nuget-validate.cs -- latest-safe Newtonsoft.Json
+dotnet run <skill-dir>/scripts/nuget-validate.cs -- validate Newtonsoft.Json 13.0.3
+dotnet run <skill-dir>/scripts/nuget-validate.cs -- audit-project ./src/MyProject/MyProject.csproj
 ```
 
 ### JSON Output
@@ -50,7 +52,7 @@ dotnet run plugins/nuget-validate/skills/nuget-validate/scripts/nuget-validate.c
 Add `--json` to `latest-safe`, `validate`, or `audit-project`:
 
 ```powershell
-dotnet run plugins\nuget-validate\skills\nuget-validate\scripts\nuget-validate.cs -- validate Newtonsoft.Json 13.0.3 --json
+dotnet run <skill-dir>\scripts\nuget-validate.cs -- validate Newtonsoft.Json 13.0.3 --json
 ```
 
 ## Workflows
@@ -59,19 +61,19 @@ dotnet run plugins\nuget-validate\skills\nuget-validate\scripts\nuget-validate.c
 
 1. Identify the target project file.
 2. Find the latest safe version:
-   - PowerShell: `dotnet run plugins\nuget-validate\skills\nuget-validate\scripts\nuget-validate.cs -- latest-safe <PACKAGE_ID>`
-   - Bash: `dotnet run plugins/nuget-validate/skills/nuget-validate/scripts/nuget-validate.cs -- latest-safe <PACKAGE_ID>`
+   - PowerShell: `dotnet run <skill-dir>\scripts\nuget-validate.cs -- latest-safe <PACKAGE_ID>`
+   - Bash: `dotnet run <skill-dir>/scripts/nuget-validate.cs -- latest-safe <PACKAGE_ID>`
 3. Validate the selected version:
-   - PowerShell: `dotnet run plugins\nuget-validate\skills\nuget-validate\scripts\nuget-validate.cs -- validate <PACKAGE_ID> <VERSION>`
-   - Bash: `dotnet run plugins/nuget-validate/skills/nuget-validate/scripts/nuget-validate.cs -- validate <PACKAGE_ID> <VERSION>`
+   - PowerShell: `dotnet run <skill-dir>\scripts\nuget-validate.cs -- validate <PACKAGE_ID> <VERSION>`
+   - Bash: `dotnet run <skill-dir>/scripts/nuget-validate.cs -- validate <PACKAGE_ID> <VERSION>`
 4. If validation reports `isStale: true`, ask the user for confirmation before continuing.
 5. Add the package:
    - PowerShell: `dotnet add .\src\MyProject\MyProject.csproj package <PACKAGE_ID> --version <VERSION>`
    - Bash: `dotnet add ./src/MyProject/MyProject.csproj package <PACKAGE_ID> --version <VERSION>`
 6. Run restore/build commands used by the repository.
 7. Audit the resolved dependency graph:
-   - PowerShell: `dotnet run plugins\nuget-validate\skills\nuget-validate\scripts\nuget-validate.cs -- audit-project .\src\MyProject\MyProject.csproj`
-   - Bash: `dotnet run plugins/nuget-validate/skills/nuget-validate/scripts/nuget-validate.cs -- audit-project ./src/MyProject/MyProject.csproj`
+   - PowerShell: `dotnet run <skill-dir>\scripts\nuget-validate.cs -- audit-project .\src\MyProject\MyProject.csproj`
+   - Bash: `dotnet run <skill-dir>/scripts/nuget-validate.cs -- audit-project ./src/MyProject/MyProject.csproj`
 
 ### Update an Existing Package Version
 

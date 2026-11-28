@@ -1,6 +1,6 @@
 ---
 name: github-plan-issues
-description: 'Break an approved implementation plan into a GitHub issue hierarchy — one parent issue plus sub-issues — using the gh CLI''s native sub-issue support, instead of a pile of unrelated flat issues, and set their initial planning status through github-issue-status. Use when a plan has been approved and needs tracking issues, when a single feature needs multiple issues (always parent + sub-issues, never flat), when a task has 3+ subtasks or touches 5+ files, or when the user asks to "create issues for this plan", "break this down into issues", "issueを作って", "サブイシューに分割して". Hands off to github-wiki-plan for feature/refactor/perf work once issues exist.'
+description: 'Break an approved implementation plan into a GitHub issue hierarchy — one parent issue plus sub-issues — using the gh CLI''s native sub-issue support, instead of a pile of unrelated flat issues, and set their initial planning status through github-issue-status. Use when a plan has been approved and needs tracking issues, when a single feature needs multiple issues (always parent + sub-issues, never flat), when a task has 3+ subtasks or touches more than 5 files, or when the user asks to "create issues for this plan", "break this down into issues", "issueを作って", "サブイシューに分割して". Hands off to github-wiki-plan for feature/refactor/perf work, and for bug fixes that involve an architectural problem, once issues exist.'
 ---
 
 # GitHub Plan Issues
@@ -25,7 +25,8 @@ Turn an approved plan into a GitHub issue hierarchy with the `gh` CLI (2.6x+ for
 
 3. **Classify the work** — this decision drives Phase 4's wiki handoff:
    - `feature`, `refactor`, `perf` → plan gets published to the wiki after issues are created.
-   - bug fix, patch, CI/CD fix, typo, dependency bump → no wiki publishing.
+   - bug fix whose cause or fix involves the architecture → plan gets published to the wiki after issues are created.
+   - any other bug fix, patch, CI/CD fix, typo, dependency bump → no wiki publishing.
    - If it's genuinely ambiguous, ask the user — don't default to "no wiki" just because it's easier.
 
 4. **Read repository Issue templates before proposing titles or bodies.** Inspect `.github/ISSUE_TEMPLATE/` Markdown templates and YAML forms on the default branch, its `config.yml`, and legacy `ISSUE_TEMPLATE.*` files in `.github/`, the root, or `docs/` (case-insensitive). If the repository supplies none, check applicable defaults in the owner's public `.github` repository; an access failure is not proof of absence. Choose the template appropriate to each parent/child's work type and preserve required sections, title prefixes, fields, and applicable labels/assignees. For forms, include each required input and option/checkbox response in the rendered Markdown, or use the form UI if its constraints cannot be represented faithfully. Do not invent evidence or check unverified items. `--body-file` and connector writes do not apply templates automatically: render the template yourself and verify its requirements before validation. If a required answer is unknown, ask for it before creating the issue.

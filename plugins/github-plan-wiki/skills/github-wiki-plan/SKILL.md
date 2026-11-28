@@ -1,13 +1,13 @@
 ---
 name: github-wiki-plan
-description: 'Publish an approved feature/refactor/perf plan to a GitHub wiki in English and Japanese, maintain category tables and last-updated dates in both Home pages, and verify every Home wiki link resolves. Use for approved wiki plans, Home index updates, and the handoff from github-plan-issues. Bug fixes, patches, and CI/CD-only changes do not trigger plan publishing by default.'
+description: 'Publish an approved feature/refactor/perf plan to a GitHub wiki in English and Japanese, maintain category tables and last-updated dates in both Home pages, and verify every Home wiki link resolves. Use for approved wiki plans, Home index updates, and the handoff from github-plan-issues. Bug fixes are published only when the bug involves an architectural problem; other bug fixes, patches, and CI/CD-only changes do not trigger plan publishing.'
 ---
 
 # GitHub Wiki Plan
 
 Publish an approved plan to the repository's GitHub wiki as a bilingual page pair, and keep the `Home` index current. The Git path and the public wiki URL are different namespaces. Never derive a public link from the Git directory.
 
-Only run this for `feature`/`refactor`/`perf` work — bug fixes, patches, and CI/CD-only changes don't get wiki pages.
+Run this for `feature`/`refactor`/`perf` work, and for a bug fix only when the bug involves an architectural problem. Other bug fixes, patches, and CI/CD-only changes don't get wiki pages.
 
 ## Phase 0 — Confirm the wiki exists and is initialized
 
@@ -47,7 +47,7 @@ GitHub preserves subdirectories in the wiki Git repository but publishes every p
 Start from [templates/plan-page.md](templates/plan-page.md). Include:
 
 - Title, with a language-switch link at the top: "日本語" targets the canonical `<slug>_ja` public URL on the English page, and "English" targets the canonical `<slug>` public URL on the Japanese page
-- Links to the tracking issue(s) — parent issue and its sub-issues (issue links are allowed; this is the one exception to the placeholder rule below)
+- Links to the tracking issue(s) — parent issue and its sub-issues (issue links are allowed; see the placeholder rule below for its exceptions)
 - Background, design, implementation phases, verification approach — drawn from the approved plan
 - **Placeholder any URL, IP address, email address, or GUID**, per the team's documentation rules — with two exceptions: same-repo issue links, and public, unauthenticated website URLs that were actually referenced while designing the plan (e.g. a reference implementation or upstream doc the plan is modeled on). Anything else — internal/authenticated endpoints, private hosts, credentials-adjacent URLs — gets a placeholder.
 
